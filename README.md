@@ -21,4 +21,4 @@ std::array is perhaps an unecessarily large include and only used for get_state(
 ## SmallPRNG_32.h
 A 32-bit 2-rotate version of the the above. You can implement the 64-bit version as a 2-rotate too (using 39 and 11 as your rotation constants), but Jenkins recommends against it due to the lower avalanche achieved. Ergo: I stick with 3-rotate for 64-bit, and 2-rotate for 32-bit. 
 
-[Try SmallPRNG_32 over at compiler explorer]([https://godbolt.org/z/oWzfhWzWd](https://godbolt.org/z/bTv499ssW)).
+[Try SmallPRNG_32 over at compiler explorer](https://godbolt.org/z/bTv499ssW).
