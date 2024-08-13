@@ -4,10 +4,16 @@
 #include <thread>
 #include <random> //only needed for createSeedsB, for std::random_device
 
-//seeding.h is a collection of different strategies for generating seeds. Probably not production code worthy, but good enough for a bit of inspiration. :)
+/*This file demonstrates a few ideas for sourcing entropy in C++. 
+    std::random_device is typically hardware-based, high-quality entropy and works fine on most platforms and configurations. 
+    However, there are times when you might need other sources of entropy — perhaps for speed reasons, to generate seeds at 
+compile time, or when targeting portable devices without hardware / kernel entropy evailable. 
 
-// createSeeds uses time-since-the-epoch, CPU time, thread ID, and a memory address as sources of entropy.
+Use these functions as inspiration and adjust for your own platform and needs.*/
+
+// createSeeds uses time-since-the-epoch, CPU time, thread ID, and a stack memory address as sources of entropy.
 // each value is hashed and then further mixed using splitmix64. 
+// hashing *and* splitmixing is very likely overkill. One or the other ought to be fine.
 static typename RNG::State createSeeds() noexcept{
     const auto hash = std::hash<RNG::u64>{};
     const auto date = hash(std::chrono::system_clock::now().time_since_epoch().count());    
@@ -33,4 +39,22 @@ static typename RNG::State createSeedsB() {
     seeds[2] = RNG::splitmix64(rd() ^ (seeds[1] << 1));
     seeds[3] = RNG::splitmix64(rd() ^ (seeds[2] << 1));
     return seeds;
+}
+
+// compile_time_seed() generates a 64-bit value at compile time based on the date, time, and a secret string.
+// If your compiler supports the __COUNTER__ preprocessor macro, this function can produce unique seeds 
+// for each invocation within the same compilation unit. 
+// Note that __DATE__ and __TIME__ are expanded only once during the compilation, so they remain constant 
+// throughout the entire compilation process.
+constexpr uint64_t compile_time_seed() noexcept{
+    uint64_t shifted = 0;       
+    const char* source = __DATE__ " " __TIME__ " secret ";
+    for (const char* c = source; *c != '\0'; ++c) {
+        shifted <<= 8;
+        shifted |= static_cast<uint64_t>(*c);
+    }
+#ifdef __COUNTER__
+    shifted ^= static_cast<uint64_t>(__COUNTER__);
+#endif
+    return shifted;
 }
