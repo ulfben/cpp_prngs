@@ -5,13 +5,15 @@
 #include <span>
 #include <cmath>
 /*
-A C++ 64-bit three-rotate implementation of the famous Jenkins Small Fast PRNG.
+A C++ 64-bit three-rotate implementation of the famous Jenkins Small Fast PRNG. 
 Original public domain C-code and writeup by Bob Jenkins https://burtleburtle.net/bob/rand/smallprng.html
 C++ implementation by Ulf Benjaminsson (ulfbenjaminsson.com), also placed in the public domain. Use freely!
+
+Satisfies 'UniformRandomBitGenerator', meaning it works well with std::shuffle, std::sample, most of the std::*_distribution-classes, etc.
 */
 class SmallPRNG
  {
-    using u64 = uint64_t;
+    using u64 = uint64_t;    
     u64 a;
     u64 b;
     u64 c;
@@ -22,6 +24,8 @@ class SmallPRNG
     }
 
 public:
+    using result_type = u64;
+
     constexpr SmallPRNG(u64 seed) noexcept : a(0xf1ea5eed), b(seed), c(seed), d(seed) {        
         // warmup: run the generator a couple of cycles to mix the state thoroughly
         for (auto i = 0; i < 20; ++i) { 
@@ -30,10 +34,14 @@ public:
     }
     constexpr SmallPRNG(std::span<const u64, 4> state) noexcept : a(state[0]), b(state[1]), c(state[2]), d(state[3]) {}
 
-    constexpr u64 max() noexcept{
+    static constexpr result_type max() noexcept{
         return std::numeric_limits<u64>::max();
     }
-  
+    
+    static constexpr result_type min() noexcept {
+        return std::numeric_limits<u64>::lowest();
+    }
+
   	constexpr bool coinToss() noexcept{
         return next() & 1; //checks the least significant bit
     }
@@ -62,7 +70,7 @@ public:
         return static_cast<T>(2.0) * normalized<T>() - static_cast<T>(1.0);
     }
 
-    constexpr u64 next() noexcept {
+    constexpr result_type next() noexcept {
         // The rotate constants (7, 13, 37) are chosen specifically for 64-bit terms, to provide
         // better avalanche characteristics, achieving 18.4 bits of avalanche after 5 rounds.
         const u64 e = a - rot(b, 7); 
@@ -71,6 +79,10 @@ public:
         c = d + e;
         d = e + a;
         return d;
+    }
+
+    constexpr result_type operator()() noexcept {
+        return next();
     }
 
     template<typename T = float>
@@ -117,6 +129,9 @@ public:
 
     auto state = rand.get_state();
     rand.set_state(state);
+
+    std::array<int, 10> data = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    std::shuffle(data.begin(), data.end(), rand);
 
     return random_unsigned;
 } */
