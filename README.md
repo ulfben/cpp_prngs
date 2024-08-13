@@ -28,6 +28,13 @@ A 32-bit 2-rotate version of the the above. You can implement the 64-bit version
 
 [Try SmallPRNG_32 over at compiler explorer](https://godbolt.org/z/ExhWaGqGa).
 
+## PCG32.h
+A constexpr variant of [Melissa O'Neill's minimal PCG](https://www.pcg-random.org/download.html#minimal-c-implementation) (Permuted Congruential Generator). Very small, very fast. Satisfies [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) and offers the following interface:
+
+*  `next()` - [0, std::numeric_limits<uint32_t>::max())
+*  `next(bound)` - [0, bound)
+*  `normalized()` - 0.0f-1.0f
+
 ## xoshiro256ss.h
 The "xoshiro256** 1.0" generator. Public interface, rejection sampling and seeding utilities (see; [seeding.h](https://github.com/ulfben/cpp_prngs/blob/main/seeding.h)) by Ulf Benjaminsson (2023). 
 Based on [C++ port by Arthur O'Dwyer (2021)](https://quuxplusone.github.io/blog/2021/11/23/xoshiro/), of [the C original by David Blackman and Sebastiano Vigna (2018)](https://prng.di.unimi.it/xoshiro256starstar.c).
