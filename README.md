@@ -14,7 +14,9 @@ My public domain port of [Jenkins' smallfast prng](https://burtleburtle.net/bob/
 * `next_gaussian(mean, deviation)` -> random number following a normal distribution centered around the mean
 * `get_state()` -> std::array of the rng state for saving
 * `set_state(span<u64>)` : restore the state of the rng
- 
+
+Additionally satisfies [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator), meaning that it supports std::shuffle, std::sample, most of the std::*_distribution-classes, etc.
+
 The entire file is only ~100 lines of relatively simple code, executable at compile time and optionally templated to try and support whatever numeric type the user needs.
 std::array is perhaps an unecessarily large include and only used for get_state(). If you don't need to save and reload state, simply remove it. :)
 
