@@ -35,6 +35,8 @@ A constexpr variant of [Melissa O'Neill's minimal PCG](https://www.pcg-random.or
 *  `next(bound)` - [0, bound)
 *  `normalized()` - 0.0f-1.0f
 
+[Try PCG32 over at compiler explorer](https://godbolt.org/z/WTa6GTqff)
+
 ## xoshiro256ss.h
 The "xoshiro256** 1.0" generator. Public interface, rejection sampling and seeding utilities (see; [seeding.h](https://github.com/ulfben/cpp_prngs/blob/main/seeding.h)) by Ulf Benjaminsson (2023). 
 Based on [C++ port by Arthur O'Dwyer (2021)](https://quuxplusone.github.io/blog/2021/11/23/xoshiro/), of [the C original by David Blackman and Sebastiano Vigna (2018)](https://prng.di.unimi.it/xoshiro256starstar.c).
