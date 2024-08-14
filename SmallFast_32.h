@@ -6,12 +6,12 @@
 #include <cmath>
 /*
 A C++ 32-bit two-rotate implementation of the famous Jenkins Small Fast PRNG.
-Original public domain C-code and writeup by Bob Jenkins https://burtleburtle.net/bob/rand/smallprng.html
+Original public domain C-code and writeup by Bob Jenkins https://burtleburtle.net/bob/rand/SmallFast32.html
 C++ implementation by Ulf Benjaminsson (ulfbenjaminsson.com), also placed in the public domain. Use freely!
 
 Satisfies 'UniformRandomBitGenerator', meaning it works well with std::shuffle, std::sample, most of the std::*_distribution-classes, etc.
 */
-class SmallPRNG
+class SmallFast32
  {
     using u32 = uint32_t;    
     u32 a;
@@ -26,13 +26,13 @@ class SmallPRNG
 public:
     using result_type = u32;
 
-    constexpr SmallPRNG(u32 seed) noexcept : a(0xf1ea5eed), b(seed), c(seed), d(seed) {        
+    constexpr SmallFast32(u32 seed = 0xBADC0FFE) noexcept : a(0xf1ea5eed), b(seed), c(seed), d(seed) {        
         // warmup: run the generator a couple of cycles to mix the state thoroughly
         for (auto i = 0; i < 20; ++i) { 
             next();
         }
     }
-    constexpr SmallPRNG(std::span<const u32, 4> state) noexcept : a(state[0]), b(state[1]), c(state[2]), d(state[3]) {}
+    constexpr SmallFast32(std::span<const u32, 4> state) noexcept : a(state[0]), b(state[1]), c(state[2]), d(state[3]) {}
 
     static constexpr result_type max() noexcept{
         return std::numeric_limits<u32>::max();
@@ -48,25 +48,24 @@ public:
 
     template<typename T>
     constexpr T between(T min, T max) noexcept {
-        assert(min < max && "SmallPRNG::between(min, max) called with inverted range.");
+        assert(min < max && "SmallFast32::between(min, max) called with inverted range.");
         if constexpr (std::is_floating_point_v<T>) {
             return min + (max - min) * normalized<T>();
         } else if constexpr (std::is_integral_v<T>) {
             using UT = std::make_unsigned_t<T>;
-            UT range = static_cast<UT>(max - min);
-            UT num = next() % (range + 1);
-            return min + static_cast<T>(num);
+            UT range = static_cast<UT>(max - min);            
+            return min + static_cast<T>(next(range));
         }
     }
 
     template<typename T = float>
     constexpr T normalized() noexcept {
-        return static_cast<T>(next()) / (static_cast<long double>(max()) + 1.0L);
+        return static_cast<T>(next()) / static_cast<T>(max());
     }
 
     template<typename T = float>
     constexpr T unit_range() noexcept {
-        static_assert(std::is_floating_point_v<T>, "SmallPRNG::unit_range can only be used with floating point types.");
+        static_assert(std::is_floating_point_v<T>, "SmallFast32::unit_range can only be used with floating point types.");
         return static_cast<T>(2.0) * normalized<T>() - static_cast<T>(1.0);
     }
 
@@ -82,10 +81,29 @@ public:
     constexpr result_type operator()() noexcept {
         return next();
     }
+	
+	constexpr result_type next(u32 max) noexcept {
+		//Lemires' algorithm. See https://www.pcg-random.org/posts/bounded-rands.html
+		// And: https://codingnest.com/random-distributions-are-not-one-size-fits-all-part-2/		
+		  uint64_t long_mult = next() * uint64_t(max);
+		  u32 low_bits = static_cast<u32>(long_mult);		  
+		  if (low_bits < max) {
+			u32 rejection_threshold = -max % max;		
+			while (low_bits < rejection_threshold) {
+			  long_mult = next() * uint64_t(max);
+			  low_bits = u32(long_mult);
+			}
+		  }
+		  return long_mult >> 32;
+	}
+	
+	constexpr result_type operator()(u32 max) noexcept {
+        return next(max);
+    }
 
     template<typename T = float>
     constexpr T next_gaussian(T mean, T stddev) noexcept {
-        static_assert(std::is_floating_point_v<T>, "SmallPRNG::next_guassian can only be used with a floating point type");
+        static_assert(std::is_floating_point_v<T>, "SmallFast32::next_guassian can only be used with a floating point type");
         static bool hasSpare = false;
         static T spare{};
 
@@ -106,13 +124,23 @@ public:
         return mean + stddev * (u * s);
     }
 
+    constexpr bool operator==(const SmallFast32& rhs) const noexcept {
+        return (a == rhs.a) && (b == rhs.b) 
+            && (c == rhs.c) && (d == rhs.d);
+    }
+
+    constexpr bool operator!=(const SmallFast32& rhs) const noexcept {
+        return !operator==(rhs);
+    }
+
     constexpr std::array<u32, 4> get_state() const noexcept {
         return {a, b, c, d};
     }
     constexpr void set_state(std::span<const u32, 4> s) noexcept {
-        *this = SmallPRNG(s);
+        *this = SmallFast32(s);
     }
 };
+
 
 /*sample usage:
 int main() {
