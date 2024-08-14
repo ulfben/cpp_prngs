@@ -53,14 +53,16 @@ public:
             return min + (max - min) * normalized<T>();
         } else if constexpr (std::is_integral_v<T>) {
             using UT = std::make_unsigned_t<T>;
-            UT range = static_cast<UT>(max - min);            
-            return min + static_cast<T>(next(range));
+            UT range = static_cast<UT>(max - min); 
+            assert(range != SmallFast32::max() && "SmallFast32::between() - The range is too large and may cause an overflow.");           
+            //depending on your needs, consider: if(range == max) return next();
+            return min + static_cast<T>(next(range+1));
         }
     }
 
     template<typename T = float>
     constexpr T normalized() noexcept {
-        return static_cast<T>(next()) / static_cast<T>(max());
+        return static_cast<T>(next() * 0x1.0p-32f);
     }
 
     template<typename T = float>
@@ -82,23 +84,23 @@ public:
         return next();
     }
 	
-	constexpr result_type next(u32 max) noexcept {
+	constexpr result_type next(u32 bound) noexcept {
 		//Lemires' algorithm. See https://www.pcg-random.org/posts/bounded-rands.html
 		// And: https://codingnest.com/random-distributions-are-not-one-size-fits-all-part-2/		
-		  uint64_t long_mult = next() * uint64_t(max);
+		  uint64_t long_mult = next() * uint64_t(bound);
 		  u32 low_bits = static_cast<u32>(long_mult);		  
-		  if (low_bits < max) {
-			u32 rejection_threshold = -max % max;		
+		  if (low_bits < bound) {
+			u32 rejection_threshold = -bound % bound;		
 			while (low_bits < rejection_threshold) {
-			  long_mult = next() * uint64_t(max);
+			  long_mult = next() * uint64_t(bound);
 			  low_bits = u32(long_mult);
 			}
 		  }
 		  return long_mult >> 32;
 	}
 	
-	constexpr result_type operator()(u32 max) noexcept {
-        return next(max);
+	constexpr result_type operator()(u32 bound) noexcept {
+        return next(bound);
     }
 
     template<typename T = float>
@@ -140,7 +142,6 @@ public:
         *this = SmallFast32(s);
     }
 };
-
 
 /*sample usage:
 int main() {
