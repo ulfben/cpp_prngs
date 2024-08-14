@@ -53,9 +53,10 @@ public:
             return min + (max - min) * normalized<T>();
         } else if constexpr (std::is_integral_v<T>) {
             using UT = std::make_unsigned_t<T>;
-            UT range = static_cast<UT>(max - min);
-            UT num = next() % (range + 1);
-            return min + static_cast<T>(num);
+            UT range = static_cast<UT>(max - min);        
+            assert(range != SmallFast64::max() && "SmallFast64::between() - The range is too large and may cause an overflow.");           
+            //depending on your needs, consider: if(range == max) return next();    
+            return min + static_cast<T>(next(range + 1));
         }
     }
 
@@ -83,6 +84,15 @@ public:
 
     constexpr result_type operator()() noexcept {
         return next();
+    }
+
+	constexpr result_type next(u64 bound) noexcept {
+        //can't use Lemire's algorithms since uint128_t isn't portable.		
+        return static_cast<result_type>(bound * normalized());		  
+	}
+	
+	constexpr result_type operator()(u64 bound) noexcept {
+        return next(bound);
     }
 
     template<typename T = float>
@@ -124,6 +134,7 @@ public:
         *this = SmallFast64(s);
     }
 };
+
 //sample usage:
 /*int main() {
     SmallFast64 rand(223456321);
