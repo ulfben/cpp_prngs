@@ -11,7 +11,7 @@ C++ implementation by Ulf Benjaminsson (ulfbenjaminsson.com), also placed in the
 
 Satisfies 'UniformRandomBitGenerator', meaning it works well with std::shuffle, std::sample, most of the std::*_distribution-classes, etc.
 */
-class SmallPRNG
+class SmallFast64
  {
     using u64 = uint64_t;    
     u64 a;
@@ -26,13 +26,13 @@ class SmallPRNG
 public:
     using result_type = u64;
 
-    constexpr SmallPRNG(u64 seed) noexcept : a(0xf1ea5eed), b(seed), c(seed), d(seed) {        
+    constexpr SmallFast64(u64 seed = 0xBADC0FFEE0DDF00D) noexcept : a(0xf1ea5eed), b(seed), c(seed), d(seed) {        
         // warmup: run the generator a couple of cycles to mix the state thoroughly
         for (auto i = 0; i < 20; ++i) { 
             next();
         }
     }
-    constexpr SmallPRNG(std::span<const u64, 4> state) noexcept : a(state[0]), b(state[1]), c(state[2]), d(state[3]) {}
+    constexpr SmallFast64(std::span<const u64, 4> state) noexcept : a(state[0]), b(state[1]), c(state[2]), d(state[3]) {}
 
     static constexpr result_type max() noexcept{
         return std::numeric_limits<u64>::max();
@@ -48,7 +48,7 @@ public:
 
     template<typename T>
     constexpr T between(T min, T max) noexcept {
-        assert(min < max && "SmallPRNG::between(min, max) called with inverted range.");
+        assert(min < max && "SmallFast64::between(min, max) called with inverted range.");
         if constexpr (std::is_floating_point_v<T>) {
             return min + (max - min) * normalized<T>();
         } else if constexpr (std::is_integral_v<T>) {
@@ -61,12 +61,12 @@ public:
 
     template<typename T = float>
     constexpr T normalized() noexcept {
-        return static_cast<T>(next()) / (static_cast<long double>(max()) + 1.0L);
+        return static_cast<T>(next() * 0x1.0p-64);
     }
 
     template<typename T = float>
     constexpr T unit_range() noexcept {
-        static_assert(std::is_floating_point_v<T>, "SmallPRNG::unit_range can only be used with floating point types.");
+        static_assert(std::is_floating_point_v<T>, "SmallFast64::unit_range can only be used with floating point types.");
         return static_cast<T>(2.0) * normalized<T>() - static_cast<T>(1.0);
     }
 
@@ -87,7 +87,7 @@ public:
 
     template<typename T = float>
     constexpr T next_gaussian(T mean, T stddev) noexcept {
-        static_assert(std::is_floating_point_v<T>, "SmallPRNG::next_guassian can only be used with a floating point type");
+        static_assert(std::is_floating_point_v<T>, "SmallFast64::next_guassian can only be used with a floating point type");
         static bool hasSpare = false;
         static T spare{};
 
@@ -108,17 +108,25 @@ public:
         return mean + stddev * (u * s);
     }
 
+    constexpr bool operator==(const SmallFast64& rhs) const noexcept {
+        return (a == rhs.a) && (b == rhs.b) 
+            && (c == rhs.c) && (d == rhs.d);
+    }
+
+    constexpr bool operator!=(const SmallFast64& rhs) const noexcept {
+        return !operator==(rhs);
+    }
+
     constexpr std::array<u64, 4> get_state() const noexcept {
         return {a, b, c, d};
     }
     constexpr void set_state(std::span<const u64, 4> s) noexcept {
-        *this = SmallPRNG(s);
+        *this = SmallFast64(s);
     }
 };
-
 //sample usage:
 /*int main() {
-    SmallPRNG rand(223456321);
+    SmallFast64 rand(223456321);
 
     [[maybe_unused]] auto random_unsigned = rand.between(10u, 50u); 
     [[maybe_unused]] int random_int = rand.between(-10, 10); 
