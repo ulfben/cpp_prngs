@@ -1,44 +1,54 @@
 # cpp_prngs
-When talking about random number generation for making games fun (ergo: not the kind of randomness you'd use to generate a SSH key pair...), the standard library comes up short in many ways. The `<random>` library is [not particularly user friendly](https://youtu.be/zUVQhcu32rg?si=G3LHsYagEHhH9UYS&t=234), it is [easy to use wrong](https://www.youtube.com/watch?v=4_QO1nm7uJs), provides [poor guarantuees and zero portability](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/) and [std::mt19937 is famously slow and bloated](https://quuxplusone.github.io/blog/2021/11/23/xoshiro/). 
+When talking about random number generation for making games fun the C and C++ standard libraries comes up short in many ways. `srand()/rand()` [is biased, not thread safe and offers limited range](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/#fn15). `<random>` library is [inconvenient](https://youtu.be/zUVQhcu32rg?si=G3LHsYagEHhH9UYS&t=234), [easy to use wrong](https://www.pcg-random.org/posts/cpp-seeding-surprises.html), provides [poor guarantuees, zero portability](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/) and none of it is available at compile time. 
 
-Hence this repo. It holds my collection of pseudo random number generators for C++. The PRNGs in this repo are all single-file, mostly constexpr and provides interfaces that are helpful to a game dev - just copy-paste any one of them whenever you need random numbers for a project. 
+The best Pseudo Random Number Generator (PRNG) offered by the standard library is likely the Mersenne Twister, but opting for `std::mt19937` instead of more efficient alternatives like [Xorshift](https://en.wikipedia.org/wiki/Xorshift) or a [PCG](https://en.wikipedia.org/wiki/Permuted_congruential_generator) variant sacrifices [a significant amount of performance](https://quuxplusone.github.io/blog/2021/11/23/xoshiro/). 
 
-Enjoy, and do let me know if you run into any bugs or add any cool features!
+Hence this repo! If you're making games and need your random number generator to be: 
+- fast and small
+- portable
+- easy to seed
+- feature-rich
+- compatible with `<algorithm>` (`std::shuffle`, `std::sample`, `std::*_distribution`, etc)
+- executable at compile time
 
-## SmallPRNG_64.h
-My public domain port of [Jenkins' smallfast prng](https://burtleburtle.net/bob/rand/smallprng.html). SmallPRNG_64.h is a 64-bit three-rotate implementation, including a pretty handy interface;
+Just copy-paste any one of these and go forth and prosper. Let me know if you find bugs or add any cool new features!
+
+## SmallFast_32.h
+My public domain port of [Jenkins' smallfast 32-bit 2-rotate prng](https://burtleburtle.net/bob/rand/smallprng.html), including a handy interface;
 
 * `between(min, max)` -> [min, max] (inclusive)
-* `normalized()` - 0.0-1.0
+* `normalized()` - [0.0, 1.0)
 * `coinToss()` -> true or false
-* `unit_range()` -> -1.0 - 1.0
-* `next()` -> [0, std::numeric_limits<u64>::max()]
+* `unit_range()` -> [-1.0 - 1.0)
+* `next()` -> [0, std::numeric_limits<u32>::max()]
+* `next(bound)` -> [0, bound)
 * `next_gaussian(mean, deviation)` -> random number following a normal distribution centered around the mean
 * `get_state()` -> std::array of the rng state for saving
-* `set_state(span<u64>)` : restore the state of the rng
+* `set_state(span<u32>)` : restore the state of the rng
 
-Additionally satisfies [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator), meaning that it supports std::shuffle, std::sample, most of the std::*_distribution-classes, etc.
+Additionally satisfies [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator), meaning that it supports `std::shuffle`, `std::sample`, most of the `std::*_distribution`-classes, etc.
 
-The entire file is about 100 lines of relatively simple code, executable at compile time, and optionally templated to support various numeric types. std::array is perhaps an unnecessarily large inclusion and is only used for get_state(). If you don't need to save and reload the state, you can easily remove it. :)
+The entire file is about 100 lines of relatively simple code, executable at compile time, and optionally templated to support various numeric types. `std::array` is perhaps an unnecessarily large inclusion and is only used for `get_state()`. If you don't need to save and reload the state, you can easily remove it. :)
 
-[Try SmallPRNG_64 over at compiler explorer](https://godbolt.org/z/xGvvPq8vh).
+[Try SmallFast_32 over at compiler explorer](https://godbolt.org/z/dd1zx377j).
 
-## SmallPRNG_32.h
-A 32-bit 2-rotate version of the the above. You can implement the 64-bit version as a 2-rotate too (using 39 and 11 as your rotation constants), but Jenkins recommends against it due to the lower avalanche achieved. Therefore, I use three rotates for 64-bit and two rotates for 32-bit. 
+## SmallFast_64.h
+SmallFast_64.h is a 64-bit three-rotate implementation of the above. You can implement the 64-bit version as a 2-rotate too (using 39 and 11 as your rotation constants), but Jenkins recommends against it due to the lower avalanche achieved. Therefore, I use three rotates for 64-bit and two rotates for 32-bit. 
 
-[Try SmallPRNG_32 over at compiler explorer](https://godbolt.org/z/ExhWaGqGa).
+[Try SmallFast_64 over at compiler explorer](https://godbolt.org/z/96crrq5nx).
 
 ## PCG32.h
 A constexpr variant of [Melissa O'Neill's minimal PCG](https://www.pcg-random.org/download.html#minimal-c-implementation) (Permuted Congruential Generator). Very small, very fast. Satisfies [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) and offers the following interface:
 
-*  `next()` - [0, std::numeric_limits<uint32_t>::max())
+*  `next()` - [0, std::numeric_limits<uint32_t>::max()]
 *  `next(bound)` - [0, bound)
-*  `normalized()` - 0.0f-1.0f
+*  `normalized()` - [0.0f - 1.0f)
 
 [Try PCG32 over at compiler explorer](https://godbolt.org/z/WTa6GTqff)
 
 ## xoshiro256ss.h
-The "xoshiro256** 1.0" generator. Public interface, rejection sampling and seeding utilities (see; [seeding.h](https://github.com/ulfben/cpp_prngs/blob/main/seeding.h)) by Ulf Benjaminsson (2023). 
+The "xoshiro256** 1.0" generator. Ignore this for now, use one of the above instead. I'm not happy with the interface I wrote for this.
+Public interface, rejection sampling and seeding utilities (see; [seeding.h](https://github.com/ulfben/cpp_prngs/blob/main/seeding.h)) by Ulf Benjaminsson (2023). 
 Based on [C++ port by Arthur O'Dwyer (2021)](https://quuxplusone.github.io/blog/2021/11/23/xoshiro/), of [the C original by David Blackman and Sebastiano Vigna (2018)](https://prng.di.unimi.it/xoshiro256starstar.c).
 [splitmix64 by Sebastiano Vigna (2015)](https://prng.di.unimi.it/splitmix64.c) 
 
