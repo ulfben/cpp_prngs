@@ -1,17 +1,17 @@
 # cpp_prngs
-When talking about random number generation for making games fun the C and C++ standard libraries comes up short in many ways. `srand()/rand()` [is biased, not thread safe and offers limited range](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/#fn15). `<random>` library is [inconvenient](https://youtu.be/zUVQhcu32rg?si=G3LHsYagEHhH9UYS&t=234), [easy to use wrong](https://www.pcg-random.org/posts/cpp-seeding-surprises.html), provides [poor guarantuees, zero portability](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/) and none of it is available at compile time. 
+When talking about random number generation (for making games fun, not for making SSH keys...) the C and C++ standard libraries comes up short in many ways. The classical C `srand()/rand()` [is biased, not thread safe, not portable and offers limited range](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/#fn15). The C++ `<random>` library is [inconvenient](https://youtu.be/zUVQhcu32rg?si=G3LHsYagEHhH9UYS&t=234), [easy to use wrong](https://www.pcg-random.org/posts/cpp-seeding-surprises.html), provides [poor guarantuees](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/) and is not available at compile time. 
 
-The best Pseudo Random Number Generator (PRNG) offered by the standard library is likely the Mersenne Twister, but opting for `std::mt19937` instead of more efficient alternatives like [Xorshift](https://en.wikipedia.org/wiki/Xorshift) or a [PCG](https://en.wikipedia.org/wiki/Permuted_congruential_generator) variant sacrifices [a significant amount of performance](https://quuxplusone.github.io/blog/2021/11/23/xoshiro/). 
+The best Pseudo Random Number Generator (PRNG) offered by the C++ standard library is likely the Mersenne Twister, but opting for `std::mt19937` instead of more efficient alternatives like [Xorshift](https://en.wikipedia.org/wiki/Xorshift) or a [PCG](https://en.wikipedia.org/wiki/Permuted_congruential_generator) variant sacrifices [a significant amount of performance](https://quuxplusone.github.io/blog/2021/11/23/xoshiro/). 
 
 Hence this repo! If you're making games and need your random number generator to be: 
 - fast and small
 - portable
 - easy to seed
-- feature-rich
+- feature-rich (ints, floats, coin flip, numbers with some range, save and restore state, etc)
 - compatible with `<algorithm>` (`std::shuffle`, `std::sample`, `std::*_distribution`, etc)
 - executable at compile time
 
-Just copy-paste any one of these and go forth and prosper. Let me know if you find bugs or add any cool new features!
+... just go ahead and copy-paste any one of these and go forth and prosper. Let me know if you find bugs or add any cool new features!
 
 ## SmallFast_32.h
 My public domain port of [Jenkins' smallfast 32-bit 2-rotate prng](https://burtleburtle.net/bob/rand/smallprng.html), including a handy interface;
