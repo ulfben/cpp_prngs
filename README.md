@@ -22,6 +22,7 @@ My public domain port of [Jenkins' smallfast 32-bit 2-rotate prng](https://burtl
 * `unit_range()` -> [-1.0 - 1.0)
 * `next()` -> [0, std::numeric_limits<u32>::max()]
 * `next(bound)` -> [0, bound)
+* `next_2(u16 bound)` -> [0, bound), [0, bound)
 * `next_gaussian(mean, deviation)` -> random number following a normal distribution centered around the mean
 * `get_state()` -> std::array of the rng state for saving
 * `set_state(span<u32>)` : restore the state of the rng
@@ -30,7 +31,7 @@ Additionally satisfies [UniformRandomBitGenerator](https://en.cppreference.com/w
 
 The entire file is about 100 lines of relatively simple code, executable at compile time, and optionally templated to support various numeric types. `std::array` is perhaps an unnecessarily large inclusion and is only used for `get_state()`. If you don't need to save and reload the state, you can easily remove it. :)
 
-[Try SmallFast_32 over at compiler explorer](https://godbolt.org/z/dd1zx377j).
+[Try SmallFast_32 over at compiler explorer](https://godbolt.org/z/d5G53dvaE).
 
 ## SmallFast_64.h
 SmallFast_64.h is a 64-bit three-rotate implementation of the above. You can implement the 64-bit version as a 2-rotate too (using 39 and 11 as your rotation constants), but Jenkins recommends against it due to the lower avalanche achieved. Therefore, I use three rotates for 64-bit and two rotates for 32-bit. 
