@@ -4,6 +4,7 @@
 #include <limits>
 #include <span>
 #include <cmath>
+#include <utility> //for std::pair
 /*
 A C++ 64-bit three-rotate implementation of the famous Jenkins Small Fast PRNG. 
 Original public domain C-code and writeup by Bob Jenkins https://burtleburtle.net/bob/rand/smallprng.html
@@ -95,6 +96,89 @@ public:
         return next(bound);
     }
 
+    constexpr std::pair<uint32_t, uint32_t> next_2(uint32_t bound) noexcept {
+	//batch generation of bounded integers. Based on https://lemire.me/blog/2024/08/17/faster-random-integer-generation-with-batching/
+        u64 random64bit = next();
+
+        // First multiplication: generate the first number in [0, bound)
+        u64 long_mult = (random64bit >> 32) * static_cast<u64>(bound);
+        uint32_t result1 = static_cast<uint32_t>(long_mult >> 32); // [0, bound)
+        uint32_t low_bits = static_cast<uint32_t>(long_mult & 0xFFFFFFFF);
+
+        // Second multiplication (reusing low_bits): generate the second number in [0, bound)
+        long_mult = low_bits * static_cast<u64>(bound);
+        uint32_t result2 = static_cast<uint32_t>(long_mult >> 32); // [0, bound)
+        low_bits = static_cast<uint32_t>(long_mult & 0xFFFFFFFF);
+               
+        // Check and handle bias
+        u64 product_bound = static_cast<u64>(bound) * static_cast<u64>(bound);
+        if (low_bits < product_bound) {
+            uint32_t threshold = static_cast<uint32_t>(-product_bound % product_bound);
+            while (low_bits < threshold) {
+                random64bit = next();
+                long_mult = (random64bit >> 32) * static_cast<u64>(bound);
+                result1 = static_cast<uint32_t>(long_mult >> 32);
+                low_bits = static_cast<uint32_t>(long_mult & 0xFFFFFFFF);
+
+                long_mult = low_bits * static_cast<u64>(bound);
+                result2 = static_cast<uint32_t>(long_mult >> 32);
+                low_bits = static_cast<uint32_t>(long_mult & 0xFFFFFFFF);
+            }
+        }
+
+        return std::make_pair(result1, result2);
+    }
+
+    constexpr std::array<uint16_t, 4> next_4(uint16_t bound) noexcept {
+        u64 random64bit = next();
+        // First multiplication: generate the first 16-bit number in [0, bound)
+        u64 long_mult = (random64bit >> 48) * static_cast<u64>(bound);
+        uint16_t result1 = static_cast<uint16_t>(long_mult >> 16); // [0, bound)
+        uint16_t low_bits = static_cast<uint16_t>(long_mult & 0xFFFF);
+
+        // Second multiplication: generate the second 16-bit number in [0, bound)
+        long_mult = (random64bit >> 32 & 0xFFFF) * static_cast<u64>(bound);
+        uint16_t result2 = static_cast<uint16_t>(long_mult >> 16); // [0, bound)
+        low_bits = static_cast<uint16_t>(long_mult & 0xFFFF);
+
+        // Third multiplication: generate the third 16-bit number in [0, bound)
+        long_mult = (random64bit >> 16 & 0xFFFF) * static_cast<u64>(bound);
+        uint16_t result3 = static_cast<uint16_t>(long_mult >> 16); // [0, bound)
+        low_bits = static_cast<uint16_t>(long_mult & 0xFFFF);
+
+        // Fourth multiplication: generate the fourth 16-bit number in [0, bound)
+        long_mult = (random64bit & 0xFFFF) * static_cast<u64>(bound);
+        uint16_t result4 = static_cast<uint16_t>(long_mult >> 16); // [0, bound)
+        low_bits = static_cast<uint16_t>(long_mult & 0xFFFF);
+
+        // Bias handling
+        u64 product_bound = static_cast<u64>(bound) * static_cast<u64>(bound);
+        if (low_bits < product_bound) {
+            uint16_t threshold = static_cast<uint16_t>(-product_bound % product_bound);
+            while (low_bits < threshold) {
+                random64bit = next();
+                // Recalculate all four results
+                long_mult = (random64bit >> 48) * static_cast<u64>(bound);
+                result1 = static_cast<uint16_t>(long_mult >> 16);
+                low_bits = static_cast<uint16_t>(long_mult & 0xFFFF);
+
+                long_mult = (random64bit >> 32 & 0xFFFF) * static_cast<u64>(bound);
+                result2 = static_cast<uint16_t>(long_mult >> 16);
+                low_bits = static_cast<uint16_t>(long_mult & 0xFFFF);
+
+                long_mult = (random64bit >> 16 & 0xFFFF) * static_cast<u64>(bound);
+                result3 = static_cast<uint16_t>(long_mult >> 16);
+                low_bits = static_cast<uint16_t>(long_mult & 0xFFFF);
+
+                long_mult = (random64bit & 0xFFFF) * static_cast<u64>(bound);
+                result4 = static_cast<uint16_t>(long_mult >> 16);
+                low_bits = static_cast<uint16_t>(long_mult & 0xFFFF);
+            }
+        }
+        return {result1, result2, result3, result4};
+    }
+
+
     template<typename T = float>
     constexpr T next_gaussian(T mean, T stddev) noexcept {
         static_assert(std::is_floating_point_v<T>, "SmallFast64::next_guassian can only be used with a floating point type");
@@ -149,8 +233,10 @@ public:
     auto state = rand.get_state();
     rand.set_state(state);
 
-    std::array<int, 10> data = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    std::shuffle(data.begin(), data.end(), rand);
+    // std::array<int, 10> data = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    // std::shuffle(data.begin(), data.end(), rand);
 
-    return random_unsigned;
+    [[maybe_unused]] auto [val1, val2] = rand.next_2(320u); //two bounded 32-bit values. Max bound 4,294,967,295.
+    [[maybe_unused]] auto [v1, v2, v3, v4] = rand.next_4(1080); //four bounded 16-bit values. Max bound 65535
+    return v4;
 } */
