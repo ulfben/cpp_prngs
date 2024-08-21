@@ -7,9 +7,9 @@ Hence this repo! If you're making games and need your random number generator to
 - fast and small
 - portable
 - easy to seed
-- feature-rich (ints, floats, coin flip, numbers with some range, save and restore state, etc)
-- compatible with `<algorithm>` (`std::shuffle`, `std::sample`, `std::*_distribution`, etc)
 - executable at compile time
+- feature-rich (ints, floats, coin flip, ranges, save and restore state, etc)
+- compatible with `<algorithm>` (`std::shuffle`, `std::sample`, `std::*_distribution`, etc)
 
 ... just go ahead and copy-paste any one of these and go forth and prosper. Let me know if you find bugs or add any cool new features!
 
@@ -20,8 +20,8 @@ My public domain port of [Jenkins' smallfast 32-bit 2-rotate prng](https://burtl
 * `normalized()` - [0.0, 1.0)
 * `coinToss()` -> true or false
 * `unit_range()` -> [-1.0 - 1.0)
-* `next()` -> [0, std::numeric_limits<u32>::max()]
-* `next(bound)` -> [0, bound)
+* `next()` -> [0, `std::numeric_limits<u32>::max()`]
+* `next(u32 bound)` -> [0, bound)
 * `next_2(u16 bound)` -> [0, bound), [0, bound)
 * `next_gaussian(mean, deviation)` -> random number following a normal distribution centered around the mean
 * `get_state()` -> std::array of the rng state for saving
@@ -36,7 +36,12 @@ The entire file is about 100 lines of relatively simple code, executable at comp
 ## SmallFast_64.h
 SmallFast_64.h is a 64-bit three-rotate implementation of the above. You can implement the 64-bit version as a 2-rotate too (using 39 and 11 as your rotation constants), but Jenkins recommends against it due to the lower avalanche achieved. Therefore, I use three rotates for 64-bit and two rotates for 32-bit. 
 
-[Try SmallFast_64 over at compiler explorer](https://godbolt.org/z/96crrq5nx).
+Provides similar interface as SmallFast32 but with larger range, plus additional bulk generation: 
+* `next(u64 bound)` -> [0, bound)
+* `next_2(u32 bound)` -> 2 x [0, bound)
+* `next_4(u16 bound)` -> 4 x [0, bound)
+
+[Try SmallFast_64 over at compiler explorer](https://godbolt.org/z/1o8EGo6Wv).
 
 ## PCG32.h
 A constexpr variant of [Melissa O'Neill's minimal PCG](https://www.pcg-random.org/download.html#minimal-c-implementation) (Permuted Congruential Generator). Very small, very fast. Satisfies [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) and offers the following interface:
