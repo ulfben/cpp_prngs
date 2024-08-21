@@ -4,6 +4,7 @@
 #include <limits>
 #include <span>
 #include <cmath>
+#include <utility> //for std::pair
 /*
 A C++ 32-bit two-rotate implementation of the famous Jenkins Small Fast PRNG.
 Original public domain C-code and writeup by Bob Jenkins https://burtleburtle.net/bob/rand/SmallFast32.html
@@ -103,6 +104,39 @@ public:
         return next(bound);
     }
 
+    constexpr std::pair<uint16_t, uint16_t> next_2(uint16_t bound) noexcept {
+        //based on https://lemire.me/blog/2024/08/17/faster-random-integer-generation-with-batching/
+        u32 random32bit = next();
+        // First multiplication: generate the first number in [0, bound)
+        u32 long_mult = (random32bit >> 16) * u32(bound);
+        uint16_t result1 = long_mult >> 16; // [0, bound)
+        uint16_t low_bits = long_mult & 0xFFFF;
+
+        // Second multiplication (reusing low_bits): generate the second number in [0, bound)
+        long_mult = low_bits * u32(bound);
+        uint16_t result2 = long_mult >> 16; // [0, bound)
+        low_bits = long_mult & 0xFFFF;
+        
+        // Check and handle bias
+        u32 product_bound = u32(bound) * u32(bound);        
+        if (low_bits < product_bound) {
+            uint16_t threshold = uint16_t(-product_bound % product_bound);
+            while (low_bits < threshold) {
+                random32bit = next(); // generate a new 32-bit random integer
+                long_mult = (random32bit >> 16) * u32(bound);
+                result1 = long_mult >> 16;
+                low_bits = long_mult & 0xFFFF;
+
+                long_mult = low_bits * u32(bound);
+                result2 = long_mult >> 16;
+                low_bits = long_mult & 0xFFFF;
+            }
+        }
+
+        return std::make_pair(result1, result2);
+    }
+
+
     template<typename T = float>
     constexpr T next_gaussian(T mean, T stddev) noexcept {
         static_assert(std::is_floating_point_v<T>, "SmallFast32::next_guassian can only be used with a floating point type");
@@ -145,7 +179,7 @@ public:
 
 /*sample usage:
 int main() {
-    SmallPRNG rand(223456322);
+    SmallFast32 rand(223456322);
 
     [[maybe_unused]] auto random_unsigned = rand.between(10u, 50u); 
     [[maybe_unused]] int random_int = rand.between(-10, 10); 
@@ -157,8 +191,11 @@ int main() {
     auto state = rand.get_state();
     rand.set_state(state);
 
-    std::array<int, 10> data = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    std::shuffle(data.begin(), data.end(), rand);
+    //generate 2 bounded values at once:
+    const auto [val1, val2] = rand.next_2(100); //two bounded 16-bit values. Max bound 65535.
 
-    return random_unsigned;
+   // std::array<int, 10> data = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+   // std::shuffle(data.begin(), data.end(), rand);
+
+    return val1;
 }*/
