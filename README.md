@@ -76,6 +76,14 @@ The `jump()` function is equivalent to 2^128 calls to `next()`. It can be used t
 This file demonstrates a few ideas for sourcing entropy in C++. `std::random_device` is typically hardware-based, high-quality entropy and works fine [on most platforms and configurations](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/). However, there are times when you might need other sources of entropy—perhaps for speed reasons, to generate seeds at compile time, or when targeting portable devices without hardware / kernel entropy evailable. Use seeding.h for inspiration. :)
 
 ## std_random.hpp 
-If you want the best the standard library has to offer, but with a slightly more useful interface, check out std_random.hpp.
+If you want the best the standard library has to offer, but with a more useful interface, check out std_random.hpp. 
+It's based on `std::mt19937`, and will by default seed the full 2,496 byte state of using std::random_device. It can also be manually seeded for reproducability. 
+The interface provides:
 
-[Try std_random.hpp over at Compiler Explorer](https://compiler-explorer.com/z/eqMaz3hbr).
+* T getNumber<T>(min, max);  //ranges are inclusive for integrals, half-open for floats
+* char color();              // [0,255]
+* bool coinToss();           // true/false
+* float normalized();        // [0.0,1.0)
+* float unit_range();        // [-1.0,1.0)
+
+[Try std_random.hpp over at Compiler Explorer](https://compiler-explorer.com/z/fKz443bG4).
