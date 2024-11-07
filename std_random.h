@@ -1,7 +1,6 @@
 /*
 A demonstration of using the C++ standard library features to generate random numbers.
 */
-
 #include <random>
 #include <type_traits>
 #include <array>
@@ -22,7 +21,6 @@ private:
     }
 
 public:        
-    //std::mt19937 constructor require an l-value, hence why we take seed_seq by value here
     explicit Random(std::seed_seq seed_seq) : rng_(seed_seq) {}
 
     //default ctor fully seeds the generator
@@ -43,39 +41,55 @@ public:
         std::uniform_int_distribution<int> dist{0, 255};
         return static_cast<unsigned char>(dist(rng_));
     }
-    
-    int getInt(int from, int thru) {  // [from, thru] inclusive
-        std::uniform_int_distribution<int> dist{from, thru};
+
+    float normalized() {  // [0.0, 1.0)
+        std::uniform_real_distribution<float> dist{0.0, 1.0};
+        return dist(rng_);
+    }
+
+    bool coinToss() {  // true or false with 50% probability
+        std::bernoulli_distribution dist{0.5};
+        return dist(rng_);
+    }
+
+    float unit_range() {  // [-1.0, 1.0]
+        std::uniform_real_distribution<float> dist{-1.0, 1.0};
         return dist(rng_);
     }
     
     template<typename T>
-    typename std::enable_if_t<std::is_floating_point_v<T>, T>
-    getFloat(T from = T{0}, T upto = T{1}) {  // [from, upto) exclusive
-        std::uniform_real_distribution<T> dist{from, upto};
-        return dist(rng_);
-    }
-    
-    template<typename T>
-    typename std::enable_if_t<std::is_integral_v<T>, T>
-    getNumber(T min, T max) {  // [min, max] inclusive
-        std::uniform_int_distribution<T> dist{min, max};
-        return dist(rng_);
-    }
-    
-    template<typename T>
-    typename std::enable_if_t<std::is_floating_point_v<T>, T>
-    getNumber(T from, T upto) {  // [from, upto) exclusive
-        return getFloat(from, upto);
+    T getNumber(T min, T max) {  
+        if constexpr (std::is_integral_v<T>) {           
+            std::uniform_int_distribution<T> dist{min, max};
+            return dist(rng_);
+        } else if constexpr (std::is_floating_point_v<T>) {            
+            std::uniform_real_distribution<T> dist{min, max};
+            return dist(rng_);
+        } else {
+            static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
+                         "getNumber only supports integral and floating point types");
+        }
     }
 };
 
-/*
-Example usage: 
-
+/* usage
 int main(){
-    Random r;
-    return r.getNumber(0, 255 );
-}
+    Random rng;
+    
+    // Integer ranges (inclusive)
+    int i = rng.getNumber(1, 6);
+    short s = rng.getNumber<short>(0, 100);
+    unsigned long ul = rng.getNumber(0ul, 1000ul);
 
+    // Floating point ranges (half-open)
+    float f = rng.getNumber(0.0f, 1.0f);
+    double d = rng.getNumber(0.0, 100.0);
+
+    // Special cases
+    auto color = rng.color();              // [0,255]
+    auto coin = rng.coinToss();            // true/false
+    auto norm = rng.normalized();          // [0.0,1.0)
+    auto unit = rng.unit_range();          // [-1.0,1.0]
+    return s;
+}
 */
