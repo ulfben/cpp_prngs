@@ -9,15 +9,16 @@
 // - https://datatracker.ietf.org/doc/html/draft-eastlake-fnv-29
 // 
 // Note: The FNV algorithm and this implementation are in the public domain.
-//
+// Thanks to @lippuu for introducing me to FNV and this handy interface for it! 
 struct string_hash {
     // FNV-1a algorithm constants (64-bit variant)
-    static constexpr uint64_t FNV_64_PRIME = 1099511628211ULL;
-    static constexpr uint64_t FNV_64_OFFSET_BASIS = 14695981039346656037ULL;
+    using u64 = std::uint64_t;
+    static constexpr u64 FNV_64_PRIME = 1099511628211ULL;
+    static constexpr u64 FNV_64_OFFSET_BASIS = 14695981039346656037ULL;
   
-    static constexpr uint64_t fnv1a(std::string_view str, uint64_t basis = FNV_64_OFFSET_BASIS) noexcept {
+    static constexpr u64 fnv1a(std::string_view str, u64 basis = FNV_64_OFFSET_BASIS) noexcept {
         for (const char c : str) {
-            basis ^= static_cast<uint64_t>(c);
+            basis ^= static_cast<uint64_t>(std::byte(c));
             basis *= FNV_64_PRIME;
         }
         return basis;
@@ -29,5 +30,5 @@ struct string_hash {
     // enable comparison operators, for use of string_hash as key in std::map, std::set, etc.
     constexpr auto operator<=>(const string_hash&) const noexcept = default;
 
-    uint64_t value{0};
+    u64 value{0};
 };
