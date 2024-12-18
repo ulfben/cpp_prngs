@@ -33,7 +33,7 @@ struct string_hash {
     u64 value{0};
 };
 
-// User-defined literal for string_hash
-constexpr string_hash operator""_hash(const char* str, std::size_t len) noexcept {
-    return string_hash(std::string_view(str, len));
+// User-defined literal for compile time hashing of string literals
+constexpr auto operator""_hash(const char* str, std::size_t len) noexcept {
+    return string_hash::fnv1a(std::string_view(str, len));
 }
