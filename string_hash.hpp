@@ -34,6 +34,6 @@ struct string_hash {
 };
 
 // User-defined literal for string_hash
-constexpr string_hash operator""_fnv(const char* str, std::size_t len) noexcept {
+constexpr string_hash operator""_hash(const char* str, std::size_t len) noexcept {
     return string_hash(std::string_view(str, len));
 }
