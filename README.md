@@ -46,11 +46,35 @@ Provides similar interface as SmallFast32 but with larger range, plus additional
 ## PCG32.h
 A constexpr variant of [Melissa O'Neill's minimal PCG](https://www.pcg-random.org/download.html#minimal-c-implementation) (Permuted Congruential Generator). Very small, very fast. Satisfies [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) and offers the following interface:
 
-*  `next()` - [0, std::numeric_limits<uint32_t>::max()]
-*  `next(bound)` - [0, bound)
-*  `normalized()` - [0.0f - 1.0f)
+| Method | Description |
+|--------|-------------|
+| `PCG32()` | Default constructor - initializes with default seed and default stream |
+| `PCG32(seed, sequence = 1)` | Initialize with specific seed and optional sequence ID. The sequence parameter selects different streams of random numbers - different sequences are guaranteed to not overlap even with the same seed |
+| `next()` | Returns random number in range [0, 2³²) |
+| `next(bound)` | Returns random number in range [0, bound) |
+| `normalized()` | Returns random float in range [0.0f, 1.0f) |
+| `between(min, max)` | Returns random float in range [min, max) |
+| `advance(delta)` | Advance internal state by `delta` steps, with O(log n) complexity |
+| `backstep(delta)` | Reverse internal state by `delta` steps, with O(log n) complexity |
+| `seed(seed, sequence = 1)` | Reset generator with new seed and optional sequence |
+| `get_state()` | Returns current internal state as `std::pair<uint64_t, uint64_t>` |
+| `set_state(state, sequence)` | Sets internal state directly |
+| `from_state(state, sequence)` | Creates new generator from saved state |
 
-[Try PCG32 over at compiler explorer](https://godbolt.org/z/WTa6GTqff)
+[Try PCG32 over at compiler explorer](https://compiler-explorer.com/z/PrnP4h5Mf)
+
+## std_random.hpp 
+If you want the best the standard library has to offer, but with a more useful interface, check out std_random.hpp. 
+It's based on `std::mt19937`, and will by default seed the full 2,496 byte state of using std::random_device. It can also be manually seeded for reproducability. 
+The interface provides:
+
+* T getNumber<T>(min, max);  //ranges are inclusive for integrals, half-open for floats
+* char color();              // [0,255]
+* bool coinToss();           // true/false
+* float normalized();        // [0.0,1.0)
+* float unit_range();        // [-1.0,1.0)
+
+[Try std_random.hpp over at Compiler Explorer](https://compiler-explorer.com/z/fKz443bG4).
 
 ## xoshiro256ss.h
 The "xoshiro256** 1.0" generator. Ignore this for now, use one of the above instead. I'm not happy with the interface I wrote for this.
@@ -75,15 +99,32 @@ The `jump()` function is equivalent to 2^128 calls to `next()`. It can be used t
 ## seeding.h
 This file demonstrates a few ideas for sourcing entropy in C++. `std::random_device` is typically hardware-based, high-quality entropy and works fine [on most platforms and configurations](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/). However, there are times when you might need other sources of entropy—perhaps for speed reasons, to generate seeds at compile time, or when targeting portable devices without hardware / kernel entropy evailable. Use seeding.h for inspiration. :)
 
-## std_random.hpp 
-If you want the best the standard library has to offer, but with a more useful interface, check out std_random.hpp. 
-It's based on `std::mt19937`, and will by default seed the full 2,496 byte state of using std::random_device. It can also be manually seeded for reproducability. 
-The interface provides:
+## string_hash.h
+A constexpr implementation of the [FNV-1a (Fowler-Noll-Vo) hash algorithm](https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function) with a convenient string literal operator. While not a PRNG itself, fast string hashing is useful for:
+- Replacing slow string comparisons with fast integer comparisons
+- Generating compile-time seeds for PRNGs from string literals (like `auto seed = "my game seed"_fnv;`, see more below)
+- Creating deterministic hashes for game content when you need reproducible numbers
 
-* T getNumber<T>(min, max);  //ranges are inclusive for integrals, half-open for floats
-* char color();              // [0,255]
-* bool coinToss();           // true/false
-* float normalized();        // [0.0,1.0)
-* float unit_range();        // [-1.0,1.0)
+The implementation is about 30 lines of code and provides:
+* Explicit constructor: `string_hash("some text")`  
+* String literal operator: `"some text"_hash`
+* Full comparison operators for use as key in STL containers
 
-[Try std_random.hpp over at Compiler Explorer](https://compiler-explorer.com/z/fKz443bG4).
+You can play around with macro expansions to generate deterministic but unique seeds at compile time:
+```
+// File/line information
+constexpr auto file_seed = __FILE__"_hash;                  // full path of current source file
+constexpr auto line_seed = std::string{__FILE__}.append(__LINE__, '_')_hash; // file+line number
+
+// Date/time of compilation
+constexpr auto time_seed = __DATE__ " " __TIME__"_hash;     // "Mar 18 2024 15:30:45"
+
+// Function information (compiler-dependent)
+constexpr auto func_seed = __FUNCTION__"_hash;              // current function name
+constexpr auto pretty_func = __PRETTY_FUNCTION__"_hash;     // detailed function info including namespace/templates
+```
+The most commonly useful ones for game dev would probably be:
+
+__FILE__ + __LINE__ for per-location seeds
+__DATE__ + __TIME__ for per-compilation seeds
+__FUNCTION__ for function-specific seeds
