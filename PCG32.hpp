@@ -1,11 +1,12 @@
 #pragma once
+#include <cassert>
 #include <cstdint>
 #include <limits>
 #include <compare>
 #include <utility>
 // PCG32 - Permuted Congruential Generator
 // Based on the implementation by Melissa O'Neill (https://www.pcg-random.org)
-// C++ implementation by Ulf Benjaminsson (ulfbenjaminsson.com)
+// C++ implementation by Ulf Benjaminsson (ulfbenjaminsson.com) 2024
 // This implementation is placed in the public domain. Use freely.
 // Satisfies 'UniformRandomBitGenerator' requirements - compatible with std::shuffle, 
 // std::sample, and most std::*_distribution classes.
@@ -61,6 +62,40 @@ struct PCG32{
         return result >> 32;
     }
 
+    constexpr bool coinToss() noexcept{
+        return next() & 1; //checks the least significant bit
+    }
+
+    //generate float in [0, 1)
+    constexpr float normalized() noexcept{
+        return 0x1.0p-32f * next(); //again, courtesy of Melissa O'Neill. See: https://www.pcg-random.org/posts/bounded-rands.html
+        //0x1.0p-32 is a binary floating point constant for 2^-32 that we use to convert a random 
+        // integer value in the range [0..2^32) into a float in the unit interval 0-1        
+        //A less terrifying, but also less efficient, way to achieve the same goal  is:         
+        //    return static_cast<float>(std::ldexp(next(), -32));
+        //see https://mumble.net/~campbell/tmp/random_real.c for more info.        
+    }
+
+    //generate float in [-1, 1)    
+    constexpr float unit_range() noexcept{
+        return 2.0f * normalized() - 1.0f;
+    }
+
+    template<std::floating_point F>
+    constexpr F between(F min, F max) noexcept{
+        assert(min < max && "pcg32::between(min, max) called with inverted range.");
+        return min + (max - min) * normalized();
+    }
+
+    template<std::integral I>
+    constexpr I between(I min, I max) noexcept{
+        assert(min < max && "pcg32::between(min, max) called with inverted range.");
+        using UI = std::make_unsigned_t<I>;
+        UI range = static_cast<UI>(max - min);
+        if(range == max()){ return next(); } //avoid overflow
+        return min + static_cast<I>(next(range));
+    }
+
     //Based on Brown, "Random Number Generation with Arbitrary Stride,"
     // Transactions of the American Nuclear Society (Nov. 1994)    
     constexpr void advance(u64 delta) noexcept{
@@ -83,21 +118,6 @@ struct PCG32{
     constexpr void backstep(u64 delta) noexcept{
         advance(u32(0) - delta);  // going backwards works due to modular arithmetic
     }
-       
-    //generate float in [0, 1)
-    constexpr float normalized() noexcept{
-        return 0x1.0p-32f * next(); //again, courtesy of Melissa O'Neill. See: https://www.pcg-random.org/posts/bounded-rands.html
-        //0x1.0p-32 is a binary floating point constant for 2^-32 that we use to convert a random 
-        // integer value in the range [0..2^32) into a float in the unit interval 0-1        
-        //A less terrifying, but also less efficient, way to achieve the same goal  is:         
-        //    return static_cast<float>(std::ldexp(next(), -32));
-        //see https://mumble.net/~campbell/tmp/random_real.c for more info.        
-    }
-
-    //generate float in [min, max)
-    constexpr float between(float min, float max) noexcept{
-        return min + (max - min) * normalized();
-    }
 
     constexpr void set_state(u64 new_state, u64 new_inc) noexcept{
         state = new_state;
@@ -111,8 +131,8 @@ struct PCG32{
         rng.set_state(saved_state, saved_inc);
         return rng;
     }
-    
-    // Operators and standard interface
+
+    // operators and standard interface
     constexpr result_type operator()() noexcept{
         return next();
     }
@@ -128,8 +148,8 @@ struct PCG32{
     constexpr void discard(u64 count) noexcept{
         advance(count);
     }
-    auto operator<=>(const PCG32& other) const noexcept = default;    
+    constexpr auto operator<=>(const PCG32& other) const noexcept = default;
 private:
     u64 state{0}; // RNG state.  All values are possible.
-    u64 inc{1}; // Controls which RNG sequence (stream) is selected. Must *always* be odd.
+    u64 inc{1}; // controls which RNG sequence (stream) is selected. Must *always* be odd.
 };
