@@ -89,11 +89,12 @@ struct PCG32{
 
     template<std::integral I>
     constexpr I between(I min, I max) noexcept{
-        assert(min < max && "pcg32::between(min, max) called with inverted range.");
         using UI = std::make_unsigned_t<I>;
+        static_assert(std::numeric_limits<UI>::max() <= std::numeric_limits<result_type>::max(),
+            "PCG32::between() only supports types up to PCG32::result_type in size");
+        assert(min < max && "pcg32::between(min, max) called with inverted range.");        
         UI range = static_cast<UI>(max - min);
-        if(range == max()){ return next(); } //avoid overflow
-        return min + static_cast<I>(next(range));
+        return min + static_cast<I>(next(static_cast<result_type>(range)));
     }
 
     //Based on Brown, "Random Number Generation with Arbitrary Stride,"
