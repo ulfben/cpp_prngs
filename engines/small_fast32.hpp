@@ -1,0 +1,65 @@
+#pragma once
+#include "../concepts.hpp" //for RandomBitEngine
+#include <limits>
+#include <cstdint>
+
+/*
+A C++ 32-bit two-rotate implementation of Jenkins Small Fast PRNG.
+Original public domain C-code and writeup by Bob Jenkins https://burtleburtle.net/bob/rand/SmallFast32.html
+C++ implementation by Ulf Benjaminsson (ulfbenjaminsson.com), also placed in the public domain. Use freely!
+*/
+class SmallFast32 final{
+   using u32 = std::uint32_t;
+   u32 a;
+   u32 b;
+   u32 c;
+   u32 d;
+
+   static constexpr u32 rot(u32 x, u32 k) noexcept{
+      return (x << k) | (x >> (32 - k));
+   }
+
+public:
+   using result_type = u32;
+
+   constexpr SmallFast32() noexcept
+      : SmallFast32(0xBADC0FFEu){}
+
+   explicit constexpr SmallFast32(result_type seed) noexcept : a(0xf1ea5eedu), b(seed), c(seed), d(seed){
+      discard(20); //warmup
+   }
+
+   constexpr void seed() noexcept{
+      *this = SmallFast32{};
+   }
+   constexpr void seed(result_type seed) noexcept{
+      *this = SmallFast32{seed};
+   }
+     
+   static constexpr result_type min() noexcept{
+      return std::numeric_limits<result_type>::min();
+   }
+   static constexpr result_type max() noexcept{
+      return std::numeric_limits<result_type>::max();
+   }
+   constexpr result_type operator()() noexcept{
+      return next();
+   }
+
+   constexpr result_type next() noexcept{
+      const u32 e = a - rot(b, 27);
+      a = b ^ rot(c, 17);
+      b = c + d;
+      c = d + e;
+      d = e + a;
+      return d;
+   }
+
+   constexpr void discard(unsigned long long n) noexcept{
+      while(n--){
+         next();
+      }
+   }
+   constexpr bool operator==(const SmallFast32& rhs) const noexcept = default;
+};
+static_assert(RandomBitEngine<SmallFast32>);

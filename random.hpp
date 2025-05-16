@@ -1,0 +1,193 @@
+﻿#pragma once
+#include <cassert>
+#include <cmath>
+#include <type_traits>
+#ifdef _MSC_VER
+#include <intrin.h>    // for _umul128
+#endif
+#include "concepts.hpp" //for RandomBitEngine concept
+
+// This is a simple random number generator interface that wraps around any engine that meets the RandomBitEngine concept.
+// providing useful functions for generating random numbers, including integers, floating-point numbers, and colors
+// as well as methods for Gaussian distribution, coin flips (with odds), picking from collections (index or element), etc.
+namespace rnd {
+   template<RandomBitEngine E>
+   class Random final{
+      E _e{}; //any uniform bit generator 
+
+   public:
+      using engine_type = E;
+      using result_type = typename E::result_type;
+      static constexpr unsigned BITS = std::numeric_limits<result_type>::digits;
+
+      constexpr Random() noexcept = default; //the engine will default initialize
+      explicit constexpr Random(engine_type engine) noexcept : _e(engine){}
+      explicit constexpr Random(result_type seed_val) noexcept : _e(seed_val){};
+      constexpr bool operator==(const Random& rhs) const noexcept = default;
+
+      //access to the underlying engine. Might be useful.
+      constexpr const E& engine() const noexcept{ return _e; }
+      constexpr E& engine() noexcept{ return _e; }
+
+      //advance the random engine n steps. 
+      //Some engines (like PCG32) can do this in O(1).
+      constexpr void discard(unsigned long long n) noexcept{
+         _e.discard(n);
+      }
+
+      constexpr void seed() noexcept{
+         _e = E{};
+      }
+      constexpr void seed(result_type v) noexcept{
+         _e.seed(v);
+      }
+
+      static constexpr auto min() noexcept{
+         return E::min();
+      }
+      static constexpr auto max() noexcept{
+         return E::max();
+      }
+
+    //Produces a random value in the range [min(), max()]
+      constexpr result_type next() noexcept{ return _e(); }
+      constexpr result_type operator()() noexcept{ return next(); }
+
+    // Produces a random value in [0, bound) with *very small* bias (no rejection),      
+      constexpr result_type next(result_type bound) noexcept{
+        // Daniel Lemire’s “fastrange” multiply‐shift algorithm,  
+        // see: https://github.com/lemire/fastrange  
+        //      https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/  
+        // Far faster (and less bias) than naive modulo, eg. return next() % bound;
+         assert(bound > 0 && "bound must be positive");
+         using u64 = std::uint64_t;
+
+         result_type raw_value = next(); // 1) raw_value can be any value in the range [0, 2^BITS)
+
+         // 2) multiply into a 2×BITS product
+         if constexpr(BITS <= 32){
+            u64 product = u64(raw_value) * u64(bound); //2.1) product will be in the range [0, bound x 2^BITS)
+            auto result = result_type(product >> BITS); //3) shifting right by BITS is equivalent to calling floor(product / 2^BITS)
+            return result; //3.1) meaning the result is now in the range [0, bound−1]
+         } else if constexpr(BITS <= 64){
+#ifndef _MSC_VER // GCC/Clang: use built-in 128-bit type        
+            using u128 = __uint128_t;
+            u128 product = u128(raw_value) * u128(bound);
+            return result_type(product >> BITS);
+#else //MSVC doesn't provide a 128-bit type, so fallback
+    // to an intrinsic that puts the high 64 bits into `high_bits`
+            u64 high_bits{};
+            (void) _umul128(raw_value, bound, &high_bits);
+            return result_type(high_bits);
+#endif
+         } else{
+             //4) in case someone ever writes a >64-bit engine; fall back to the basic modulo solution
+            return bound > 0 ? raw_value % bound : bound; //avoid division by zero in release builds
+         }
+      }
+      constexpr result_type operator()(result_type bound) noexcept{ return next(bound); }
+
+    // integer in [lo, hi)
+      template<std::integral I>
+      constexpr I between(I lo, I hi) noexcept{
+         if(!(lo < hi)){
+            assert(false && "between(lo, hi): inverted or empty range");
+            return lo;
+         }
+         using U = std::make_unsigned_t<I>;
+         U bound = U(hi) - U(lo);
+         assert(bound <= E::max() && "between(lo, hi): range too large for this engine. Consider a 64-bit engine (xoshiro256ss, SmallFast64) or ensure hi–lo <= max()");
+         auto safe_bound = static_cast<result_type>(bound);
+         return lo + static_cast<I>(next(safe_bound));
+      }
+
+      // real in [lo, hi)
+      template<std::floating_point F>
+      constexpr F between(F lo, F hi) noexcept{
+         return lo + (hi - lo) * normalized<F>();
+      }
+
+      // real in [0.0, 1.0)
+      template<std::floating_point F>
+      constexpr F normalized() noexcept{
+         constexpr F inv_range = F(1) / (F(max()) + F(1));
+         return F(next()) * inv_range;
+      }
+
+      // real in [-1.0, 1.0)
+      template<std::floating_point F>
+      constexpr F signed_norm() noexcept{
+         return F(2) * normalized<F>() - F(1);
+      }
+
+      // boolean
+      constexpr bool coin_flip() noexcept{ return bool(next() & 1); }
+
+      // boolean with probability
+      template<std::floating_point F>
+      constexpr bool coin_flip(F probability) noexcept{
+         return normalized<F>() < probability;
+      }
+
+      // 24-bit RGB packed as 0xRRGGBB
+      constexpr std::uint32_t rgb8() noexcept{
+         static_assert(BITS >= 24, "rgb8() requires an engine with at least 24 bits");
+         return static_cast<std::uint32_t>(next() & 0x00'FF'FF'FFu);
+      }
+
+      // 32-bit RGBA packed as 0xRRGGBBAA
+      constexpr std::uint32_t rgba8() noexcept{
+         if constexpr(BITS >= 32){
+           // one raw sample, grab low 32 bits            
+            return static_cast<std::uint32_t>(next() & 0xFF'FF'FF'FFu);
+         } else{
+           // narrow engine: fall back to four 8-bit calls
+            return (next(256) << 24)
+               | (next(256) << 16)
+               | (next(256) << 8)
+               | next(256);
+         }
+      }
+
+      // pick an index in [0, size)
+      template<std::ranges::sized_range R>
+      constexpr auto index(const R& collection) noexcept{
+         assert(!std::ranges::empty(collection) && "Random::index(): empty collection.");
+         using idx_t = std::ranges::range_size_t<R>;
+         return static_cast<idx_t>(
+            between<idx_t>(0,
+               static_cast<idx_t>(std::ranges::size(collection))));
+      }
+
+      // get an iterator to a random element. Accepts const and non-const ranges
+      template<std::ranges::forward_range R>
+         requires std::ranges::sized_range<R>
+      constexpr auto iterator(R&& collection) noexcept{
+         assert(!std::ranges::empty(collection) && "Random::iterator(): empty collection");
+         auto idx = index(collection); // index accepts const&
+         auto it = std::ranges::begin(collection); // picks begin or cbegin for us
+         std::advance(it, idx);
+         return it;
+      }
+
+      //return a reference to a random element in a collection
+      //accepts both const and non-const ranges
+      template<std::ranges::forward_range R>
+         requires std::ranges::sized_range<R>
+      constexpr auto element(R&& collection) noexcept{
+         return *iterator(std::forward<R>(collection));
+      }
+
+      template<std::floating_point F>
+      constexpr F gaussian(F mean, F stddev) noexcept{
+            // Based on the Central Limit Theorem; https://en.wikipedia.org/wiki/Central_limit_theorem
+            // the Irwin–Hall distribution (sum of 12 U(0,1) has mean = 6, variance = 1).            
+            // Subtract 6 and multiply by stddev to get an approximate N(mean, stddev) sample.
+         F sum{};
+         for(auto i = 0; i < 12; ++i){
+            sum += normalized<F>();
+         }
+         return mean + (sum - F(6)) * stddev;
+      }
+   };
+} //namespace rnd
