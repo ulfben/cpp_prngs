@@ -6,7 +6,7 @@ The best pseudo-random number generator (PRNG) offered by the C++ standard libra
 
 Hence this repo! If you're making games and need your random number generator to be:
 
-- small (16 or 32 bytes) and *fast* 
+- small (16 or 32 bytes) and [*fast*](https://quick-bench.com/q/LA8dukv8BScXyy82vlm2zFYBgA0)
 - deterministic across platforms (e.g., *portable!*)
 - easy to seed
 - feature-rich (ints, floats, coin flip, ranges, pick-from-collection, etc.)
@@ -39,7 +39,7 @@ Want to use your own engine? Just make sure it satisfies the `RandomBitEngine` c
 
 ## [Engines](https://github.com/ulfben/cpp_prngs/tree/main/engines)
 
-All these engines are very fast, compact (16 or 32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (over about 4.2 million elements). This is uncommon and (in debug builds) the Random\<E> code will alert you if this happens.
+[All these engines are very fast](https://quick-bench.com/q/LA8dukv8BScXyy82vlm2zFYBgA0), compact (16 or 32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (over about 4.2 million elements). This is uncommon and (in debug builds) the Random\<E> code will alert you if this happens.
 
 | File Name           | Output Width | Description                                                                                                                                |
 |---------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
