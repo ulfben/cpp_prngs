@@ -4,9 +4,11 @@ When talking about random number generation - for making games fun, not for maki
 
 The best pseudo-random number generator (PRNG) offered by the C++ standard library is likely the Mersenne Twister. But choosing `std::mt19937` over more efficient alternatives like [Xorshift](https://en.wikipedia.org/wiki/Xorshift) or a [PCG](https://en.wikipedia.org/wiki/Permuted_congruential_generator) variant sacrifices [a significant amount of performance](https://quuxplusone.github.io/blog/2021/11/23/xoshiro/) in *addition* to the problems listed above.
 
-Hence this repo! If you're making games and need your random number generator to be:
+For a deep, game-focused comparison of 47 PRNGs across 9 platforms, see Rhet Butler’s excellent [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/), which highlights the performance, portability, and statistical quality concerns that matter most in real-world game development. Several of the top-performing generators featured there - including Romu and SmallFast - are included here.
 
-- small (16 or 32 bytes) and [*fast*](https://quick-bench.com/q/LA8dukv8BScXyy82vlm2zFYBgA0)
+And so; if you're making games and need your random number generator to be:
+
+- small (16 or 32 bytes) and [*fast*](https://quick-bench.com/q/ZSBTxZHWDN34Im2Y6_4rEx9Xbpc)
 - deterministic across platforms (e.g., *portable!*)
 - easy to seed
 - feature-rich (ints, floats, coin flip, ranges, pick-from-collection, etc.)
@@ -31,7 +33,7 @@ int damage = rng.between(10, 20);   // Random int in [10, 20)
 
 Use `Random<E>` to access convenient utilities like floats, coin flips, Gaussian samples, picking from containers, color packing, and more.
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/aevcre8nj)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/KTz4eWKzT)
 
 Want to use your own engine? Just make sure it satisfies the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp)).
 
@@ -39,16 +41,17 @@ Want to use your own engine? Just make sure it satisfies the `RandomBitEngine` c
 
 ## [Engines](https://github.com/ulfben/cpp_prngs/tree/main/engines)
 
-[All these engines are very fast](https://quick-bench.com/q/LA8dukv8BScXyy82vlm2zFYBgA0), compact (16 or 32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (over about 4.2 million elements). This is uncommon and (in debug builds) the Random\<E> code will alert you if this happens.
+[All these engines are very fast](https://quick-bench.com/q/ZSBTxZHWDN34Im2Y6_4rEx9Xbpc), compact (16 or 32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (over about 4.2 million elements). Such large containers are rare through and, in debug builds, the `Random<E>` code will alert you if this problem occurs.
 
 | File Name           | Output Width | Description                                                                                                                                |
 |---------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| [`romuduojr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/romuduojr.hpp) | 64 bits | C++ port of [Mark Overton’s RomuDuoJr](https://romu-random.org/). Winner of Rhet Butler’s [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/)! |
 | [`pcg32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/pcg32.hpp)         | 32 bits      | C++ port of [Melissa O’Neill’s minimal PCG32](https://www.pcg-random.org/download.html#minimal-c-implementation). Wikipedia: [Permuted congruential generator](https://en.wikipedia.org/wiki/Permuted_congruential_generator) |
 | [`xoshiro256ss.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/xoshiro256ss.h)  | 64 bits      | C++ port of [David Blackman & Sebastiano Vigna's xoshiro256** 1.0](https://prng.di.unimi.it/) generator. Wikipedia: [Xorshift](https://en.wikipedia.org/wiki/Xorshift). |
 | [`small_fast32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/small_fast32.hpp)  | 32 bits      | C++ port of [Bob Jenkins’ 32-bit “Small Fast”](https://burtleburtle.net/bob/rand/smallprng.html) PRNG (two-rotate). |
 | [`small_fast64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/small_fast64.hpp)  | 64 bits      | A 64-bit three-rotate implementation of the above. Three rotates (7, 13, 37) ensure stronger avalanche behavior than a naïve two-rotate 64-bit variant. |
 
-Each engine satisfies the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp) concept, which extends the C++20 [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) to ensure compatibility with the STL. You can use the engines directly, but `RandomBitEngine` provides only a minimal set of features: seeding, advancing, reporting `min()` and `max()`, and generating random unsigned integers.
+Each engine satisfies the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp) concept, which extends the C++20 [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) to ensure compatibility with the STL. You can use the engines directly, but `RandomBitEngine` provides only a minimal set of features: seeding, advancing, reporting `min()` and `max()`, comparison (of state) and generating random unsigned integers.
 
 The engines are kept simple so they can be swapped easily with the top-level [`Random<E>`](https://github.com/ulfben/cpp_prngs/blob/main/random.hpp) template. `Random<E>` wraps any engine - including your own - to provide a consistent, user-friendly interface designed for game development. See the full interface below.
 
@@ -65,7 +68,7 @@ The engines are kept simple so they can be swapped easily with the top-level [`R
 | `min()`                             | Returns the engine’s minimum possible value (typically 0)                                    |
 | `max()`                             | Returns the engine’s maximum possible value                                                  |
 | `next()` / `operator()()`           | Returns next random number in range `[min(), max())`                                         |
-| `next(bound)` / `operator()(bound)` | Returns next random number in range `[0, bound)`                                             |
+| `next(bound)` / `operator()(bound)` | Next random number in `[0, bound)`, using [Lemire's FastRange method](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) (minimal bias, very fast) |
 | `between(lo, hi)`                   | Returns random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float) |
 | `normalized<F>()`                   | Returns random float in `[0.0, 1.0)`                                                         |
 | `signed_norm<F>()`                  | Returns random float in `[-1.0, 1.0)`                                                        |
