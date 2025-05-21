@@ -10,10 +10,31 @@
 // This is a simple random number generator interface that wraps around any engine that meets the RandomBitEngine concept.
 // providing useful functions for generating random numbers, including integers, floating-point numbers, and colors
 // as well as methods for Gaussian distribution, coin flips (with odds), picking from collections (index or element), etc.
+// Source: https://github.com/ulfben/cpp_prngs/
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/dGj41dKa9
+// Benchmark on Quick Bench: https://quick-bench.com/q/ZSBTxZHWDN34Im2Y6_4rEx9Xbpc
 namespace rnd {
    template<RandomBitEngine E>
    class Random final{
-      E _e{}; //any uniform bit generator 
+      E _e{}; //the underlying engine providing random bits. This class will turn those into useful values.
+
+     //private helper for 128-bit multiplications
+     // computes the high 64 bits of a 64×64-bit multiplication.
+     // Used to implement Daniel Lemire’s "fastrange" trick: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/   
+     // which maps uniformly distributed `x` in [0, 2^BITS) to [0, bound) with negligible bias.     
+      template<unsigned BITS>
+      constexpr std::uint64_t mul_shift_high64(std::uint64_t x, std::uint64_t bound) noexcept{
+#if defined(_MSC_VER)
+         // MSVC doesn't support __uint128_t; use intrinsic instead
+         std::uint64_t high{};
+         (void) _umul128(x, bound, &high); // low 64 bits discarded
+         return high; //return the high 64 bits
+#elif defined(__SIZEOF_INT128__)
+         return std::uint64_t((__uint128_t(x) * __uint128_t(bound)) >> BITS);
+#else
+         static_assert(false, "mul_shift_high64 requires either __uint128_t or MSVC _umul128");
+#endif
+      }
 
    public:
       using engine_type = E;
@@ -25,12 +46,12 @@ namespace rnd {
       explicit constexpr Random(result_type seed_val) noexcept : _e(seed_val){};
       constexpr bool operator==(const Random& rhs) const noexcept = default;
 
-      //access to the underlying engine. Might be useful.
+      //access to the underlying engine for manual serialization, etc.
       constexpr const E& engine() const noexcept{ return _e; }
       constexpr E& engine() noexcept{ return _e; }
 
       //advance the random engine n steps. 
-      //Some engines (like PCG32) can do this in O(1).
+      //some engines (like PCG32) can do this faster than linear time
       constexpr void discard(unsigned long long n) noexcept{
          _e.discard(n);
       }
@@ -49,45 +70,31 @@ namespace rnd {
          return E::max();
       }
 
-    //Produces a random value in the range [min(), max()]
+      // Produces a random value in the range [min(), max()]
       constexpr result_type next() noexcept{ return _e(); }
       constexpr result_type operator()() noexcept{ return next(); }
 
-    // Produces a random value in [0, bound) with *very small* bias (no rejection),      
+      // produces a random value in [0, bound) using Lemire's fastrange.
+      // achieves very small bias without using rejection, and is much faster than naive modulo.
       constexpr result_type next(result_type bound) noexcept{
-        // Daniel Lemire’s “fastrange” multiply‐shift algorithm,  
-        // see: https://github.com/lemire/fastrange  
-        //      https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/  
-        // Far faster (and less bias) than naive modulo, eg. return next() % bound;
          assert(bound > 0 && "bound must be positive");
-         using u64 = std::uint64_t;
 
-         result_type raw_value = next(); // 1) raw_value can be any value in the range [0, 2^BITS)
+         result_type raw_value = next(); // raw_value ∈ [0, 2^BITS)
 
-         // 2) multiply into a 2×BITS product
-         if constexpr(BITS <= 32){
-            u64 product = u64(raw_value) * u64(bound); //2.1) product will be in the range [0, bound x 2^BITS)
-            auto result = result_type(product >> BITS); //3) shifting right by BITS is equivalent to calling floor(product / 2^BITS)
-            return result; //3.1) meaning the result is now in the range [0, bound−1]
+         if constexpr(BITS <= 32){ // for small engines, multiply into a 64-bit product             
+            auto product = std::uint64_t(raw_value) * std::uint64_t(bound); // product is now in [0, bound * 2^BITS)
+            auto result = result_type(product >> BITS); // equivalent to floor(product / 2^BITS)
+            return result; // result is now in range [0, bound)
          } else if constexpr(BITS <= 64){
-#ifndef _MSC_VER // GCC/Clang: use built-in 128-bit type        
-            using u128 = __uint128_t;
-            u128 product = u128(raw_value) * u128(bound);
-            return result_type(product >> BITS);
-#else //MSVC doesn't provide a 128-bit type, so fallback
-    // to an intrinsic that puts the high 64 bits into `high_bits`
-            u64 high_bits{};
-            (void) _umul128(raw_value, bound, &high_bits);
-            return result_type(high_bits);
-#endif
-         } else{
-             //4) in case someone ever writes a >64-bit engine; fall back to the basic modulo solution
-            return bound > 0 ? raw_value % bound : bound; //avoid division by zero in release builds
+             // same logic, but use helper for 128-bit math, since __uint128_t isn't universally available
+            return mul_shift_high64<BITS>(raw_value, bound);
          }
-      }
+         // fallback for hypothethcial >64-bit engines. Naive modulo (slower, more bias)         
+         return bound > 0 ? raw_value % bound : bound; // avoid division by zero in release builds
+      }      
       constexpr result_type operator()(result_type bound) noexcept{ return next(bound); }
 
-    // integer in [lo, hi)
+      // integer in [lo, hi)
       template<std::integral I>
       constexpr I between(I lo, I hi) noexcept{
          if(!(lo < hi)){

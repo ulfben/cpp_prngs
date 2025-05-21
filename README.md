@@ -33,7 +33,7 @@ int damage = rng.between(10, 20);   // Random int in [10, 20)
 
 Use `Random<E>` to access convenient utilities like floats, coin flips, Gaussian samples, picking from containers, color packing, and more.
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/KTz4eWKzT)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/dGj41dKa9)
 
 Want to use your own engine? Just make sure it satisfies the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp)).
 

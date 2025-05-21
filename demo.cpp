@@ -5,7 +5,9 @@
 #include <string_view>
 #include <algorithm>
 
-//demo is also available on compiler explorer: https://compiler-explorer.com/z/aevcre8nj
+// Source: https://github.com/ulfben/cpp_prngs/
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/dGj41dKa9
+// Benchmark on Quick Bench: https://quick-bench.com/q/ZSBTxZHWDN34Im2Y6_4rEx9Xbpc
 
 int main(){
    using namespace rnd;       
