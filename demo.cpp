@@ -6,8 +6,8 @@
 #include <algorithm>
 
 // Source: https://github.com/ulfben/cpp_prngs/
-// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/dGj41dKa9
-// Benchmark on Quick Bench: https://quick-bench.com/q/ZSBTxZHWDN34Im2Y6_4rEx9Xbpc
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/Tj1Gscs5P
+// Benchmark on Quick Bench: https://quick-bench.com/q/uYxo_h6epOVq4XRf-qHr0MzJF4g
 
 int main(){
    using namespace rnd;       

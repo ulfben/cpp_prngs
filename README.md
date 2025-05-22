@@ -8,14 +8,14 @@ For a deep, game-focused comparison of 47 PRNGs across 9 platforms, see Rhet But
 
 And so; if you're making games and need your random number generator to be:
 
-- small (16 or 32 bytes) and [*fast*](https://quick-bench.com/q/ZSBTxZHWDN34Im2Y6_4rEx9Xbpc)
+- small (16 or 32 bytes) and [*fast*](https://quick-bench.com/q/uYxo_h6epOVq4XRf-qHr0MzJF4g)
 - deterministic across platforms (e.g., *portable!*)
 - easy to seed
 - feature-rich (ints, floats, coin flip, ranges, pick-from-collection, etc.)
 - executable at compile time
 - [compatible](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) with all of your favorite STL algorithms and distributions (`std::shuffle`, `std::sample`, `std::*_distribution`, etc.)
 
-...just go ahead and copy-paste one of these engines and the `random.hpp` interface, and go forth and prosper. Let me know if you find bugs or add any cool new features!
+... go ahead and copy-paste any of these engines and the `random.hpp` interface, and go forth and prosper. Let me know if you find bugs or add any cool new features!
 
 ---
 
@@ -33,14 +33,14 @@ int damage = rng.between(10, 20);   // Random int in [10, 20)
 
 Use `Random<E>` to access convenient utilities like floats, coin flips, Gaussian samples, picking from containers, color packing, and more.
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/dGj41dKa9)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/Tj1Gscs5P)
 
 Want to use your own engine? Just make sure it satisfies the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp)).
 
 ---
 
 ## [Engines](https://github.com/ulfben/cpp_prngs/tree/main/engines)
-All these engines [are very fast](https://quick-bench.com/q/ZSBTxZHWDN34Im2Y6_4rEx9Xbpc):
+All these engines [are very fast](https://quick-bench.com/q/uYxo_h6epOVq4XRf-qHr0MzJF4g):
 
 ![quickbench_cpp_prngs](https://github.com/user-attachments/assets/afe1d89d-a42b-4383-9764-8efa2bf069c8)
 
@@ -75,7 +75,7 @@ The engines are kept simple so they can be swapped easily with the top-level [`R
 | `between(lo, hi)`                   | Returns random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float) |
 | `bits(n)`                           | Returns `n` random bits at runtime, in `[0, 2ⁿ)` (1 ≤ `n` ≤ 64)         |
 | `bits<n>()`                         | Returns `n` random bits at compile-time, in `[0, 2ⁿ)` (1 ≤ `n` ≤ 64)  |
-| `normalized<F>()`                   | Returns float in `[0.0, 1.0)`, using [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/) |
+| `normalized<F>()`                   | Float in `[0.0, 1.0)`, using [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/) |
 | `signed_norm<F>()`                  | Returns float in `[-1.0, 1.0)`                   |
 | `coin_flip()`                       | Fair coin, returns `true` ~50% of the time                                                  |
 | `coin_flip(p)`                      | Returns `true` with probability `p` (where `p` is a float in `[0.0, 1.0]`)                   |
