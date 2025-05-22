@@ -73,9 +73,11 @@ The engines are kept simple so they can be swapped easily with the top-level [`R
 | `next()` / `operator()()`           | Returns next random number in range `[min(), max())`                                         |
 | `next(bound)` / `operator()(bound)` | Next random number in `[0, bound)`, using [Lemire's FastRange method](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) (minimal bias, very fast) |
 | `between(lo, hi)`                   | Returns random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float) |
-| `normalized<F>()`                   | Returns random float in `[0.0, 1.0)`                                                         |
-| `signed_norm<F>()`                  | Returns random float in `[-1.0, 1.0)`                                                        |
-| `coin_flip()`                       | Fair coin, returns `true` \~50% of the time                                                  |
+| `bits(n)`                           | Returns `n` random bits at runtime, in `[0, 2ⁿ)` (1 ≤ `n` ≤ 64)         |
+| `bits<n>()`                         | Returns `n` random bits at compile-time, in `[0, 2ⁿ)` (1 ≤ `n` ≤ 64)  |
+| `normalized<F>()`                   | Returns float in `[0.0, 1.0)`, using [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/) |
+| `signed_norm<F>()`                  | Returns float in `[-1.0, 1.0)`                   |
+| `coin_flip()`                       | Fair coin, returns `true` ~50% of the time                                                  |
 | `coin_flip(p)`                      | Returns `true` with probability `p` (where `p` is a float in `[0.0, 1.0]`)                   |
 | `rgb8()`                            | Packs three 8-bit channels into `0xRRGGBB`                                                   |
 | `rgba8()`                           | Packs four 8-bit channels into `0xRRGGBBAA`                                                  |
