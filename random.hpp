@@ -115,17 +115,23 @@ namespace rnd {
          return lo + (hi - lo) * normalized<F>();
       }
 
-      // real in [0.0, 1.0)
-      template<std::floating_point F>
+      // real in [0.0,1.0) using the "IQ float hack"
+      //   see Iñigo Quilez, "sfrand": https://iquilezles.org/articles/sfrand/
+      // Fast, branchless and, now, portable.
+      template <std::floating_point F>
       constexpr F normalized() noexcept{
-         constexpr F inv_range = F(1) / (F(max()) + F(1));
-         return F(next()) * inv_range;
+         using UInt = std::conditional_t<sizeof(F) == 4, uint32_t, uint64_t>;// Pick wide enough unsigned int type for F
+         constexpr int mantissa_bits = std::numeric_limits<F>::digits - 1;   // Number of mantissa bits for F (e.g., 23 for float)
+         constexpr UInt base = std::bit_cast<UInt>(F(1.0));                  // Bit pattern for F(1.0), i.e., exponent set, mantissa 0
+         UInt mantissa = static_cast<UInt>(bits(mantissa_bits));             // Get random bits to fill the mantissa field
+         UInt as_int = base | mantissa;                                      // Combine base (1.0) with random mantissa bits
+         return std::bit_cast<F>(as_int) - F(1.0);                           // Convert bits to float/double, then subtract 1.0 to get [0,1)
       }
 
-      // real in [-1.0, 1.0)
-      template<std::floating_point F>
-      constexpr F signed_norm() noexcept{
-         return F(2) * normalized<F>() - F(1);
+      // real in [-1.0,1.0) using the IQ float hack.      
+      template <std::floating_point F>
+      constexpr F signed_norm() noexcept{        
+         return F(2) * normalized<F>() - F(1); // scale to [0.0, 2.0), then shift to [-1.0, 1.0)
       }
 
       // boolean
