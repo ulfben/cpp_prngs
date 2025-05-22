@@ -40,8 +40,11 @@ Want to use your own engine? Just make sure it satisfies the `RandomBitEngine` c
 ---
 
 ## [Engines](https://github.com/ulfben/cpp_prngs/tree/main/engines)
+All these engines [are very fast](https://quick-bench.com/q/ZSBTxZHWDN34Im2Y6_4rEx9Xbpc):
 
-[All these engines are very fast](https://quick-bench.com/q/ZSBTxZHWDN34Im2Y6_4rEx9Xbpc), compact (16 or 32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (over about 4.2 million elements). Such large containers are rare through and, in debug builds, the `Random<E>` code will alert you if this problem occurs.
+![quickbench_cpp_prngs](https://github.com/user-attachments/assets/afe1d89d-a42b-4383-9764-8efa2bf069c8)
+
+They are also compact (16 or 32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (over about 4.2 million elements). Such large containers are rare through and, in debug builds, the `Random<E>` code will alert you if this problem occurs.
 
 | File Name           | Output Width | Description                                                                                                                                |
 |---------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
