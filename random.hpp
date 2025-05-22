@@ -139,22 +139,12 @@ namespace rnd {
 
       // 24-bit RGB packed as 0xRRGGBB
       constexpr std::uint32_t rgb8() noexcept{
-         static_assert(BITS >= 24, "rgb8() requires an engine with at least 24 bits");
-         return static_cast<std::uint32_t>(next() & 0x00'FF'FF'FFu);
+         return static_cast<std::uint32_t>(bits<24>()); //same as next() & 0x00'FF'FF'FFu       
       }
 
       // 32-bit RGBA packed as 0xRRGGBBAA
       constexpr std::uint32_t rgba8() noexcept{
-         if constexpr(BITS >= 32){
-           // one raw sample, grab low 32 bits            
-            return static_cast<std::uint32_t>(next() & 0xFF'FF'FF'FFu);
-         } else{
-           // narrow engine: fall back to four 8-bit calls
-            return (next(256) << 24)
-               | (next(256) << 16)
-               | (next(256) << 8)
-               | next(256);
-         }
+         return static_cast<std::uint32_t>(bits<32>()); //next() & 0xFF'FF'FF'FFu         
       }
 
       // pick an index in [0, size)
