@@ -1,4 +1,5 @@
 #include "engines/pcg32.hpp" // PCG32 engine
+#include "engines/romuduojr.hpp" // RomuDuoJr engine 
 #include "random.hpp" // the Random interface
 #include <print>
 #include <vector>
@@ -7,15 +8,18 @@
 
 // Source: https://github.com/ulfben/cpp_prngs/
 // Demo is available on Compiler Explorer: https://compiler-explorer.com/z/Tj1Gscs5P
-// Benchmark on Quick Bench: https://quick-bench.com/q/uYxo_h6epOVq4XRf-qHr0MzJF4g
+// Benchmarks:
+   // Quick Bench for generating raw random values: https://quick-bench.com/q/uYxo_h6epOVq4XRf-qHr0MzJF4g
+   // Quick Bench for generating normalized floats: https://quick-bench.com/q/1J4pPyIi2AzaFE2J5rEHw0y0ltk
+   // Quick Bench for generating bounded values: https://quick-bench.com/q/WtObF-J9d9oGsVeytSr1soGnpKg
 
 int main(){
    using namespace rnd;       
    const std::string_view str{"abcdefghijklmnopqrstuvwxyz"};
    std::vector<int> vec{1,2,3,4,5,6,7,8,9,10};
 
-   Random<PCG32> random{};  //create a random number generator with default seed, using the PCG32 engine
-   std::println("Random<PCG32>:");
+   Random<RomuDuoJr> random{};  //create a random number generator with default seed, using the PCG32 engine
+   std::println("Random<RomuDuoJr>:");
    std::println("  next() [{},{}]: {}", random.min(), random.max(), random.next()); //same as random()
    std::println("  next(100) [0,100): {}", random.next(100)); //same as random(100)
    std::println("  between(10, 20): {}", random.between(10, 20));

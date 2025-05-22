@@ -8,10 +8,10 @@ For a deep, game-focused comparison of 47 PRNGs across 9 platforms, see Rhet But
 
 And so; if you're making games and need your random number generator to be:
 
-- small (16 or 32 bytes) and [*fast*](https://quick-bench.com/q/uYxo_h6epOVq4XRf-qHr0MzJF4g)
+- small (16 or 32 bytes) and [*fast*](https://github.com/ulfben/cpp_prngs#performance-benchmarks)
 - deterministic across platforms (e.g., *portable!*)
-- easy to seed
-- feature-rich (ints, floats, coin flip, ranges, pick-from-collection, etc.)
+- [easy to seed](https://github.com/ulfben/cpp_prngs#seedingh)
+- [feature-rich](https://github.com/ulfben/cpp_prngs#randomhpp) (ints, floats, coin flip, ranges, pick-from-collection, etc.)
 - executable at compile time
 - [compatible](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) with all of your favorite STL algorithms and distributions (`std::shuffle`, `std::sample`, `std::*_distribution`, etc.)
 
@@ -31,18 +31,16 @@ rnd::Random<SmallFast64> rng{1234}; // Seeded generator, powered by the SmallFas
 int damage = rng.between(10, 20);   // Random int in [10, 20)
 ````
 
-Use `Random<E>` to access convenient utilities like floats, coin flips, Gaussian samples, picking from containers, color packing, and more.
+Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#randomhpp) like floats, coin flips, Gaussian samples, picking from containers, color packing, and more.
 
 [Try it on Compiler Explorer!](https://compiler-explorer.com/z/Tj1Gscs5P)
 
-Want to use your own engine? Just make sure it satisfies the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp)).
+Want to use your own engine? It only needs to satisfy the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp)).
 
 ---
 
 ## [Engines](https://github.com/ulfben/cpp_prngs/tree/main/engines)
-All these engines [are very fast](https://quick-bench.com/q/uYxo_h6epOVq4XRf-qHr0MzJF4g):
-
-![quickbench_cpp_prngs](https://github.com/user-attachments/assets/afe1d89d-a42b-4383-9764-8efa2bf069c8)
+All the provided engines [are very fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks):
 
 They are also compact (16 or 32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (over about 4.2 million elements). Such large containers are rare through and, in debug builds, the `Random<E>` code will alert you if this problem occurs.
 
@@ -56,7 +54,7 @@ They are also compact (16 or 32 bytes), produce high-quality randomness, and can
 
 Each engine satisfies the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp) concept, which extends the C++20 [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) to ensure compatibility with the STL. You can use the engines directly, but `RandomBitEngine` provides only a minimal set of features: seeding, advancing, reporting `min()` and `max()`, comparison (of state) and generating random unsigned integers.
 
-The engines are kept simple so they can be swapped easily with the top-level [`Random<E>`](https://github.com/ulfben/cpp_prngs/blob/main/random.hpp) template. `Random<E>` wraps any engine - including your own - to provide a consistent, user-friendly interface designed for game development. See the full interface below.
+The engines are kept simple so they can be swapped easily with the [`Random<E>`](https://github.com/ulfben/cpp_prngs/blob/main/random.hpp) template. `Random<E>` wraps any engine - including your own - to provide a consistent, user-friendly interface designed for game development. See the full interface below.
 
 ---
 
@@ -72,29 +70,67 @@ The engines are kept simple so they can be swapped easily with the top-level [`R
 | `max()`                             | Returns the engine’s maximum possible value                                                  |
 | `next()` / `operator()()`           | Returns next random number in range `[min(), max())`                                         |
 | `next(bound)` / `operator()(bound)` | Next random number in `[0, bound)`, using [Lemire's FastRange method](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) (minimal bias, very fast) |
-| `between(lo, hi)`                   | Returns random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float) |
-| `bits(n)`                           | Returns `n` random bits at runtime, in `[0, 2ⁿ)` (1 ≤ `n` ≤ 64)         |
-| `bits<n>()`                         | Returns `n` random bits at compile-time, in `[0, 2ⁿ)` (1 ≤ `n` ≤ 64)  |
-| `normalized<F>()`                   | Float in `[0.0, 1.0)`, using [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/) |
-| `signed_norm<F>()`                  | Returns float in `[-1.0, 1.0)`                   |
+| `between(lo, hi)`                   | Random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float) |
+| `bits(n)`            | Returns `n` random bits at runtime (`1 ≤ n ≤ 64`), filled into the low bits.[^1]  |
+| `bits<n>()`          | Returns `n` random bits at compile time (`1 ≤ n ≤ 64`), filled into the low bits.[^1]  |
+| `normalized<F>()`                   | Float of type `F` in `[0.0, 1.0)`, using [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/) |
+| `signed_norm<F>()`                  | Float of type `F` in `[-1.0, 1.0)` (also using the IQ hack)                   |
 | `coin_flip()`                       | Fair coin, returns `true` ~50% of the time                                                  |
-| `coin_flip(p)`                      | Returns `true` with probability `p` (where `p` is a float in `[0.0, 1.0]`)                   |
-| `rgb8()`                            | Packs three 8-bit channels into `0xRRGGBB`                                                   |
-| `rgba8()`                           | Packs four 8-bit channels into `0xRRGGBBAA`                                                  |
+| `coin_flip(p)`                      | Weighted coin, returns `true` with probability `p` (where `p` is `[0.0, 1.0]`)                   |
+| `rgb8()`                            | Packs three 8-bit channels into a `uint32_t` as `0xRRGGBB`                                                   |
+| `rgba8()`                           | Packs four 8-bit channels into a `uint32_t` as `0xRRGGBBAA`                                                  |
 | `index(range)`                      | Returns a random index into any sized collection                                             |
 | `iterator(range)`                   | Returns an iterator to a random element in any sized collection                              |
 | `element(range)`                    | Returns a reference to a random element in any sized collection                              |
-| `gaussian(mean, stddev)`            | Returns an approximate normal (mean, stddev) sample via CLT‐based sum-of-12                  |
+| `gaussian(mean, stddev)`            | Returns an approximate normal sample, using the [Irwin–Hall sum-of-12](https://en.wikipedia.org/wiki/Irwin%E2%80%93Hall_distribution#Approximating_a_Normal_distribution) method                 |
 | `discard(n)`                        | Advances the underlying engine by `n` steps                                                  |
 | `seed()`                            | Reseeds the engine back to its default state                                                 |
 | `seed(v)`                           | Reseeds the engine with value `v`                                                            |
 | `engine()` / `engine() const`       | Access the underlying engine instance (for manual serialization)                             |
 
+[^1]: `bits(n)` / `bits<n>()` are not *intended* for integer generation - you should generally use `next()`, `next(bound)` or `between(lo, hi)` instead. *However*, if your bound is a power-of-2, and *especially* if it is known at compile time, `bits` *is* an **optimal** choice (fast and unbiased). :)
+
 ---
 
-## [seeding.h](https://github.com/ulfben/cpp_prngs/blob/main/seeding.hpp)
+### Performance Benchmarks
 
-This file demonstrates a few ideas for sourcing entropy in C++. `std::random_device` is typically hardware-based, high-quality entropy and works fine [on most platforms and configurations](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/). However, there are times when you might need other sources of entropy — perhaps for speed, compile-time generation, or portable devices without hardware/kernel entropy available. Use `seeding.h` for inspiration. :)
+![quickbench_cpp_prngs](https://github.com/user-attachments/assets/afe1d89d-a42b-4383-9764-8efa2bf069c8)
+
+These benchmarks use [QuickBench](https://quick-bench.com/) to let you compare performance across different use cases:
+
+- [`next()` – raw unsigned output](https://quick-bench.com/q/placeholder-next): baseline performance
+- [`next(bound)` – bounded integer using Lemire’s method](https://quick-bench.com/q/placeholder-bounded): efficient rejection-free range generation
+- [`normalized<float>()` – floating-point in \[0.0, 1.0)](https://quick-bench.com/q/placeholder-float): branchless float generation (IQ trick)
+
+Each benchmark loops over one million values and compares multiple engines side by side, including the std library and cstdlib alternatives.
+
+---
+
+## [`seeding.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/seeding.hpp)
+
+**TL;DR**: `seeding.hpp` is a grab bag of portable, high-entropy seeding strategies - for tools, tests, or procedural generation, at runtime or compile time.
+
+All engines in this library are seeded from a single `uint64_t` or `uint32_t` value. They provide a hardcoded default seed, so default construction (`Random<E>()`) is always valid - but produces the *same* sequence every time.
+
+To get varied sequences, you’ll want to provide a high-entropy seed. `std::random_device` is often used for this - it's typically hardware-backed and [works fine on most platforms](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/). But it can be slow, unavailable (e.g. on embedded systems, or at compile time), and is unsuitable when you need determinism.
+
+That's where `seeding.hpp` comes in. It offers a range of techniques for generating seed values at both **runtime** and **compile time**. This is especially useful in game development, where deterministic seeds can drive **procedurally generated content**, levels, loot tables, or enemy behavior - based on assets files, player names, thread IDs, or even compile-time metadata.
+
+```cpp
+// Compile-time seeds
+constexpr auto static_seed = seed::fnv1a("level_3_checkpoint");
+constexpr auto file_seed   = seed::from_source();   // __FILE__ + __DATE__ + __TIME__
+
+// Runtime seeds
+auto time_seed   = seed::from_time();       // high-resolution wall clock
+auto thread_seed = seed::from_thread();     // unique per thread
+auto max_entropy = seed::from_all();        // mixes all sources
+
+// Usage
+Random<SmallFast64> rng1(static_seed);
+Random<PCG32>       rng2(seed::to_32(time_seed));
+Random<Xoshiro256SS> rng3(max_entropy);
+```
 
 ---
 
