@@ -1,14 +1,15 @@
 ﻿#pragma once
+#include <bit> // for std::bit_cast
 #include <cassert>
 #include <cmath>
 #include <type_traits>
 #ifdef _MSC_VER
-#include <intrin.h>    // for _umul128
+#include <intrin.h>    // for _umul128, 64x64 multiplication
 #endif
 #include "concepts.hpp" //for RandomBitEngine concept
 
-// This is a simple random number generator interface that wraps around any engine that meets the RandomBitEngine concept.
-// providing useful functions for generating random numbers, including integers, floating-point numbers, and colors
+// This is an RNG interface that wraps around any engine that meets the RandomBitEngine concept.
+// It provides useful functions for generating values, including integers, floating-point numbers, and colors
 // as well as methods for Gaussian distribution, coin flips (with odds), picking from collections (index or element), etc.
 // Source: https://github.com/ulfben/cpp_prngs/
 // Demo is available on Compiler Explorer: https://compiler-explorer.com/z/dGj41dKa9
@@ -70,7 +71,7 @@ namespace rnd {
          return E::max();
       }
 
-      // Produces a random value in the range [min(), max()]
+      // Produces a random value in the range [min(), max())
       constexpr result_type next() noexcept{ return _e(); }
       constexpr result_type operator()() noexcept{ return next(); }
 
@@ -79,7 +80,7 @@ namespace rnd {
       constexpr result_type next(result_type bound) noexcept{
          assert(bound > 0 && "bound must be positive");
 
-         result_type raw_value = next(); // raw_value ∈ [0, 2^BITS)
+         result_type raw_value = next(); // raw_value is in the range [0, 2^BITS)
 
          if constexpr(BITS <= 32){ // for small engines, multiply into a 64-bit product             
             auto product = std::uint64_t(raw_value) * std::uint64_t(bound); // product is now in [0, bound * 2^BITS)
@@ -91,7 +92,7 @@ namespace rnd {
          }
          // fallback for hypothethcial >64-bit engines. Naive modulo (slower, more bias)         
          return bound > 0 ? raw_value % bound : bound; // avoid division by zero in release builds
-      }      
+      }
       constexpr result_type operator()(result_type bound) noexcept{ return next(bound); }
 
       // integer in [lo, hi)
@@ -195,6 +196,47 @@ namespace rnd {
             sum += normalized<F>();
          }
          return mean + (sum - F(6)) * stddev;
+      }
+
+       // Returns N random bits from the engine, with a branchless fast path when possible
+      template <unsigned n>
+      constexpr std::uint64_t bits() noexcept{
+         static_assert(n > 0 && n <= 64, "Can only extract 1–64 bits");
+         if constexpr(BITS >= n){ // fast path: single call, mask out the needed bits             
+            return next() & ((uint64_t(1) << n) - 1);
+         } else{ // general path: gather as many bits as needed             
+            uint64_t value = 0;
+            unsigned filled = 0;
+            while(filled < n){
+               uint64_t r = next();
+               unsigned avail = std::min(BITS, n - filled);
+               value |= ((r & ((uint64_t(1) << avail) - 1)) << filled);
+               filled += avail;
+            }
+            return value;
+         }
+      }
+
+      // Returns N random bits from the engine, for use when n is not known at compile time
+      constexpr std::uint64_t bits(unsigned n) noexcept{
+         assert(n > 0 && n <= 64);
+         switch(n){
+         case 8:  return bits<8>();
+         case 16: return bits<16>();
+         case 24: return bits<24>();
+         case 32: return bits<32>();
+         case 64: return bits<64>();
+         default:
+            std::uint64_t value = 0;
+            unsigned filled = 0;
+            while(filled < n){
+               uint64_t r = next();
+               unsigned avail = std::min(BITS, n - filled);
+               value |= ((r & ((std::uint64_t(1) << avail) - 1)) << filled);
+               filled += avail;
+            }
+            return value;
+         }
       }
    };
 } //namespace rnd
