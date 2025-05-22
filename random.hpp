@@ -79,7 +79,6 @@ namespace rnd {
       // achieves very small bias without using rejection, and is much faster than naive modulo.
       constexpr result_type next(result_type bound) noexcept{
          assert(bound > 0 && "bound must be positive");
-
          result_type raw_value = next(); // raw_value is in the range [0, 2^BITS)
 
          if constexpr(BITS <= 32){ // for small engines, multiply into a 64-bit product             
@@ -89,9 +88,9 @@ namespace rnd {
          } else if constexpr(BITS <= 64){
              // same logic, but use helper for 128-bit math, since __uint128_t isn't universally available
             return mul_shift_high64<BITS>(raw_value, bound);
+         } else{ // fallback for hypothethcial >64-bit engines. Naive modulo (slower, more bias)                     
+            return bound > 0 ? raw_value % bound : bound; // avoid division by zero in release builds          
          }
-         // fallback for hypothethcial >64-bit engines. Naive modulo (slower, more bias)         
-         return bound > 0 ? raw_value % bound : bound; // avoid division by zero in release builds
       }
       constexpr result_type operator()(result_type bound) noexcept{ return next(bound); }
 
@@ -120,6 +119,7 @@ namespace rnd {
       // Fast, branchless and, now, portable.
       template <std::floating_point F>
       constexpr F normalized() noexcept{
+         static_assert(std::numeric_limits<F>::is_iec559, "normalized() requires IEEE 754 (IEC 559) floating point types.");
          using UInt = std::conditional_t<sizeof(F) == 4, uint32_t, uint64_t>;// Pick wide enough unsigned int type for F
          constexpr int mantissa_bits = std::numeric_limits<F>::digits - 1;   // Number of mantissa bits for F (e.g., 23 for float)
          constexpr UInt base = std::bit_cast<UInt>(F(1.0));                  // Bit pattern for F(1.0), i.e., exponent set, mantissa 0
@@ -130,7 +130,7 @@ namespace rnd {
 
       // real in [-1.0,1.0) using the IQ float hack.      
       template <std::floating_point F>
-      constexpr F signed_norm() noexcept{        
+      constexpr F signed_norm() noexcept{
          return F(2) * normalized<F>() - F(1); // scale to [0.0, 2.0), then shift to [-1.0, 1.0)
       }
 
@@ -194,22 +194,18 @@ namespace rnd {
          return mean + (sum - F(6)) * stddev;
       }
 
-       // Returns N random bits from the engine, with a branchless fast path when possible
+      // Returns N random bits from the engine, with a branchless fast path when possible
       template <unsigned n>
       constexpr std::uint64_t bits() noexcept{
          static_assert(n > 0 && n <= 64, "Can only extract 1–64 bits");
-         if constexpr(BITS >= n){ // fast path: single call, mask out the needed bits             
-            return next() & ((uint64_t(1) << n) - 1);
-         } else{ // general path: gather as many bits as needed             
-            uint64_t value = 0;
-            unsigned filled = 0;
-            while(filled < n){
-               uint64_t r = next();
-               unsigned avail = std::min(BITS, n - filled);
-               value |= ((r & ((uint64_t(1) << avail) - 1)) << filled);
-               filled += avail;
+         if constexpr(BITS >= n){ // fast path: engine is wide enough to deliver all bits in a single call            
+            if constexpr(n < 64){
+               return next() & ((std::uint64_t(1) << n) - 1); // mask out n bits
+            } else{ // n == 64, return all bits. Avoids UB on shift by 64
+               return next();
             }
-            return value;
+         } else{ //general path, call runtime version to gather enough bits
+            return bits(n);
          }
       }
 
@@ -226,9 +222,9 @@ namespace rnd {
             std::uint64_t value = 0;
             unsigned filled = 0;
             while(filled < n){
-               uint64_t r = next();
+               std::uint64_t r = next();
                unsigned avail = std::min(BITS, n - filled);
-               value |= ((r & ((std::uint64_t(1) << avail) - 1)) << filled);
+               value |= ((r & ((uint64_t(1) << avail) - 1)) << filled);
                filled += avail;
             }
             return value;
