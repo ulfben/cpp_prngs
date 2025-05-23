@@ -25,5 +25,4 @@ SOFTWARE.
 ## Additional License Notice
 
 **Note:**  
-The file [`pcg32.hpp`](pcg32.hpp) is based on [code by M.E. O'Neill](https://github.com/imneme/pcg-c-basic) and is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).  
-A copy of the Apache 2.0 license is included in this repository as [`LICENSE.Apache2`](LICENSE.Apache2).
+The file [`pcg32.hpp`](pcg32.hpp) is based on [code by M.E. O'Neill](https://github.com/imneme/pcg-c-basic) and is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
