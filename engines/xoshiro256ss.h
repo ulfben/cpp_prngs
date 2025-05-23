@@ -3,10 +3,20 @@
 #include <limits>
 #include <cstdint>
 
-// The "xoshiro256** 1.0" generator by David Blackman and Sebastiano Vigna (2018)
-   // https://prng.di.unimi.it/xoshiro256starstar.c
-// C++ implementation by Ulf Benjaminsson (2025) https://github.com/ulfben/cpp_prngs
-// splitmix64 by Sebastiano Vigna (2015) https://prng.di.unimi.it/splitmix64.c
+/*
+  Xoshiro256SS - a modern C++ port of xoshiro256** 1.0.
+
+  The original "xoshiro256** 1.0" generator by David Blackman and Sebastiano Vigna (public domain)
+  https://prng.di.unimi.it/xoshiro256starstar.c
+
+  "splitmix64" by Sebastiano Vigna (public domain) 
+  https://prng.di.unimi.it/splitmix64.c
+
+  C++ implementation by Ulf Benjaminsson, 2025,
+  Licensed under the MIT License. See LICENSE.md for details.
+  https://github.com/ulfben/cpp_prngs/
+*/
+
 class Xoshiro256SS{
    using u64 = std::uint64_t;
    u64 s[4]{};

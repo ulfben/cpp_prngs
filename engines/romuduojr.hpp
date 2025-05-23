@@ -2,15 +2,21 @@
 #include "../concepts.hpp" //for RandomBitEngine
 #include <cstdint>
 #include <limits>
+/*
+  RomuDuoJr - Modern C++ Port
 
-// romuduojr.hpp — a cleaned-up C++ implementation of the RomuDuoJr PRNG,
-// based on Mark Overton’s Romu family: https://romu-random.org/
-// and featured as a top performer in Rhet Butler’s “RNG Battle Royale” (2020):
-// https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/
-// This implementation is based on Rhets' code in xromu2jr.h: https://github.com/Almightygir/rhet_RNG/blob/main/xromu2jr.h
-// Ported to modern C++ by Ulf Benjaminsson (2025), https://github.com/ulfben/cpp_prngs
-// Released into the public domain — use freely!
+  Based on "xromu2jr.h" by Rhet Butler (public domain)
+  https://github.com/Almightygir/rhet_RNG/blob/main/xromu2jr.h
 
+  "xromu2jr.h" is based on Mark Overton’s Romu family: https://romu-random.org/
+  Featured as a top performer in Rhet Butler’s “RNG Battle Royale” (2020):
+  https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/
+
+  C++ port and modifications by Ulf Benjaminsson, 2025
+  https://github.com/ulfben/cpp_prngs/
+
+  Licensed under the MIT License. See LICENSE.md for details.
+*/
 class RomuDuoJr final{
    using u64 = std::uint64_t;
    u64 x;

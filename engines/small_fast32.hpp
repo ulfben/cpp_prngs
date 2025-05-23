@@ -2,11 +2,15 @@
 #include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
-
 /*
-A C++ 32-bit two-rotate implementation of Jenkins Small Fast PRNG.
-Original public domain C-code and writeup by Bob Jenkins https://burtleburtle.net/bob/rand/SmallFast32.html
-C++ implementation by Ulf Benjaminsson (ulfbenjaminsson.com), also placed in the public domain. Use freely!
+  SmallFast64 PRNG - a modern C++ 32-bit two-rotate implementation of Jenkins Small Fast PRNG.
+
+  Original algorithm and C code by Bob Jenkins (public domain)
+  https://burtleburtle.net/bob/rand/smallprng.html
+
+  C++ implementation by Ulf Benjaminsson, 2025,
+  Licensed under the MIT License. See LICENSE.md for details.
+  https://github.com/ulfben/cpp_prngs/
 */
 class SmallFast32 final{
    using u32 = std::uint32_t;

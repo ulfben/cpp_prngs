@@ -3,12 +3,26 @@
 #include <limits>
 #include <cstdint>
 
-// PCG32 - Permuted Congruential Generator
-// Based on the minimal C implementation by Melissa O'Neill (https://www.pcg-random.org)
-// C++ implementation by Ulf Benjaminsson (ulfbenjaminsson.com)
-// This implementation is placed in the public domain. Use freely.
-// Satisfies 'UniformRandomBitGenerator', meaning it works well with std::shuffle, std::sample, most of the std::*_distribution-classes, etc.
-// Additionally satisfies 'RandomBitEngine' which I use for the Random utility wrapper
+// pcg32.hpp - Minimal PCG32 implementation for C++
+//
+// Based on "Really minimal PCG32 code" by M.E. O'Neill (2014)
+// https://github.com/imneme/pcg-c-basic/
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// Ported to modern C++ and adapted by Ulf Benjaminsson, 2025
+// Copyright (c) 2014 M.E. O'Neill, pcg-random.org
+// Copyright (c) 2025 Ulf Benjaminsson, github.com/ulfben/cpp_prngs
 
 class PCG32 final{
    using u64 = std::uint64_t;

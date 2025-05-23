@@ -3,10 +3,16 @@
 #include <limits>
 #include <cstdint>
 /*
-A C++ 64-bit three-rotate implementation of Jenkins Small Fast PRNG.
-Original public domain C-code and writeup by Bob Jenkins https://burtleburtle.net/bob/rand/smallprng.html
-C++ implementation by Ulf Benjaminsson (ulfbenjaminsson.com), also placed in the public domain. Use freely!
+  SmallFast64 PRNG - a modern C++ 64-bit three-rotate implementation of Jenkins Small Fast PRNG.
+
+  Original algorithm and C code by Bob Jenkins (public domain)
+  https://burtleburtle.net/bob/rand/smallprng.html
+
+  C++ implementation by Ulf Benjaminsson, 2025,
+  Licensed under the MIT License. See LICENSE.md for details.
+  https://github.com/ulfben/cpp_prngs/
 */
+
 class SmallFast64{
    using u64 = std::uint64_t;
    u64 a;
