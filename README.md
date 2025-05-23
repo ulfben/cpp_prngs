@@ -114,23 +114,31 @@ All engines in this library are seeded from a single `uint64_t` or `uint32_t` va
 
 To get varied sequences, you’ll want to provide a high-entropy seed. `std::random_device` is often used for this - it's typically hardware-backed and [works fine on most platforms](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/). But it can be slow, unavailable (e.g. on embedded systems, or at compile time), and is unsuitable when you need determinism.
 
-That's where `seeding.hpp` comes in. It offers a range of techniques for generating seed values at both **runtime** and **compile time**. This is especially useful in game development, where deterministic seeds can drive **procedurally generated content**, levels, loot tables, or enemy behavior - based on assets files, player names, thread IDs, or even compile-time metadata.
+In game development determinism is often needed. Procedural systems such as level generation, loot tables, or AI behavior, all benefit from consistent seeds that allow us to reproduce the same output across runs and platforms. This is where `seeding.hpp` shines! It provides a variety of seeding techniques that work in both runtime and compile-time contexts, letting you draw entropy from sources like timestamps, thread IDs, game assets, player data, and even compilation metadata.
 
 ```cpp
-// Compile-time seeds
-constexpr auto static_seed = seed::fnv1a("level_3_checkpoint");
-constexpr auto file_seed   = seed::from_source();   // __FILE__ + __DATE__ + __TIME__
+//Example usage:
+using rnd::Random; 
+using seed::to_32; // Convenience alias for converting a 64-bit seed to 32 bits (for smaller engines).
 
-// Runtime seeds
-auto time_seed   = seed::from_time();       // high-resolution wall clock
-auto thread_seed = seed::from_thread();     // unique per thread
-auto max_entropy = seed::from_all();        // mixes all sources
+// Compile-time seeding:
+constexpr auto seed1 = seed::from_text("my_game_seed");
+constexpr auto seed2 = seed::from_source();           // Different for each compilation unit (source file)
+constexpr auto seed3 = SEED_UNIQUE_FROM_SOURCE();     // Different for each macro expansion, even within the same source file
 
-// Usage
-Random<SmallFast64> rng1(static_seed);
-Random<PCG32>       rng2(seed::to_32(time_seed));
-Random<Xoshiro256SS> rng3(max_entropy);
+// Runtime seeding:
+Random<SmallFast32> rng1(to_32(seed::from_time()));   // Wall clock time, folded down to 32 bits for SmallFast32
+Random<SmallFast64> rng2(seed::from_system_entropy());// Uses std::random_device (hardware/system entropy)
+
+// Pseudo-entropy sources:
+Random<RomuDuoJr> rng3(seed::from_thread());          // Unique per thread
+Random<PCG32>     rng4(to_32(seed::from_stack()));    // Varies per run of the application, if ASLR is active
+Random<PCG32>     rng5(to_32(seed::from_cpu_time())); // Varies with CPU time consumed by the process; can reflect workload or scheduling
+
+// Maximum entropy:
+Random<Xoshiro256SS> rng6(seed::from_all());          // Combines all sources (time, thread, stack, entropy, etc.)
 ```
+These utilities help you ensure that your random number generators are seeded appropriately - whether you need reproducibility, speed, or maximal entropy.
 
 ---
 
