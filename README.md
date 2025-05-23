@@ -10,7 +10,7 @@ And so; if you're making games and need your random number generator to be:
 
 - small (16 or 32 bytes) and [*fast*](https://github.com/ulfben/cpp_prngs#performance-benchmarks)
 - deterministic across platforms (e.g., *portable!*)
-- [easy to seed](https://github.com/ulfben/cpp_prngs#seedingh)
+- [easy to seed](https://github.com/ulfben/cpp_prngs#seedinghpp)
 - [feature-rich](https://github.com/ulfben/cpp_prngs#randomhpp) (ints, floats, coin flip, ranges, pick-from-collection, etc.)
 - executable at compile time
 - [compatible](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) with all of your favorite STL algorithms and distributions (`std::shuffle`, `std::sample`, `std::*_distribution`, etc.)
