@@ -95,7 +95,7 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 
 ### Performance Benchmarks
 
-![quickbench_cpp_prngs](https://github.com/user-attachments/assets/afe1d89d-a42b-4383-9764-8efa2bf069c8)
+![quickbench_cpp_prngs](https://github.com/user-attachments/assets/5a22df16-cf7f-4220-b8cd-65052448c00f)
 
 These benchmarks use [QuickBench](https://quick-bench.com/) to let you compare performance across different use cases:
 
