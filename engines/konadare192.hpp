@@ -29,7 +29,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Modifications and C++26 port by Ulf Benjaminsson, 2024.
+ * Modifications and C++26 port by Ulf Benjaminsson, 2025.
  *    https://github.com/ulfben/cpp_prngs
  */
 class Konadare192 final{
@@ -51,7 +51,7 @@ class Konadare192 final{
       // "kMixNoMul" from Evensen original repo
       u64 c = b;
       u64 x = a;
-      for(int i = 0; i < 5; ++i){
+      for(u64 i = 0; i < 5; ++i){
          x ^= rotr(x, 25) ^ rotr(x, 49);
          c += INC + (c << 15) + (c << 7) + i;
          c ^= (c >> 47) ^ (c >> 23);

@@ -33,7 +33,7 @@ int damage = rng.between(10, 20);   // Random int in [10, 20)
 
 Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#randomhpp) like floats, coin flips, Gaussian samples, picking from containers, color packing, and more.
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/Tj1Gscs5P)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/nzK9joeYE)
 
 Want to use your own engine? It only needs to satisfy the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp)).
 
@@ -47,8 +47,9 @@ They are also compact (16 or 32 bytes), produce high-quality randomness, and can
 | File Name           | Output Width | Description                                                                                                                                |
 |---------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
 | [`romuduojr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/romuduojr.hpp) | 64 bits | C++ port of [Mark Overton’s RomuDuoJr](https://romu-random.org/). Winner of Rhet Butler’s [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/)! |
+| [`konadare192.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/konadare192.hpp)         | 64 bits      | C++ port of [Pelle Evensen's konadare192px++](https://github.com/pellevensen/PReenactiNG). Second fastest and second smallest PRNG in this lineup.  |
 | [`pcg32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/pcg32.hpp)         | 32 bits      | C++ port of [Melissa O’Neill’s minimal PCG32](https://www.pcg-random.org/download.html#minimal-c-implementation). Wikipedia: [Permuted congruential generator](https://en.wikipedia.org/wiki/Permuted_congruential_generator) |
-| [`xoshiro256ss.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/xoshiro256ss.h)  | 64 bits      | C++ port of [David Blackman & Sebastiano Vigna's xoshiro256** 1.0](https://prng.di.unimi.it/) generator. Wikipedia: [Xorshift](https://en.wikipedia.org/wiki/Xorshift). |
+| [`xoshiro256ss.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/xoshiro256ss.h)  | 64 bits      | C++ port of [David Blackman & Sebastiano Vigna's xoshiro256\*\* 1.0](https://prng.di.unimi.it/) generator. Wikipedia: [Xorshift](https://en.wikipedia.org/wiki/Xorshift). |
 | [`small_fast32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/small_fast32.hpp)  | 32 bits      | C++ port of [Bob Jenkins’ 32-bit “Small Fast”](https://burtleburtle.net/bob/rand/smallprng.html) PRNG (two-rotate). |
 | [`small_fast64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/small_fast64.hpp)  | 64 bits      | A 64-bit three-rotate implementation of the above. Three rotates (7, 13, 37) ensure stronger avalanche behavior than a naïve two-rotate 64-bit variant. |
 
@@ -98,9 +99,9 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 
 These benchmarks use [QuickBench](https://quick-bench.com/) to let you compare performance across different use cases:
 
-- [`next()` – raw unsigned output](https://quick-bench.com/q/uYxo_h6epOVq4XRf-qHr0MzJF4g): baseline performance
-- [`next(bound)` – bounded integer using Lemire’s method](https://quick-bench.com/q/WtObF-J9d9oGsVeytSr1soGnpKg): efficient rejection-free range generation
-- [`normalized<float>()` – floating-point in \[0.0, 1.0)](https://quick-bench.com/q/1J4pPyIi2AzaFE2J5rEHw0y0ltk): branchless float generation (IQ trick)
+- [`next()` – raw unsigned output](https://quick-bench.com/q/vWdKKNz7kEyf6kQSNnUEFOX_4DI): baseline performance
+- [`next(bound)` – bounded integer using Lemire’s method](https://quick-bench.com/q/WHEcW9iSV7I8qB_4eb1KWOvNZU0): efficient rejection-free range generation
+- [`normalized<float>()` – floating-point in \[0.0, 1.0)](https://quick-bench.com/q/GARc3WSfZu4sdVeCAMSWWPMQwSE): branchless float generation (IQ trick)
 
 Each benchmark loops over one million values and compares multiple engines side by side, including the std library and cstdlib alternatives.
 
@@ -208,6 +209,7 @@ This project includes, or is based on, the following PRNG engines and reference 
 - **xoshiro256\*\***: Based on David Blackman & Sebastiano Vigna’s reference code ([public domain](https://prng.di.unimi.it/xoshiro256starstar.c)).
 - **splitmix64**: By Sebastiano Vigna ([public domain](https://prng.di.unimi.it/splitmix64.c)).
 - **PCG32**: Based on M.E. O’Neill’s reference implementation ([Apache License 2.0](https://github.com/imneme/pcg-c-basic/)).
+- **konadare192px++**: By Pelle Evensen ([Apache License 2.0](https://github.com/pellevensen/PReenactiNG)).
 - **moremur**: By Pelle Evensen ([public domain](https://mostlymangling.blogspot.com/2019/12/stronger-better-morer-moremur-better.html)).
 
 Where applicable, copyright and license information is included in the header of each source file.

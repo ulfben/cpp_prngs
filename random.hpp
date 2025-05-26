@@ -12,11 +12,11 @@
 // It provides useful functions for generating values, including integers, floating-point numbers, and colors
 // as well as methods for Gaussian distribution, coin flips (with odds), picking from collections (index or element), etc.
 // Source: https://github.com/ulfben/cpp_prngs/
-// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/Tj1Gscs5P
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/nzK9joeYE
 // Benchmarks:
-   // Quick Bench for generating raw random values: https://quick-bench.com/q/uYxo_h6epOVq4XRf-qHr0MzJF4g
-   // Quick Bench for generating normalized floats: https://quick-bench.com/q/1J4pPyIi2AzaFE2J5rEHw0y0ltk
-   // Quick Bench for generating bounded values: https://quick-bench.com/q/WtObF-J9d9oGsVeytSr1soGnpKg
+   // Quick Bench for generating raw random values: https://quick-bench.com/q/vWdKKNz7kEyf6kQSNnUEFOX_4DI
+   // Quick Bench for generating normalized floats: https://quick-bench.com/q/GARc3WSfZu4sdVeCAMSWWPMQwSE
+   // Quick Bench for generating bounded values: https://quick-bench.com/q/WHEcW9iSV7I8qB_4eb1KWOvNZU0
 namespace rnd {
    template<RandomBitEngine E>
    class Random final{
