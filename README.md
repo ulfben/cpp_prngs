@@ -208,7 +208,7 @@ This project includes, or is based on, the following PRNG engines and reference 
 - **xoshiro256\*\***: Based on David Blackman & Sebastiano Vigna’s reference code ([public domain](https://prng.di.unimi.it/xoshiro256starstar.c)).
 - **splitmix64**: By Sebastiano Vigna ([public domain](https://prng.di.unimi.it/splitmix64.c)).
 - **PCG32**: Based on M.E. O’Neill’s reference implementation ([Apache License 2.0](https://github.com/imneme/pcg-c-basic/)).
-- **moremur**: By Pelle Evensen ([license status unknown](https://mostlymangling.blogspot.com/2019/12/stronger-better-morer-moremur-better.html)).
+- **moremur**: By Pelle Evensen ([public domain](https://mostlymangling.blogspot.com/2019/12/stronger-better-morer-moremur-better.html)).
 
 Where applicable, copyright and license information is included in the header of each source file.
 
