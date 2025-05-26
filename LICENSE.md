@@ -25,4 +25,5 @@ SOFTWARE.
 ## Additional License Notice
 
 **Note:**  
-The file [`pcg32.hpp`](pcg32.hpp) is based on [code by M.E. O'Neill](https://github.com/imneme/pcg-c-basic) and is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+The file [`konadare192.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/konadare192.hpp) is based on [code by Pelle Evensen](https://github.com/pellevensen/PReenactiNG) and is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+The file [`pcg32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/pcg32.hpp) is based on [code by M.E. O'Neill](https://github.com/imneme/pcg-c-basic) and is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
