@@ -67,7 +67,9 @@ public:
          next();
       }
    }
-
+   constexpr SmallFast64 split() noexcept{
+      return SmallFast64{next()};
+   }
    constexpr bool operator==(const SmallFast64& rhs) const noexcept = default;
 };
 static_assert(RandomBitEngine<SmallFast64>);

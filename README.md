@@ -87,6 +87,7 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 | `discard(n)`                        | Advances the underlying engine by `n` steps                                                  |
 | `seed()`                            | Reseeds the engine back to its default state                                                 |
 | `seed(v)`                           | Reseeds the engine with value `v`                                                            |
+| `split()`                           | Returns a decorrelated, forked engine; advances this engine's state; use for parallel streams |
 | `engine()` / `engine() const`       | Access the underlying engine instance (for manual serialization)                             |
 
 [^1]: `bits(n)` / `bits<n>()` are not *intended* for integer generation - you should generally use `next()`, `next(bound)` or `between(lo, hi)` instead. *However*, if your bound is a power-of-2, and *especially* if it is known at compile time, `bits` *is* an **optimal** choice (fast and unbiased). :)

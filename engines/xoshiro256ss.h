@@ -9,7 +9,7 @@
   The original "xoshiro256** 1.0" generator by David Blackman and Sebastiano Vigna (public domain)
   https://prng.di.unimi.it/xoshiro256starstar.c
 
-  "splitmix64" by Sebastiano Vigna (public domain) 
+  "splitmix64" by Sebastiano Vigna (public domain)
   https://prng.di.unimi.it/splitmix64.c
 
   C++ implementation by Ulf Benjaminsson, 2025,
@@ -101,6 +101,9 @@ public:
         }
         s = temp;
     } */
+   constexpr Xoshiro256SS split() noexcept{
+      return Xoshiro256SS{next()};
+   }
 
    constexpr bool operator==(const Xoshiro256SS& rhs) const noexcept = default; //will do the right thing since C++20! 
 };

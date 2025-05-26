@@ -25,4 +25,5 @@ std::equality_comparable<E>&&               // e1 == e2
       { e.seed() } noexcept;                // reseed to default state
       { e.seed(seed) } noexcept;            // reseed with value
       { e.discard(n) } noexcept;            // advance the state, no return value
+      { e.split() } noexcept -> std::same_as<E>; // returns a decorrelated, forked engine; advances this engine's state
 };

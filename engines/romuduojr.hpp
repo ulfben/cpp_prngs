@@ -36,7 +36,7 @@ public:
    using result_type = u64;
 
    constexpr RomuDuoJr() noexcept : RomuDuoJr(0xFEEDFACEFEEDFACEULL){}
-      
+
    explicit constexpr RomuDuoJr(u64 seed) noexcept
       : x(0x9E6C63D0676A9A99ULL), y(!seed - seed){
       // Initialize x to a fixed odd constant, y to ~seed – seed.
@@ -75,6 +75,10 @@ public:
       while(n--){
          next();
       }
+   }
+
+   constexpr RomuDuoJr split() noexcept{
+      return RomuDuoJr{next()};
    }
 
    static constexpr result_type min() noexcept{

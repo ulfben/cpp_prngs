@@ -99,6 +99,10 @@ public:
    constexpr void seed() noexcept{ 
       *this = Konadare192{}; 
    }
+
+   constexpr Konadare192 split() noexcept{
+      return Konadare192{next()};
+   }
    
    static constexpr result_type min() noexcept{ 
       return std::numeric_limits<result_type>::min(); 

@@ -46,6 +46,20 @@ public:
       seed(seed_val, sequence);
    }
 
+   constexpr result_type next() noexcept{
+      const auto oldstate = state;
+      state = oldstate * MULT + inc;
+      const auto xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
+      const auto rot = oldstate >> 59u;
+      return static_cast<result_type>(
+         (xorshifted >> rot) |
+         (xorshifted << ((~rot + 1) & 31))
+         );
+   }
+   constexpr result_type operator()() noexcept{
+      return next();
+   }
+   
    constexpr void seed() noexcept{
       seed(DEFAULT_SEED, DEFAULT_STREAM);
    }
@@ -57,28 +71,6 @@ public:
       (void) next(); //“Warm up” the internal LCG so the first returned bits are mixed.
       state += seed_val;
       (void) next();
-   }
-
-   constexpr result_type operator()() noexcept{
-      return next();
-   }
-
-   constexpr result_type next() noexcept{
-      const auto oldstate = state;
-      state = oldstate * MULT + inc;
-      const auto xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
-      const auto rot = oldstate >> 59u;
-      return static_cast<result_type>(
-         (xorshifted >> rot) |
-         (xorshifted << ((~rot + 1) & 31))
-      );
-   }
-
-   static constexpr result_type min() noexcept{
-      return std::numeric_limits<result_type>::min();
-   }
-   static constexpr result_type max() noexcept{
-      return std::numeric_limits<result_type>::max();
    }
 
    constexpr void discard(u64 delta) noexcept{
@@ -99,6 +91,19 @@ public:
       }
       state = acc_mult * state + acc_plus;
    }
+
+   constexpr PCG32 split() noexcept{
+      return PCG32{next(), (next() << 1u) | 1u};
+   }
+
+   static constexpr result_type min() noexcept{
+      return std::numeric_limits<result_type>::min();
+   }
+
+   static constexpr result_type max() noexcept{
+      return std::numeric_limits<result_type>::max();
+   }
+
    constexpr bool operator==(const PCG32& rhs) const noexcept = default;
 };
 static_assert(RandomBitEngine<PCG32>);

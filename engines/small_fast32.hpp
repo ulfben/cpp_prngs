@@ -39,7 +39,7 @@ public:
    constexpr void seed(result_type seed) noexcept{
       *this = SmallFast32{seed};
    }
-     
+
    static constexpr result_type min() noexcept{
       return std::numeric_limits<result_type>::min();
    }
@@ -64,6 +64,11 @@ public:
          next();
       }
    }
+
+   constexpr SmallFast32 split() noexcept{
+      return SmallFast32{next()};
+   }
+
    constexpr bool operator==(const SmallFast32& rhs) const noexcept = default;
 };
 static_assert(RandomBitEngine<SmallFast32>);

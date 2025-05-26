@@ -67,6 +67,12 @@ namespace rnd {
          _e.seed(v);
       }
 
+      // returns a decorrelated, forked engine; advances this engine's state
+      // use for parallel or independent streams use (think: task/thread-local randomness)
+      constexpr Random<E> split() noexcept{
+         return Random<E>(_e.split());
+      }
+
       static constexpr auto min() noexcept{
          return E::min();
       }
