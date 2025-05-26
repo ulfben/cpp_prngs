@@ -98,9 +98,9 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 
 These benchmarks use [QuickBench](https://quick-bench.com/) to let you compare performance across different use cases:
 
-- [`next()` – raw unsigned output](https://quick-bench.com/q/placeholder-next): baseline performance
-- [`next(bound)` – bounded integer using Lemire’s method](https://quick-bench.com/q/placeholder-bounded): efficient rejection-free range generation
-- [`normalized<float>()` – floating-point in \[0.0, 1.0)](https://quick-bench.com/q/placeholder-float): branchless float generation (IQ trick)
+- [`next()` – raw unsigned output](https://quick-bench.com/q/uYxo_h6epOVq4XRf-qHr0MzJF4g): baseline performance
+- [`next(bound)` – bounded integer using Lemire’s method](https://quick-bench.com/q/WtObF-J9d9oGsVeytSr1soGnpKg): efficient rejection-free range generation
+- [`normalized<float>()` – floating-point in \[0.0, 1.0)](https://quick-bench.com/q/1J4pPyIi2AzaFE2J5rEHw0y0ltk): branchless float generation (IQ trick)
 
 Each benchmark loops over one million values and compares multiple engines side by side, including the std library and cstdlib alternatives.
 
