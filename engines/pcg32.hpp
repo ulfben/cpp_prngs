@@ -32,7 +32,10 @@ class PCG32 final{
    static constexpr u64 MULT = 6364136223846793005ULL;
    u64 state{0}; // RNG state.  All values are possible.
    u64 inc{1}; // controls which RNG sequence (stream) is selected. Must *always* be odd.
-
+   
+   static constexpr u32 rotr(u32 x, u32 r) noexcept{
+      return (x >> r) | (x << (32 - r));
+   }
 public:
    using result_type = u32;
 
@@ -49,12 +52,9 @@ public:
    constexpr result_type next() noexcept{
       const auto oldstate = state;
       state = oldstate * MULT + inc;
-      const auto xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
-      const auto rot = oldstate >> 59u;
-      return static_cast<result_type>(
-         (xorshifted >> rot) |
-         (xorshifted << ((~rot + 1) & 31))
-         );
+      const u32 xorshifted = static_cast<u32>(((oldstate >> 18u) ^ oldstate) >> 27u);
+      const u32 rot = static_cast<u32>(oldstate >> 59u);
+      return rotr(xorshifted, rot);     
    }
    constexpr result_type operator()() noexcept{
       return next();
