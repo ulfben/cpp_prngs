@@ -2,6 +2,7 @@
 #include <bit> // for std::bit_cast
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <type_traits>
 #ifdef _MSC_VER
 #include <intrin.h>    // for _umul128, 64x64 multiplication
@@ -97,7 +98,7 @@ namespace rnd {
          } else if constexpr(BITS <= 64){
              // same logic, but use helper for 128-bit math, since __uint128_t isn't universally available
             return mul_shift_high64<BITS>(raw_value, bound);
-         } else{ // fallback for hypothethcial >64-bit engines. Naive modulo (slower, more bias)                     
+         } else{ // fallback for hypothetical >64-bit engines. Naive modulo (slower, more bias)                     
             return bound > 0 ? raw_value % bound : bound; // avoid division by zero in release builds          
          }
       }
