@@ -3,6 +3,7 @@
 #include <random>
 #include <thread>
 #include <string_view>
+#include <type_traits>
 // Source: https://github.com/ulfben/cpp_prngs/
 // Utility functions for seeding PRNGs (Pseudo Random Number Generators).
 // 
@@ -25,7 +26,7 @@ namespace seed {
    // "moremur" mixing function by Pelle Evensen (2019); see: https://mostlymangling.blogspot.com/2019/12/stronger-better-morer-moremur-better.html
    // Fast, strong 64-bit mixer for hashing and PRNG seeding; outperforms SplitMix64 in avalanche and diffusion tests.
    // Modified to add a fixed constant, avoiding the trivial zero state for low-entropy seeds.
-   u64 moremur(u64 x){
+   constexpr u64 moremur(u64 x) noexcept{
       x += 0x9E3779B97F4A7C15ULL; // golden ratio increment
       x ^= x >> 27;
       x *= 0x3C79AC492BA7B653UL;
@@ -136,17 +137,22 @@ namespace seed {
    // - Higher overhead
    // - Useful when seed quality is critical
    // - Good for initializing large-state PRNGs
-   inline u64 from_all() noexcept{
-      const auto time = from_time();
-      const auto cpu = from_cpu_time();
-      const auto thread = from_thread();
-      const auto stack = from_stack();
-      const auto entropy = from_system_entropy();
-      const auto source = from_source();
-      return moremur(time ^ cpu ^ thread ^ stack ^ entropy ^ source);
+   constexpr u64 from_all() noexcept{
+      if(std::is_constant_evaluated()){
+         const auto source = from_source();
+         return moremur(source);
+      }else{
+         const auto time = from_time();
+         const auto cpu = from_cpu_time();
+         const auto thread = from_thread();
+         const auto stack = from_stack();
+         const auto entropy = from_system_entropy();
+         const auto source = from_source();
+         return moremur(time ^ cpu ^ thread ^ stack ^ entropy ^ source);
+      }
    }
 
-   inline u32 to_32(u64 seed) noexcept{
+   constexpr u32 to_32(u64 seed) noexcept{
       return static_cast<u32>(seed ^ (seed >> 32)); //XOR-fold to mix high and low bits when casting to 32 bits.
    }
 }
