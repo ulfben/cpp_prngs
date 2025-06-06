@@ -1,8 +1,13 @@
 #pragma once
-#include <chrono>
+#include <chrono> 
+#include <cstddef>
+#include <cstdint>
+#include <ctime> //for std::clock
+#include <memory> //for unique_ptr
 #include <random>
-#include <thread>
 #include <string_view>
+#include <thread>
+#include <type_traits>
 // Source: https://github.com/ulfben/cpp_prngs/
 // Utility functions for seeding PRNGs (Pseudo Random Number Generators).
 // 
@@ -17,7 +22,7 @@
 // - Utilities for converting from 64-bit to 32-bit seeds
 //
 // The entropy sources are designed to be composable - you can use them individually
-// or combine them for maximum entropy when needed.
+// or combine them for maximum entropy when needed. See `from_all()` for an example of combining multiple sources.
 namespace seed {
    using u64 = std::uint64_t;
    using u32 = std::uint32_t;
@@ -25,12 +30,12 @@ namespace seed {
    // "moremur" mixing function by Pelle Evensen (2019); see: https://mostlymangling.blogspot.com/2019/12/stronger-better-morer-moremur-better.html
    // Fast, strong 64-bit mixer for hashing and PRNG seeding; outperforms SplitMix64 in avalanche and diffusion tests.
    // Modified to add a fixed constant, avoiding the trivial zero state for low-entropy seeds.
-   u64 moremur(u64 x){
+   constexpr u64 moremur(u64 x){
       x += 0x9E3779B97F4A7C15ULL; // golden ratio increment
       x ^= x >> 27;
-      x *= 0x3C79AC492BA7B653UL;
+      x *= 0x3C79AC492BA7B653ULL;
       x ^= x >> 33;
-      x *= 0x1C69B3F74AC4AE35UL;
+      x *= 0x1C69B3F74AC4AE35ULL;
       x ^= x >> 27;
       return x;
    }
@@ -39,7 +44,7 @@ namespace seed {
        // FNV1a for string hashing        
       u64 hash = 14695981039346656037ULL;
       for(const char c : str){
-         hash ^= static_cast<u64>(static_cast<std::byte>(c));
+         hash ^= c;
          hash *= 1099511628211ULL;
       }
       return hash;
@@ -54,7 +59,6 @@ namespace seed {
       return from_text(__FILE__ ":" __DATE__ ":" __TIME__);
    }
 
-
 #ifdef __COUNTER__   
    // Generate unique compile-time seeds even within the same compilation unit
    // Properties:
@@ -62,16 +66,14 @@ namespace seed {
    // - Useful for generating unique seeds in the same file
    // unique_from_source(): unique value per TU (function definition).
    //   If inlined or defined in a header, value may be unique per TU.
-   // SEED_UNIQUE_FROM_SOURCE(): expands to a unique value per macro expansion.
-   #define STRINGIFY(x) #x
-   #define STR(x) STRINGIFY(x)
-   constexpr u64 unique_from_source() noexcept {
-       return from_text(__FILE__ " " __DATE__ " " __TIME__ " " STR(__COUNTER__));
+   // SEED_UNIQUE_FROM_SOURCE: expands to a unique value per macro expansion.
+#define STRINGIFY(x) #x
+#define STR(x) STRINGIFY(x)
+   constexpr u64 unique_from_source() noexcept{
+      return from_text(__FILE__ " " __DATE__ " " __TIME__ " " STR(__COUNTER__));
    }
-   #define SEED_UNIQUE_FROM_SOURCE() seed::from_text(__FILE__ " " __DATE__ " " __TIME__ " " STR(__COUNTER__))
-   #undef STRINGIFY
-   #undef STR
-#endif
+#define SEED_UNIQUE_FROM_SOURCE (seed::from_text(__FILE__ " " __DATE__ " " __TIME__ " " STR(__COUNTER__)))
+#endif // __COUNTER__
 
     // Wall clock time
     // Properties:
@@ -101,12 +103,12 @@ namespace seed {
    // - Useful for generating different seeds in multi-threaded contexts
    inline u64 from_thread() noexcept{
       // Uses std::hash to portably convert thread::id to a 64-bit value.
-      const std::thread::id tid = std::this_thread::get_id(); 
+      const std::thread::id tid = std::this_thread::get_id();
       const size_t value = std::hash<std::thread::id>{}(tid);
       return moremur(value);
    }
 
-   // Stack address
+   // Variable address
    // Properties:
    // - Varies between runs due to ASLR (Address Space Layout Randomization)
    // - May be predictable if ASLR is disabled
@@ -114,7 +116,20 @@ namespace seed {
    // - Cheap to obtain
    // - Potentially useful as supplementary entropy source
    inline u64 from_stack() noexcept{
-      const auto dummy = 0;  // local variable just for its address
+      const u64 dummy = 0;
+      return moremur(reinterpret_cast<std::uintptr_t>(&dummy));
+   }
+
+   inline u64 from_heap() noexcept{
+      std::unique_ptr<u64> dummy{new (std::nothrow) u64()};
+      if(!dummy){ return from_stack(); } // Fallback to stack if allocation fails
+      return moremur(reinterpret_cast<std::uintptr_t>(dummy.get()));
+   }
+
+   inline u64 from_global() noexcept{
+       // static = stored in global memory, but scoped locally to the function
+       // alignas(8) ensures 3 low address bits are zero (more entropy in high bits)
+      alignas(8) static const u64 dummy = 0;
       return moremur(reinterpret_cast<std::uintptr_t>(&dummy));
    }
 
@@ -135,30 +150,44 @@ namespace seed {
    // - Maximum entropy mixing
    // - Higher overhead
    // - Useful when seed quality is critical
-   // - Good for initializing large-state PRNGs
-   inline u64 from_all() noexcept{
-      const auto time = from_time();
-      const auto cpu = from_cpu_time();
-      const auto thread = from_thread();
-      const auto stack = from_stack();
-      const auto entropy = from_system_entropy();
-      const auto source = from_source();
-      return moremur(time ^ cpu ^ thread ^ stack ^ entropy ^ source);
+   constexpr u64 from_all() noexcept{
+      constexpr u64 source =
+#ifdef SEED_UNIQUE_FROM_SOURCE
+         SEED_UNIQUE_FROM_SOURCE;
+#else
+         from_source();
+#endif
+      if consteval{
+         return moremur(source);
+      }
+      return moremur(
+         moremur(from_time())         
+         ^ moremur(from_thread())
+         ^ moremur(from_stack())
+         ^ moremur(from_global())
+         ^ moremur(from_heap())
+         ^ moremur(from_system_entropy())
+         ^ moremur(from_cpu_time())
+         ^ moremur(source)
+      );
    }
 
-   inline u32 to_32(u64 seed) noexcept{
+   constexpr u32 to_32(u64 seed) noexcept{
       return static_cast<u32>(seed ^ (seed >> 32)); //XOR-fold to mix high and low bits when casting to 32 bits.
    }
+
+#undef STRINGIFY
+#undef STR
 }
 
 /* Example usage:
-using rnd::Random; 
+using rnd::Random;
 using seed::to_32; // Convenience alias for converting a 64-bit seed to 32 bits (for smaller engines).
 
 // Compile-time seeding:
 constexpr auto seed1 = seed::from_text("my_game_seed");
 constexpr auto seed2 = seed::from_source();           // Different for each compilation unit (source file)
-constexpr auto seed3 = SEED_UNIQUE_FROM_SOURCE();     // Different for each macro expansion, even within the same source file
+constexpr auto seed3 = SEED_UNIQUE_FROM_SOURCE;     // Different for each macro expansion, even within the same source file
 
 // Runtime seeding:
 Random<SmallFast32> rng1(to_32(seed::from_time()));   // Wall clock time, folded down to 32 bits for SmallFast32
