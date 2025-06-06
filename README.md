@@ -144,7 +144,7 @@ These utilities help you ensure that your random number generators are seeded ap
 
 ---
 
-## [string\_hash.h](https://github.com/ulfben/cpp_prngs/blob/main/string_hash.hpp)
+## [string\_hash.hpp](https://github.com/ulfben/cpp_prngs/blob/main/string_hash.hpp)
 
 A `constexpr` implementation of the [FNV-1a (Fowler–Noll–Vo) hash algorithm](https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function), with a convenient string literal operator. While not a PRNG itself, fast string hashing is useful for:
 
