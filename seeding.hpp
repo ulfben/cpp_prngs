@@ -30,7 +30,7 @@ namespace seed {
    // "moremur" mixing function by Pelle Evensen (2019); see: https://mostlymangling.blogspot.com/2019/12/stronger-better-morer-moremur-better.html
    // Fast, strong 64-bit mixer for hashing and PRNG seeding; outperforms SplitMix64 in avalanche and diffusion tests.
    // Modified to add a fixed constant, avoiding the trivial zero state for low-entropy seeds.
-   constexpr u64 moremur(u64 x){
+   constexpr u64 moremur(u64 x) noexcept{
       x += 0x9E3779B97F4A7C15ULL; // golden ratio increment
       x ^= x >> 27;
       x *= 0x3C79AC492BA7B653ULL;
@@ -108,7 +108,7 @@ namespace seed {
       return moremur(value);
    }
 
-   // Variable address
+   // Stack address
    // Properties:
    // - Varies between runs due to ASLR (Address Space Layout Randomization)
    // - May be predictable if ASLR is disabled
