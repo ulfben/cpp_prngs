@@ -73,10 +73,10 @@ public:
 };
 static_assert(RandomBitEngine<SmallFast32>);
 
+#ifdef VALIDATE_PRNGS
 //Reference implementation of JSF (Jenkins Small Fast) PRNG
 // https://burtleburtle.net/bob/rand/smallprng.html
 // used to verify the SmallFast32 implementation
-#include <array>
 using u4 = std::uint32_t;
 struct ranctx{
    u4 a, b, c, d;
@@ -106,10 +106,6 @@ static constexpr auto JSF_REFERENCE = []{
    return out;
    }();
 
-template <typename Engine, typename T = typename Engine::result_type, std::size_t N = 6>
-constexpr std::array<T, N> prng_outputs(Engine&& rng){
-   std::array<T, N> out{};
-   for(auto& v : out){ v = rng(); }
-   return out;
-}
 static_assert(prng_outputs(SmallFast32(123)) == JSF_REFERENCE, "SmallFast32 output does not match JSF reference");
+
+#endif //VALIDATE_PRNGS

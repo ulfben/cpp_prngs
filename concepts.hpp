@@ -27,3 +27,14 @@ std::equality_comparable<E>&&               // e1 == e2
       { e.discard(n) } noexcept;            // advance the state, no return value
       { e.split() } noexcept -> std::same_as<E>; // returns a decorrelated, forked engine; advances this engine's state
 };
+
+#define VALIDATE_PRNGS
+#ifdef VALIDATE_PRNGS
+#include <array>
+template <typename Engine, typename T = typename Engine::result_type, std::size_t N = 6>
+constexpr std::array<T, N> prng_outputs(Engine&& rng) {
+    std::array<T, N> out{};
+    for (auto& v : out) v = rng();
+    return out;
+}
+#endif // VALIDATE

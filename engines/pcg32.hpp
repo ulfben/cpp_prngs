@@ -115,12 +115,12 @@ public:
 };
 static_assert(RandomBitEngine<PCG32>);
 
+#ifdef VALIDATE_PRNGS
 // Test values for PCG32 to ensure it works as expected
-#include <array>
 static constexpr auto PCG32_REFERENCE_FROM_SEED = []{ 
    PCG32 rng(42u, 54u); //example seed and sequence, from https://github.com/imneme/pcg-c-basic/blob/master/pcg32-demo.c
    std::array<PCG32::result_type,6> vals{};
-   for(auto& v : vals) v = rng.next();
+   for(auto& v : vals){ v = rng.next() };
    return vals;
 }();
 //expected values for the above seed and sequence from: https://www.pcg-random.org/using-pcg-c-basic.html
@@ -130,3 +130,4 @@ static_assert(PCG32_REFERENCE_FROM_SEED[2] == 0xba1d3330);
 static_assert(PCG32_REFERENCE_FROM_SEED[3] == 0x83d2f293);
 static_assert(PCG32_REFERENCE_FROM_SEED[4] == 0xbfa4784b);
 static_assert(PCG32_REFERENCE_FROM_SEED[5] == 0xcbed606e);
+#endif //VALIDATE_PRNGS
