@@ -76,6 +76,7 @@ static_assert(RandomBitEngine<SmallFast32>);
 //Reference implementation of JSF (Jenkins Small Fast) PRNG
 // https://burtleburtle.net/bob/rand/smallprng.html
 // used to verify the SmallFast32 implementation
+#include <array>
 using u4 = std::uint32_t;
 struct ranctx{
    u4 a, b, c, d;
