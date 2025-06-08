@@ -73,3 +73,40 @@ public:
    constexpr bool operator==(const SmallFast64& rhs) const noexcept = default;
 };
 static_assert(RandomBitEngine<SmallFast64>);
+
+#ifdef VALIDATE_PRNGS
+//Reference implementation of JSF (Jenkins Small Fast) PRNG
+// https://burtleburtle.net/bob/rand/smallprng.html
+// used to verify the SmallFast64 implementation
+using u8 = std::uint64_t;
+struct ranctx64{
+   u8 a, b, c, d;
+};
+constexpr u8 ranval64(ranctx64& x) noexcept{
+   constexpr auto rot64 = [](u8 x, unsigned k) noexcept -> u8{
+      return (((x) << (k)) | ((x) >> (64 - (k))));
+      };
+   u8 e = x.a - rot64(x.b, 7);
+   x.a = x.b ^ rot64(x.c, 13);
+   x.b = x.c + rot64(x.d, 37);
+   x.c = x.d + e;
+   x.d = e + x.a;
+   return x.d;
+}
+constexpr ranctx64 raninit64(u8 seed) noexcept{
+   ranctx64 x{0xf1ea5eedu, seed, seed, seed};
+   for(unsigned i = 0; i < 20; ++i){
+      ranval64(x);
+   }
+   return x;
+}
+static constexpr auto JSF64_REFERENCE = []{
+   ranctx64 ctx = raninit64(123);
+   std::array<SmallFast64::result_type, 6> out{};
+   for(auto& v : out){ v = ranval64(ctx); }
+   return out;
+   }();
+
+static_assert(prng_outputs(SmallFast64(123)) == JSF64_REFERENCE, "SmallFast64 output does not match JSF reference");
+
+#endif //VALIDATE_PRNGS
