@@ -72,3 +72,43 @@ public:
    constexpr bool operator==(const SmallFast32& rhs) const noexcept = default;
 };
 static_assert(RandomBitEngine<SmallFast32>);
+
+//Reference implementation of JSF (Jenkins Small Fast) PRNG
+// https://burtleburtle.net/bob/rand/smallprng.html
+// used to verify the SmallFast32 implementation
+using u4 = std::uint32_t;
+struct ranctx{
+   u4 a, b, c, d;
+};
+constexpr u4 ranval(ranctx& x) noexcept{
+   constexpr auto rot32 = [](u4 x, unsigned k) noexcept -> u4{
+      return (((x) << (k)) | ((x) >> (32 - (k))));
+      };
+   const u4 e = x.a - rot32(x.b, 27);
+   x.a = x.b ^ rot32(x.c, 17);
+   x.b = x.c + x.d;
+   x.c = x.d + e;
+   x.d = e + x.a;
+   return x.d;
+}
+constexpr ranctx raninit(u4 seed) noexcept{
+   ranctx x{0xf1ea5eedu, seed, seed, seed};
+   for(unsigned i = 0; i < 20; ++i){
+      ranval(x);
+   }
+   return x;
+}
+static constexpr auto JSF_REFERENCE = []{
+   ranctx ctx = raninit(123);
+   std::array<SmallFast32::result_type, 6> out{};
+   for(auto& v : out){ v = ranval(ctx); }
+   return out;
+   }();
+
+template <typename Engine, typename T = typename Engine::result_type, std::size_t N = 6>
+constexpr std::array<T, N> prng_outputs(Engine&& rng){
+   std::array<T, N> out{};
+   for(auto& v : out){ v = rng(); }
+   return out;
+}
+static_assert(prng_outputs(SmallFast32(123)) == JSF_REFERENCE, "SmallFast32 output does not match JSF reference");
