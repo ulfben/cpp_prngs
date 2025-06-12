@@ -2,6 +2,7 @@
 #include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
+#include <span>
 
 /*
   Xoshiro256SS - a modern C++ port of xoshiro256** 1.0.
@@ -30,8 +31,13 @@ class Xoshiro256SS{
       z = (z ^ (z >> 27)) * 0x94d049bb133111ebuLL;
       return z ^ (z >> 31);
    }
+      //private constructor to allow factory function from_state() to bypass the seeding routines.
+   constexpr Xoshiro256SS(std::span<const u64> state) noexcept{
+      std::ranges::copy(state, s);
+   }
 public:
    using result_type = u64;
+   using state_type = u64;
 
    constexpr Xoshiro256SS() noexcept
       : Xoshiro256SS(0xFEEDFACECAFEBEEFuLL){}
@@ -46,7 +52,10 @@ public:
       s[2] = splitmix64(s[1] + 0x7F4A7C15F39CCCD1ULL); // arbitrary odd
       s[3] = splitmix64(s[2] + 0x3549B5A7B97C9A31ULL); // another odd
    }
-
+   //factory function to create a Xoshiro256SS from a state, bypassing the seeding routines.
+   static constexpr Xoshiro256SS from_state(std::span<const state_type> state) noexcept{
+      return Xoshiro256SS{state};
+   }
    constexpr void seed() noexcept{
       *this = Xoshiro256SS{};
    }
@@ -108,3 +117,33 @@ public:
    constexpr bool operator==(const Xoshiro256SS& rhs) const noexcept = default; //will do the right thing since C++20! 
 };
 static_assert(RandomBitEngine<Xoshiro256SS>);
+
+#ifdef VALIDATE_PRNGS
+//original implementation of xoshiro256** 1.0 by David Blackman and Sebastiano Vigna
+// https://prng.di.unimi.it/xoshiro256starstar.c
+constexpr uint64_t rotl(const uint64_t x, int k) noexcept{
+   return (x << k) | (x >> (64 - k));
+}
+static uint64_t s[4]{0xFEEDFACECAFEBEEFuLL,0,0,0};
+constexpr uint64_t next(void) noexcept{
+   const uint64_t result = rotl(s[1] * 5, 7) * 9;
+   const uint64_t t = s[1] << 17;
+   s[2] ^= s[0];
+   s[3] ^= s[1];
+   s[1] ^= s[2];
+   s[0] ^= s[3];
+   s[2] ^= t;
+   s[3] = rotl(s[3], 45);
+   return result;
+}
+
+static constexpr auto Xoshiro256SS_REFERENCE = []{
+   std::array<Xoshiro256SS::result_type, 6> out{};
+   for(auto& v : out){ v = next(); }
+   return out;
+   }();
+
+constexpr static uint64_t s2[4]{0xFEEDFACECAFEBEEFuLL,0,0,0};
+static_assert(prng_outputs(Xoshiro256SS::from_state(s2)) == Xoshiro256SS_REFERENCE, "Xoshiro256SS output does not match Xoshiro256** reference");
+
+#endif //VALIDATE_PRNGS
