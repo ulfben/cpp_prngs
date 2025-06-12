@@ -31,9 +31,13 @@ class RomuDuoJr final{
    static constexpr u64 mix(u64 y) noexcept{
       return y ^ (y >> 23) ^ (y >> 51);
    }
-
+   struct Direct{}; //tag for from_state()
+   //private constructor to allow factory function from_state() to bypass the seeding routines.
+   constexpr RomuDuoJr(u64 xstate, u64 ystate, Direct) noexcept
+      : x(xstate), y(ystate){}
 public:
    using result_type = u64;
+   using state_type = u64;
 
    constexpr RomuDuoJr() noexcept : RomuDuoJr(0xFEEDFACEFEEDFACEULL){}
 
@@ -58,6 +62,10 @@ public:
 
    constexpr void seed(result_type seed) noexcept{
       *this = RomuDuoJr{seed};
+   }
+   //factory function to create a RomuDuoJr from a state, bypassing the seeding routines.
+   static constexpr RomuDuoJr from_state(state_type xstate, state_type ystate) noexcept{
+      return RomuDuoJr{xstate, ystate, Direct{}};
    }
 
    constexpr result_type next() noexcept{
@@ -92,3 +100,29 @@ public:
    constexpr bool operator==(const RomuDuoJr& rhs) const noexcept = default;
 };
 static_assert(RandomBitEngine<RomuDuoJr>);
+
+#ifdef VALIDATE_PRNGS
+// Original implementation of RomuDuoJr from Mark Overton´s 2020 paperm for validation purposes 
+// see: https://www.romu-random.org/code.c
+// adjusted for constexpr evaluation, but otherwise unchanged
+#define ROTL(d,lrot) ((d<<(lrot)) | (d>>(8*sizeof(d)-(lrot))))
+struct romu_state{
+   uint64_t xState, yState;  // set to nonzero seed
+};
+constexpr uint64_t romuDuoJr_random(romu_state& s) noexcept {
+   uint64_t xp = s.xState;
+   s.xState = 15241094284759029579u * s.yState;
+   s.yState = s.yState - xp;  s.yState = ROTL(s.yState,27);
+   return xp;
+}
+
+static constexpr auto ROMUDUJR_REFERENCE = []{
+   romu_state s{123, 0};
+   std::array<RomuDuoJr::result_type, 6> out{};
+   for(auto& v : out){ v = romuDuoJr_random(s); }
+   return out;
+   }();
+
+static_assert(prng_outputs(RomuDuoJr::from_state(123, 0)) == ROMUDUJR_REFERENCE, "RomuDuoJr output does not match romuDuoJr reference");
+
+#endif //VALIDATE_PRNGS
