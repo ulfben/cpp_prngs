@@ -1,15 +1,17 @@
 #pragma once
-#include "random.hpp"
-#include "romuduojr.hpp"
+#include "random.hpp" //grab from: https://github.com/ulfben/cpp_prngs/
+#include "romuduojr.hpp" //grab from: https://github.com/ulfben/cpp_prngs/
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <compare>
 #include <cstdint>
 #include <optional>
 #include <random>
 #include <span>
 #include <string>
 #include <string_view>
+#include <ostream>
 
 // Source: https://github.com/ulfben/cpp_prngs/blob/main/ulid.hpp
 // ULID (Universally Unique Lexicographically Sortable Identifier) is fundamentally:
@@ -29,9 +31,9 @@
 // This header provides:
 //
 //   - ulid_t::generate()
-//       Generates a ULID using the current time and a per-thread RomuDuoJr
-//       PRNG. The result is time-ordered at millisecond precision, but
-//       multiple IDs within the same millisecond are not guaranteed to be
+//       Generates a ULID using the current time and a per-thread PRNG. 
+//		 The result is time-ordered at millisecond precision, but multiple 
+//		 IDs within the same millisecond are not guaranteed to be
 //       strictly monotonic.
 //
 //   - ulid_t::generate_monotonic()
@@ -57,7 +59,7 @@
 class ulid_t final{
 public:
 	using byte = std::uint8_t;
-	using Random = rnd::Random<RomuDuoJr>; //https://github.com/ulfben/cpp_prngs/
+	using Random = rnd::Random<RomuDuoJr>;
 
 	[[nodiscard]] static ulid_t generate() noexcept{
 		const auto ts = now_ms();
@@ -68,7 +70,7 @@ public:
 		return ulid;
 	}
 
-	[[nodiscard]] static ulid_t generate_monotonic(){
+	[[nodiscard]] static ulid_t generate_monotonic() noexcept{
 		auto ts = now_ms();
 		static thread_local auto rng = Random{ts ^ std::random_device{}()};
 		static thread_local std::uint64_t last_ts = 0;
@@ -122,6 +124,24 @@ public:
 		return to_string();
 	}
 
+	[[nodiscard]] constexpr std::array<byte, 16> to_bytes() const noexcept{
+		return data;
+	}
+
+	[[nodiscard]] constexpr static ulid_t from_bytes(std::span<const byte, 16> bytes) noexcept{
+		ulid_t ulid{};
+		std::ranges::copy(bytes, ulid.data.begin());
+		return ulid;
+	}
+
+	[[nodiscard]] constexpr std::uint64_t timestamp_ms() const noexcept{		
+		std::uint64_t ts = 0;
+		for(int i = 0; i < 6; ++i){ // ULID stores a 48-bit big-endian timestamp in data[0..5]
+			ts = (ts << 8) | static_cast<std::uint64_t>(data[i]);
+		}
+		return ts;
+	}
+
 	constexpr auto operator<=>(const ulid_t&) const = default;
 
 private:
@@ -149,9 +169,11 @@ private:
 
 	static std::uint64_t now_ms() noexcept{
 		using namespace std::chrono;
-		return duration_cast<milliseconds>(
-			system_clock::now().time_since_epoch()
-		).count();
+		return static_cast<std::uint64_t>(
+			duration_cast<milliseconds>(
+				system_clock::now().time_since_epoch()
+			).count()
+		);
 	}
 
 	constexpr static std::string encode_base32(std::span<const byte, 16> bytes){
@@ -246,3 +268,7 @@ private:
 		}
 	}
 };
+
+inline std::ostream& operator<<(std::ostream& os, const ulid_t& id){
+	return os << id.to_string();
+}
