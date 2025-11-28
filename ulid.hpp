@@ -10,9 +10,14 @@
 #include <span>
 #include <string>
 #include <string_view>
-// ULID (Universally Unique Lexicographically Sortable Identifier) is a 128-bit
-// identifier format with the following layout:
+
+// Source: https://github.com/ulfben/cpp_prngs/blob/main/ulid.hpp
+// ULID (Universally Unique Lexicographically Sortable Identifier) is fundamentally:
+// - a 128-bit unsigned integer
+// - serialized to 16 numeric bytes
+// - encoded using Crockford base32
 //
+// The 128-bit are laid out thusly:
 //   - 48 bits: millisecond timestamp since Unix epoch
 //   - 80 bits: randomness
 //
@@ -21,9 +26,6 @@
 // ULIDs useful as human-friendly, time-orderable identifiers for logs,
 // database keys, filenames, etc.
 // 
-// I was inspired by Marius Bancila's article on the subject: 
-//   https://mariusbancila.ro/blog/2025/11/27/universally-unique-lexicographically-sortable-identifiers-ulids/
-//
 // This header provides:
 //
 //   - ulid_t::generate()
@@ -48,6 +50,10 @@
 //
 // Monotonicity is per thread only: there is no cross-thread coordination,
 // no locking, and no global ordering between threads.
+//
+// Many thanks to Marius Bancila for the inspiration! 
+//   https://mariusbancila.ro/blog/2025/11/27/universally-unique-lexicographically-sortable-identifiers-ulids/
+
 class ulid_t final{
 public:
 	using byte = std::uint8_t;
