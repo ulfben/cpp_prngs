@@ -128,6 +128,10 @@ public:
 		return data;
 	}
 
+	[[nodiscard]] constexpr std::span<const byte, 16> as_bytes() const noexcept{
+		return std::span<const byte, 16>(data);
+	}
+
 	[[nodiscard]] constexpr static ulid_t from_bytes(std::span<const byte, 16> bytes) noexcept{
 		ulid_t ulid{};
 		std::ranges::copy(bytes, ulid.data.begin());
