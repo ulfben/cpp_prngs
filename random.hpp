@@ -204,23 +204,25 @@ namespace rnd {
          return mean + (sum - F(6)) * stddev;
       }
 
-      // Returns N random bits from the engine, with a branchless fast path when possible
-      template <unsigned n>
-      constexpr std::uint64_t bits() noexcept{
-         static_assert(n > 0 && n <= 64, "Can only extract 1–64 bits");
-         if constexpr(BITS >= n){ // fast path: engine is wide enough to deliver all bits in a single call            
-            if constexpr(n < 64){
-               return next() & ((std::uint64_t(1) << n) - 1); // mask out n bits
-            } else{ // n == 64, return all bits. Avoids UB on shift by 64
-               return next();
-            }
-         } else{ //general path, call runtime version to gather enough bits
-            return bits(n);
+     // Compile-time bit extractor with selectable return type.
+     // Precondition: (N > 0 && N <= 64)
+     // Example: rng.bits<8, std::uint8_t>() or rng.bits<16, std::uint16_t>()
+     template<unsigned N, class T = std::uint64_t>
+     constexpr T bits() noexcept{
+         static_assert(N > 0 && N <= BITS, "Can only extract 1–64 bits");
+         static_assert(std::is_unsigned_v<T>, "bits<N, T> requires an unsigned T");
+         static_assert(N <= std::numeric_limits<T>::digits, "Not enough bits in return type T to hold N bits");            
+         const result_type x = next();
+         if constexpr(N == BITS){
+             return static_cast<T>(x);
          }
-      }
+         const result_type mask = (result_type(1) << N) - 1;
+         return static_cast<T>((x >> (BITS - N)) & mask); // take top N bits            
+     }
 
-      // Returns N random bits from the engine, for use when n is not known at compile time
-      constexpr std::uint64_t bits(unsigned n) noexcept{
+     // Returns N random bits from the engine, for use when n is not known at compile time
+     // precondition: (n > 0 && n <= 64)
+     constexpr std::uint64_t bits(unsigned n) noexcept{
          assert(n > 0 && n <= 64);
          switch(n){
          case 8:  return bits<8>();
@@ -229,16 +231,16 @@ namespace rnd {
          case 32: return bits<32>();
          case 64: return bits<64>();
          default:
-            std::uint64_t value = 0;
-            unsigned filled = 0;
-            while(filled < n){
-               std::uint64_t r = next();
-               unsigned avail = std::min(BITS, n - filled);
-               value |= ((r & ((uint64_t(1) << avail) - 1)) << filled);
-               filled += avail;
-            }
-            return value;
+             std::uint64_t value = 0;
+             unsigned filled = 0;
+             while(filled < n){
+                 std::uint64_t r = next();
+                 unsigned avail = std::min(BITS, n - filled);
+                 value |= ((r & ((uint64_t(1) << avail) - 1)) << filled);
+                 filled += avail;
+             }
+             return value;
          }
-      }
+     }
    };
 } //namespace rnd
