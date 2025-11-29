@@ -208,12 +208,11 @@ namespace rnd {
          return mean + (sum - F(6)) * stddev;
       }
 
-     // Compile-time bit extractor with selectable return type.
-     // Precondition: (N > 0 && N <= 64)
+     // Returns N random bits from the engine, with selectable return type.
      // Example: rng.bits<8, std::uint8_t>() or rng.bits<16, std::uint16_t>()
      template<unsigned N, class T = std::uint64_t>
      constexpr T bits() noexcept{
-         static_assert(N > 0 && N <= BITS, "Can only extract 1–64 bits");
+         static_assert(N > 0 && N <= BITS, "Can only extract [1 – std::numeric_limits<result_type>::digits] bits");
          static_assert(std::is_unsigned_v<T>, "bits<N, T> requires an unsigned T");
          static_assert(N <= std::numeric_limits<T>::digits, "Not enough bits in return type T to hold N bits");            
          const result_type x = next();
@@ -222,6 +221,14 @@ namespace rnd {
          }
          const result_type mask = (result_type(1) << N) - 1;
          return static_cast<T>((x >> (BITS - N)) & mask); // take top N bits            
+     }
+
+     //convenience overload: fill a T with random bits
+     template<class T>
+     constexpr T bits_as() noexcept{
+         static_assert(std::is_unsigned_v<T>, "bits<T>() requires an unsigned T");
+         constexpr unsigned N = std::numeric_limits<T>::digits;
+         return bits<N, T>();
      }
 
      // Returns N random bits from the engine, for use when n is not known at compile time
