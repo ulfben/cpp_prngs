@@ -1,8 +1,12 @@
-﻿#pragma once
+#pragma once
+#include <algorithm>
 #include <bit> // for std::bit_cast
 #include <cassert>
 #include <cmath>
-#include <limits>
+#include <concepts>
+#include <cstdint>
+#include <iterator>
+#include <ranges>
 #include <type_traits>
 #ifdef _MSC_VER
 #include <intrin.h>    // for _umul128, 64x64 multiplication
