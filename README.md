@@ -73,7 +73,8 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 | `next(bound)` / `operator()(bound)` | Next random number in `[0, bound)`, using [Lemire's FastRange method](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) (minimal bias, very fast) |
 | `between(lo, hi)`                   | Random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float) |
 | `bits(n)`            | Returns `n` random bits at runtime (`1 ≤ n ≤ 64`), filled into the low bits.[^1]  |
-| `bits<n>()`          | Returns `n` random bits at compile time (`1 ≤ n ≤ 64`), filled into the low bits.[^1]  |
+| `bits<n,T>()`          | Returns `n` random bits at compile time (`1 ≤ n ≤ 64`), filled into the low bits of a T.[^1]  |
+| `bits_as<T>()`          | Returns an (unsigned) T filled with random bits.[^1]  |
 | `normalized<F>()`                   | Float of type `F` in `[0.0, 1.0)`, using [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/) |
 | `signed_norm<F>()`                  | Float of type `F` in `[-1.0, 1.0)` (also using the IQ hack)                   |
 | `coin_flip()`                       | Fair coin, returns `true` ~50% of the time                                                  |
