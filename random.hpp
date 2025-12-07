@@ -157,16 +157,6 @@ namespace rnd {
          return normalized<F>() < probability;
       }
 
-      // 24-bit RGB packed as 0xRRGGBB
-      constexpr std::uint32_t rgb8() noexcept{
-         return static_cast<std::uint32_t>(bits<24>()); //same as next() & 0x00'FF'FF'FFu       
-      }
-
-      // 32-bit RGBA packed as 0xRRGGBBAA
-      constexpr std::uint32_t rgba8() noexcept{
-         return static_cast<std::uint32_t>(bits<32>()); //next() & 0xFF'FF'FF'FFu         
-      }
-
       // pick an index in [0, size)
       template<std::ranges::sized_range R>
       constexpr auto index(const R& collection) noexcept{
