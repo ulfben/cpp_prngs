@@ -79,8 +79,6 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 | `signed_norm<F>()`                  | Float of type `F` in `[-1.0, 1.0)` (also using the IQ hack)                   |
 | `coin_flip()`                       | Fair coin, returns `true` ~50% of the time                                                  |
 | `coin_flip(p)`                      | Weighted coin, returns `true` with probability `p` (where `p` is `[0.0, 1.0]`)                   |
-| `rgb8()`                            | Packs three 8-bit channels into a `uint32_t` as `0xRRGGBB`                                                   |
-| `rgba8()`                           | Packs four 8-bit channels into a `uint32_t` as `0xRRGGBBAA`                                                  |
 | `index(range)`                      | Returns a random index into any sized collection                                             |
 | `iterator(range)`                   | Returns an iterator to a random element in any sized collection                              |
 | `element(range)`                    | Returns a reference to a random element in any sized collection                              |
