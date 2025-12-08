@@ -143,61 +143,6 @@ Random<Xoshiro256SS> rng6(seed::from_all());          // Combines all sources (t
 ```
 These utilities help you ensure that your random number generators are seeded appropriately - whether you need reproducibility, speed, or maximal entropy.
 
----
-
-## [string\_hash.hpp](https://github.com/ulfben/cpp_prngs/blob/main/string_hash.hpp)
-
-A `constexpr` implementation of the [FNV-1a (Fowler–Noll–Vo) hash algorithm](https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function), with a convenient string literal operator. While not a PRNG itself, fast string hashing is useful for:
-
-* Replacing slow string comparisons with fast integer comparisons
-* Generating compile-time seeds for PRNGs from string literals (e.g. `auto seed = "my game seed"_fnv;`)
-* Creating deterministic hashes for game content when you need reproducible numbers
-
-The implementation is \~30 lines of code and provides:
-
-* Explicit constructor: `string_hash("some text")`
-* String literal operator: `"some text"_hash`
-* Full comparison operators for use as keys in STL containers
-
-You can also generate deterministic but unique seeds at compile time using macro expansions:
-
-```cpp
-// File/line information
-constexpr auto file_seed = __FILE__"_hash";                   // full path of current source file
-constexpr auto line_seed = std::string{__FILE__}.append(__LINE__, '_')_hash; // file+line number
-
-// Date/time of compilation
-constexpr auto time_seed = __DATE__ " " __TIME__"_hash";      // "Mar 18 2024 15:30:45"
-
-// Function information (compiler-dependent)
-constexpr auto func_seed = __FUNCTION__"_hash";               // current function name
-constexpr auto pretty_func = __PRETTY_FUNCTION__"_hash";      // detailed function info including namespace/templates
-```
-
-Commonly useful for game development:
-
-* `__FILE__ + __LINE__` → per-location seeds
-* `__DATE__ + __TIME__` → per-compilation seeds
-* `__FUNCTION__`        → function-specific seeds
-
----
-
-## [std\_random.hpp](https://github.com/ulfben/cpp_prngs/blob/main/std_random.hpp)
-
-A demonstration of how to use the standard library's random facilities. `std_random.hpp` it based on `std::mt19937`, and will by default seed the full 2,496-byte state of that beast using `std::random_device`. It can also be manually seeded for reproducibility. I do not recommend using this code for all the reasons previously stated.
-
-The interface provides:
-
-* `T getNumber<T>(min, max);`  // Inclusive for integrals, half-open for floats
-* `char color();`              // \[0, 255]
-* `bool coinToss();`           // true/false
-* `float normalized();`        // \[0.0, 1.0)
-* `float unit_range();`        // \[-1.0, 1.0)
-
-[Try std\_random.hpp over at Compiler Explorer](https://compiler-explorer.com/z/fKz443bG4).
-
----
-
 ## License
 
 This repository is primarily licensed under the MIT License. See [LICENSE](https://github.com/ulfben/cpp_prngs/blob/main/LICENSE.md) for full details.
