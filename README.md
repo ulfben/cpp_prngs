@@ -61,35 +61,37 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 
 ## [random.hpp](https://github.com/ulfben/cpp_prngs/blob/main/random.hpp)
 
-| Method                              | Description                                                                                  |
-| ----------------------------------- | -------------------------------------------------------------------------------------------- |
-| `Random<E>()`                       | Default-constructs the engine E with its default seed                                        |
-| `Random<E>(seed)`                   | Constructs by seeding the engine with `seed`                                                 |
-| `Random<E>(engine)`                 | Constructs by copying an existing engine instance                                            |
-| `operator==(other)`                 | Returns `true` if two generators have identical state                                        |
-| `min()`                             | Returns the engine’s minimum possible value (typically 0)                                    |
-| `max()`                             | Returns the engine’s maximum possible value                                                  |
-| `next()` / `operator()()`           | Returns next random number in range `[min(), max())`                                         |
-| `next(bound)` / `operator()(bound)` | Next random number in `[0, bound)`, using [Lemire's FastRange method](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) (minimal bias, very fast) |
-| `between(lo, hi)`                   | Random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float) |
-| `bits(n)`            | Returns `n` random bits at runtime (`1 ≤ n ≤ 64`), filled into the low bits.[^1]  |
-| `bits<n,T>()`          | Returns `n` random bits at compile time (`1 ≤ n ≤ 64`), filled into the low bits of a T.[^1]  |
-| `bits_as<T>()`          | Returns an (unsigned) T filled with random bits.[^1]  |
-| `normalized<F>()`                   | Float of type `F` in `[0.0, 1.0)`, using [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/) |
-| `signed_norm<F>()`                  | Float of type `F` in `[-1.0, 1.0)` (also using the IQ hack)                   |
-| `coin_flip()`                       | Fair coin, returns `true` ~50% of the time                                                  |
-| `coin_flip(p)`                      | Weighted coin, returns `true` with probability `p` (where `p` is `[0.0, 1.0]`)                   |
-| `index(range)`                      | Returns a random index into any sized collection                                             |
-| `iterator(range)`                   | Returns an iterator to a random element in any sized collection                              |
-| `element(range)`                    | Returns a reference to a random element in any sized collection                              |
-| `gaussian(mean, stddev)`            | Returns an approximate normal sample, using the [Irwin–Hall sum-of-12](https://en.wikipedia.org/wiki/Irwin%E2%80%93Hall_distribution#Approximating_a_Normal_distribution) method                 |
-| `discard(n)`                        | Advances the underlying engine by `n` steps                                                  |
-| `seed()`                            | Reseeds the engine back to its default state                                                 |
-| `seed(v)`                           | Reseeds the engine with value `v`                                                            |
-| `split()`                           | Returns a decorrelated, forked engine; advances this engine's state; use for parallel streams |
-| `engine()` / `engine() const`       | Access the underlying engine instance (for manual serialization)                             |
+| Method                              | Description                                                                                                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Random<E>()`                       | Default-constructs the engine `E` with its default seed                                                                                                             |
+| `Random<E>(seed)`                   | Constructs by seeding the engine with `seed`                                                                                                                        |
+| `Random<E>(engine)`                 | Constructs by copying an existing engine instance                                                                                                                   |
+| `operator==(other)`                 | Returns `true` if two generators have identical state                                                                                                               |
+| `min()`                             | Returns the engine’s minimum possible value (typically 0)                                                                                                           |
+| `max()`                             | Returns the engine’s maximum possible value                                                                                                                         |
+| `next()` / `operator()()`           | Returns the next random number in `[min(), max())`                                                                                                                  |
+| `next(bound)` / `operator()(bound)` | Random integer in `[0, bound)`, using [Lemire’s FastRange](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) (minimal bias, very fast) |
+| `next<N, T>()`                      | Compile-time bounded integer in `[0, N)`, optionally returned as type `T`; optimized for power-of-2 bounds[^1]                                                      |
+| `between(lo, hi)`                   | Random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float)                                                                                |
+| `bits(n)`                           | Runtime: returns the top `n` random bits (`1 ≤ n ≤ digits(result_type)`), packed into `T` (default: `result_type`)[^1]                                              |
+| `bits<N, T>()`                      | Compile-time: returns the top `N` random bits as type `T`; constraints checked at compile time[^1]                                                                  |
+| `bits_as<T>()`                      | Convenience: returns an unsigned `T` filled with `digits(T)` high-quality random bits                                                                               |
+| `normalized<F>()`                   | Returns float `F` in `[0.0, 1.0)`, using the [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/)                                                     |
+| `signed_norm<F>()`                  | Returns float `F` in `[-1.0, 1.0)`                                                                                                                                  |
+| `coin_flip()`                       | Fair coin flip (`true` ~50%)                                                                                                                                        |
+| `coin_flip(p)`                      | Weighted coin (`true` with probability `p`, where `p` is in `[0.0, 1.0]`)                                                                                           |
+| `index(range)`                      | Returns a random index into any sized range                                                                                                                         |
+| `iterator(range)`                   | Returns an iterator to a random element                                                                                                                             |
+| `element(range)`                    | Returns a reference to a random element                                                                                                                             |
+| `gaussian(mean, stddev)`            | Approximate normal sample via the Irwin–Hall sum-of-12 method                                                                                                       |
+| `discard(n)`                        | Advances the underlying engine by `n` steps                                                                                                                         |
+| `seed()`                            | Reseeds the engine back to its default state                                                                                                                        |
+| `seed(v)`                           | Reseeds the engine with value `v`                                                                                                                                   |
+| `split()`                           | Produces a decorrelated, forked engine (useful for parallel streams)                                                                                                |
+| `engine()` / `engine() const`       | Access the underlying engine instance (for manual serialization, debugging, etc.)                                                                                   |
 
-[^1]: `bits(n)` / `bits<n>()` are not *intended* for integer generation - you should generally use `next()`, `next(bound)` or `between(lo, hi)` instead. *However*, if your bound is a power-of-2, and *especially* if it is known at compile time, `bits` *is* an **optimal** choice (fast and unbiased). :)
+
+[^1]: Although `bits(n)` and `bits<N>()` *can* be used for power-of-two integer ranges, this is not their intended purpose. Prefer `next<N,T>()` instead. It chooses the same fast, unbiased bit-shift specialization, but makes your code clearer and safer.
 
 ---
 
