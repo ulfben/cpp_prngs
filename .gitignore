@@ -34,6 +34,8 @@ Win32/    # 32-bit Windows builds
 *.exp     # Export files
 *.iobj    # Incremental object files
 *.ipdb    # Incremental program database files
+*.vc.db
+*.opendb
  
 # Visual Studio files
 # IDE-specific files that contain user preferences, layout settings, and debugging 
