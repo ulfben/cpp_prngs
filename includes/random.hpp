@@ -24,8 +24,9 @@
    // Quick Bench for generating bounded values: https://quick-bench.com/q/WHEcW9iSV7I8qB_4eb1KWOvNZU0
 namespace rnd {
 	namespace detail {
-		//the detail namespace holds a few private helpers for keeping the Random<E> class constexpr and portable. 
-		// specifically 128-bit multiply, which we need for Lemires' "fastrange" trick.
+		// detail: private helpers to keep Random<E> constexpr and portable.
+		// Provides a constexpr 64x64->128 multiply fallback on MSVC,
+		// where _umul128 is not constexpr (used for Lemire's fastrange).
 		struct u128_parts final{
 			std::uint64_t lo;
 			std::uint64_t hi;
@@ -38,7 +39,7 @@ namespace rnd {
 			const std::uint64_t b0 = static_cast<std::uint32_t>(b);
 			const std::uint64_t b1 = b >> 32;
 
-			// Partial products
+			// partial products
 			const std::uint64_t p00 = a0 * b0;
 			const std::uint64_t p01 = a0 * b1;
 			const std::uint64_t p10 = a1 * b0;
@@ -68,9 +69,9 @@ namespace rnd {
 			}
 		}
 
-		// private helper for 128-bit multiplications
-		// returns (x * bound) >> digits, truncated to u64
-		// Used to implement Daniel Lemire’s "fastrange" trick portably: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
+		// mul_shift_u64 - the helper we actually want.
+		// Computes (x * bound) >> digits, truncated to u64.
+		// Used to implement Daniel Lemire's fastrange trick portably.		
 		template <unsigned digits>
 		[[nodiscard]] constexpr std::uint64_t mul_shift_u64(std::uint64_t x, std::uint64_t bound) noexcept{
 			static_assert(digits >= 1 && digits <= 64, "digits must be in [1, 64]");
@@ -96,8 +97,6 @@ namespace rnd {
 			static_assert(false, "mul_shift_high64 requires either __uint128_t or MSVC _umul128");
 #endif
 		}
-			
-
 	} //detail namespace
 
 	namespace detail::selftest {
@@ -207,6 +206,7 @@ namespace rnd {
 
 		// produces a random value in [0, bound) using Lemire's fastrange.
 		// achieves very small bias without using rejection, and is much faster than naive modulo.
+		// See: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
 		constexpr result_type next(result_type bound) noexcept{
 			assert(bound > 0 && "bound must be non-zero and positive");
 
