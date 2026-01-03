@@ -23,34 +23,106 @@
    // Quick Bench for generating normalized floats: https://quick-bench.com/q/GARc3WSfZu4sdVeCAMSWWPMQwSE
    // Quick Bench for generating bounded values: https://quick-bench.com/q/WHEcW9iSV7I8qB_4eb1KWOvNZU0
 namespace rnd {
+	namespace detail {
+		//the detail namespace holds a few private helpers for keeping the Random<E> class constexpr and portable. 
+		// specifically 128-bit multiply, which we need for Lemires' "fastrange" trick.
+		struct u128_parts{
+			std::uint64_t lo;
+			std::uint64_t hi;
+		};
+
+		// constexpr 64x64 -> 128 multiply, returns (lo, hi)
+		[[nodiscard]] constexpr u128_parts mul64_to_128_parts(std::uint64_t a, std::uint64_t b) noexcept{	
+			// split 32-bit limbs
+			const std::uint64_t a0 = static_cast<std::uint32_t>(a);
+			const std::uint64_t a1 = a >> 32;
+			const std::uint64_t b0 = static_cast<std::uint32_t>(b);
+			const std::uint64_t b1 = b >> 32;
+			
+			// Partial products
+			const std::uint64_t p00 = a0 * b0; 
+			const std::uint64_t p01 = a0 * b1;
+			const std::uint64_t p10 = a1 * b0;
+			const std::uint64_t p11 = a1 * b1;
+
+			// combine:			
+			constexpr std::uint64_t lo32_mask = 0xFFFF'FFFFull;			
+			const std::uint64_t mid = p01 + p10;
+			  
+			// If mid wrapped around, we lost 2^64.
+			// After the later << 32, that becomes 2^96, i.e. bit 32 of the high word.
+			const std::uint64_t mid_carry = (mid < p01) ? (1ull << 32) : 0ull;
+
+			const std::uint64_t mid_lo = (mid & lo32_mask) << 32;
+			const std::uint64_t mid_hi = mid >> 32;
+
+			const std::uint64_t lo = p00 + mid_lo;
+			const std::uint64_t lo_carry = (lo < p00) ? 1ull : 0ull;
+
+			const std::uint64_t hi = p11 + mid_hi + mid_carry + lo_carry;
+			return {lo, hi};
+		}
+
+		// Computes (hi:lo) >> digits for digits in [1, 64], returning the low 64 bits of the shifted result.
+		template <unsigned digits>
+		[[nodiscard]] constexpr std::uint64_t shr128_to_u64(std::uint64_t hi, std::uint64_t lo) noexcept{
+			static_assert(digits > 0 && digits <= 64);
+			if constexpr(digits == 64){
+				return hi;
+			} else{
+				return (lo >> digits) | (hi << (64u - digits));
+			}
+		}
+
+		// private helper for 128-bit multiplications
+		// returns (x * bound) >> digits, truncated to u64
+		// Used to implement Daniel Lemire’s "fastrange" trick portably: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
+		template <unsigned digits>
+		[[nodiscard]] constexpr std::uint64_t mul_shift_u64(std::uint64_t x, std::uint64_t bound) noexcept{
+			static_assert(digits >= 1 && digits <= 64, "digits must be in [1, 64]");
+
+#if defined(__SIZEOF_INT128__)
+			return static_cast<std::uint64_t>(
+				(static_cast<__uint128_t>(x) * static_cast<__uint128_t>(bound)) >> digits
+				);
+
+#elif defined(_MSC_VER)
+			std::uint64_t hi = 0;
+			std::uint64_t lo = 0;
+
+			if consteval{				
+				const auto p = mul64_to_128_parts(x, bound); // constexpr fallback
+				lo = p.lo;
+				hi = p.hi;
+			} else{
+				// fast runtime path
+				lo = _umul128(x, bound, &hi);
+			}
+			return shr128_to_u64<digits>(hi, lo);
+
+#else
+			static_assert(false, "mul_shift_high64 requires either __uint128_t or MSVC _umul128");
+#endif
+		}
+
+		//quick-and-dirty test to make sure our 128-bit helper is constexpr-valid.		
+		template <std::uint64_t>
+		struct require_constexpr{};
+		using test_shift_1 = require_constexpr<mul_shift_u64<1>(0x0123'4567'89AB'CDEFuLL, 0xF0E1'D2C3'B4A5'9687uLL)>;
+		using test_shift_64 = require_constexpr<mul_shift_u64<64>(0x0123'4567'89AB'CDEFuLL, 0xF0E1'D2C3'B4A5'9687uLL)>;
+		using test_shift_max = require_constexpr<mul_shift_u64<64>(UINT64_MAX, UINT64_MAX)>;
+
+	} //detail namespace
+
 	template <RandomBitEngine E>
 	class Random final{
 		static constexpr unsigned value_bits = std::numeric_limits<E::result_type>::digits;
 		E _e{}; //the underlying engine providing random bits. This class will turn those into useful values.
 
-		//private helper for 128-bit multiplications
-		// computes the high 64 bits of a 64×64-bit multiplication.
-		// Used to implement Daniel Lemire’s "fastrange" trick: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
-		// which maps uniformly distributed `x` in [0, 2^digits) to [0, bound) with negligible bias.
-		template <unsigned digits>
-		constexpr std::uint64_t mul_shift_high64(std::uint64_t x, std::uint64_t bound) noexcept{
-#if defined(_MSC_VER)
-		// MSVC doesn't support __uint128_t; use intrinsic instead
-			std::uint64_t high{};
-			(void) _umul128(x, bound, &high); // low 64 bits discarded
-			return high;                     //return the high 64 bits
-#elif defined(__SIZEOF_INT128__)
-			return std::uint64_t((__uint128_t(x) * __uint128_t(bound)) >> digits);
-#else
-			static_assert(false,
-				"mul_shift_high64 requires either __uint128_t or MSVC _umul128");
-#endif
-		}
-
 	public:
 		using engine_type = E;
 		using result_type = typename E::result_type;
-		static_assert(std::is_unsigned_v<result_type>);		
+		static_assert(std::is_unsigned_v<result_type>);
 
 		constexpr Random() noexcept = default; //the engine will default initialize
 
@@ -110,7 +182,7 @@ namespace rnd {
 		// achieves very small bias without using rejection, and is much faster than naive modulo.
 		constexpr result_type next(result_type bound) noexcept{
 			assert(bound > 0 && "bound must be non-zero and positive");
-			
+
 			result_type raw_value = next(); // raw_value is in the range [0, 2^value_bits)
 
 			if constexpr(value_bits <= 32){ // for small engines, multiply into a 64-bit product
@@ -119,7 +191,7 @@ namespace rnd {
 				return result;                    // result is now in range [0, bound)
 			} else if constexpr(value_bits <= 64){
 				// same logic, but use helper for 128-bit math, since __uint128_t isn't universally available
-				return mul_shift_high64<value_bits>(raw_value, bound);
+				return detail::mul_shift_u64<value_bits>(raw_value, bound);
 			} else{ // fallback for hypothetical >64-bit engines. Naive modulo (slower, more bias)
 				return bound > 0 ? raw_value % bound : bound; // avoid division by zero in release builds
 			}
@@ -132,7 +204,7 @@ namespace rnd {
 		// compile time overload: next<Bound, Type>()
 		// gets random value in [0, Bound)
 		// returns value in type T (default: result_type)
-		template <result_type Bound, std::integral T = result_type> 
+		template <result_type Bound, std::integral T = result_type>
 		constexpr T next() noexcept{
 			static_assert(Bound > 0, "Bound must be positive");
 			static_assert(Bound - 1 <= static_cast<result_type>(std::numeric_limits<T>::max()),
@@ -150,7 +222,7 @@ namespace rnd {
 		}
 
 		// integer in [lo, hi)
-		template <std::integral I> 
+		template <std::integral I>
 		constexpr I between(I lo, I hi) noexcept{
 			if(!(lo < hi)){
 				assert(false && "between(lo, hi): inverted or empty range");
@@ -173,7 +245,7 @@ namespace rnd {
 		// real in [0.0,1.0) using the "IQ float hack"
 		//   see Iñigo Quilez, "sfrand": https://iquilezles.org/articles/sfrand/
 		// Fast, branchless and, now, portable.
-		template <std::floating_point F> 
+		template <std::floating_point F>
 		constexpr F normalized() noexcept{
 			static_assert(std::numeric_limits<F>::is_iec559, "normalized() requires IEEE 754 (IEC 559) floating point types.");
 			using UInt = std::conditional_t<sizeof(F) == 4, uint32_t, uint64_t>; // Pick wide enough unsigned int type for F
@@ -188,7 +260,7 @@ namespace rnd {
 		}
 
 		// real in [-1.0,1.0) using the IQ float hack.
-		template <std::floating_point F> 
+		template <std::floating_point F>
 		constexpr F signed_norm() noexcept{
 			return F(2) * normalized<F>() - F(1); // scale to [0.0, 2.0), then shift to [-1.0, 1.0)
 		}
@@ -199,13 +271,13 @@ namespace rnd {
 		}
 
 		// boolean with probability
-		template <std::floating_point F> 
+		template <std::floating_point F>
 		constexpr bool coin_flip(F probability) noexcept{
 			return normalized<F>() < probability;
 		}
 
 		// pick an index in [0, size)
-		template <std::ranges::sized_range R> 
+		template <std::ranges::sized_range R>
 		constexpr auto index(const R& collection) noexcept{
 			assert(!std::ranges::empty(collection) && "Random::index(): empty collection.");
 			using idx_t = std::ranges::range_size_t<R>;
@@ -232,7 +304,7 @@ namespace rnd {
 			return *iterator(std::forward<R>(collection));
 		}
 
-		template <std::floating_point F> 
+		template <std::floating_point F>
 		constexpr F gaussian(F mean, F stddev) noexcept{
 			// Based on the Central Limit Theorem; https://en.wikipedia.org/wiki/Central_limit_theorem
 			// the Irwin–Hall distribution (sum of 12 U(0,1) has mean = 6, variance = 1).
@@ -269,14 +341,14 @@ namespace rnd {
 			static_assert(std::is_unsigned_v<T>, "bits<N, T> requires an unsigned T");
 			static_assert(N <= std::numeric_limits<T>::digits, "Not enough bits in return type T to hold N bits");
 			return bits<T>(N); //N is a constant; the optimizer will inline and constant-fold this call
-		}		
+		}
 
 		//convenience overload: fill a T with random bits
-		template <class T> 
+		template <class T>
 		constexpr T bits_as() noexcept{
 			static_assert(std::is_unsigned_v<T>, "bits<T>() requires an unsigned T");
 			constexpr unsigned N = std::numeric_limits<T>::digits;
 			return bits<N, T>();
-		}		
+		}
 	};
 } //namespace rnd

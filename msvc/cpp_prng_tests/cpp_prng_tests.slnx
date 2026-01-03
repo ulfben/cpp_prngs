@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="cpp_prng_tests.vcxproj" />
+  <Project Path="cpp_prng_tests.vcxproj" Id="55a4d7e6-3835-4aa4-8807-e4aa261b3a52" />
 </Solution>
