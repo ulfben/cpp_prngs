@@ -331,6 +331,81 @@ TYPED_TEST(RandomTypedTest, SeedWithValueResetsToGivenSequence){
     }
 }
 
+// -----------------------------------------------------------------------------
+// Validation: 128-bit multiplication intrinsic vs constexpr fallback
+// -----------------------------------------------------------------------------
+
+// 1. Define a subset of engines that are 64-bit.
+//    We exclude 32-bit engines (PCG32, SmallFast32) because they use a 
+//    simpler logic path (casting to uint64_t) that doesn't utilize 
+//    the 128-bit fallback/intrinsic split we want to test.
+using Engines64Bit = ::testing::Types<
+    RomuDuoJr,
+    Konadare192,
+    SmallFast64,
+    Xoshiro256SS
+>;
+
+template<class Engine>
+class ConstexprValidationTest : public ::testing::Test{
+public:
+    // We use a fixed seed for validation to ensure the compile-time and runtime engines start at the exact same state.
+    static constexpr typename Engine::result_type SEED = 123456789;
+    static constexpr size_t SAMPLE_SIZE = 500;
+};
+
+TYPED_TEST_CASE(ConstexprValidationTest, Engines64Bit);
+
+// 2. The Consteval Generator
+//    This function MUST run at compile time. It forces the compiler
+//    to use the soft C++ implementation of mul_shift_u64, bypassing
+//    any runtime intrinsics like _umul128.
+template <typename Engine>
+consteval auto generate_reference_samples(){
+    using result_type = typename Engine::result_type;    
+    std::array<result_type, ConstexprValidationTest<Engine>::SAMPLE_SIZE> results{};
+    rnd::Random<Engine> rng(ConstexprValidationTest<Engine>::SEED);
+    for(size_t i = 0; i < results.size(); ++i){
+        // Create a chaotic bound to test various bit-shifts.
+        // We avoid 0 (assert failure) and ensure it varies.
+        result_type bound = (i * 1234567890123ULL) + 7;
+        // Edge case: Force max bound to test full range multiplication
+        if(i == 0) bound = Engine::max();
+        results[i] = rng.next(bound);
+    }
+    return results;
+}
+
+// 3. The Test
+TYPED_TEST(ConstexprValidationTest, RuntimeIntrinsicsMatchConstexprFallback){
+#if !defined(_MSC_VER)
+    GTEST_SKIP() << "This test only distinguishes constexpr fallback vs _umul128 on MSVC.";
+#endif
+    using Engine = TypeParam;
+    using result_type = typename Engine::result_type;
+
+    // A. COMPILE TIME: Generate the "Truth" table
+    //    This guarantees we used the portable C++ fallback logic.
+    static constexpr auto expected_values = generate_reference_samples<Engine>();
+
+    // B. RUNTIME: Generate the actual values
+    //    On MSVC/x64, this will use _umul128 (the intrinsic).
+    rnd::Random<Engine> rng(TestFixture::SEED);
+
+    // C. Compare
+    for(size_t i = 0; i < TestFixture::SAMPLE_SIZE; ++i){
+        volatile result_type bound = (i * 1234567890123ULL) + 7;
+        if(i == 0) bound = Engine::max();
+        result_type actual = rng.next(bound);
+        ASSERT_EQ(expected_values[i], actual)
+            << std::hex
+            << "Mismatch at index " << i << " for engine " << typeid(Engine).name()
+            << "\nBound was: 0x" << bound
+            << "\nFallback (Correct): 0x" << expected_values[i]
+            << "\nRuntime  (Actual):  0x" << actual;
+    }
+}
+
 int main(int argc, char** argv){
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
