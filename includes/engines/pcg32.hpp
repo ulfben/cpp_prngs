@@ -41,15 +41,16 @@ class PCG32 final{
 
 public:
    using result_type = u32;
+   using seed_type = u64;
    using state_type = u64;
 
    constexpr PCG32() noexcept
       : PCG32(DEFAULT_SEED, DEFAULT_STREAM){}
 
-   explicit constexpr PCG32(state_type seed_val) noexcept
+   explicit constexpr PCG32(seed_type seed_val) noexcept
       : PCG32(seed_val, DEFAULT_STREAM){}
 
-   constexpr PCG32(state_type seed_val, state_type sequence) noexcept{
+   constexpr PCG32(seed_type seed_val, seed_type sequence) noexcept{
       seed(seed_val, sequence);
    }
    //factory function to create a PCG32 from a state, bypassing the seeding routines.
@@ -72,7 +73,7 @@ public:
    }
 
    //seed and a sequence selection constant (a.k.a. stream id).
-   constexpr void seed(state_type seed_val, state_type sequence = DEFAULT_STREAM) noexcept{
+   constexpr void seed(seed_type seed_val, seed_type sequence = DEFAULT_STREAM) noexcept{
       state = 0U;
       inc = (sequence << 1u) | 1u; //ensure inc is odd
       (void) next(); //“Warm up” the internal LCG so the first returned bits are mixed.
@@ -80,7 +81,7 @@ public:
       (void) next();
    }
 
-   constexpr void discard(state_type delta) noexcept{
+   constexpr void discard(result_type delta) noexcept{
        //Based on Brown, "Random Number Generation with Arbitrary Stride,"
        // Transactions of the American Nuclear Society (Nov. 1994)       
       u64 cur_mult = MULT;
@@ -120,7 +121,7 @@ static_assert(RandomBitEngine<PCG32>);
 static constexpr auto PCG32_REFERENCE_FROM_SEED = []{ 
    PCG32 rng(42u, 54u); //example seed and sequence, from https://github.com/imneme/pcg-c-basic/blob/master/pcg32-demo.c
    std::array<PCG32::result_type,6> vals{};
-   for(auto& v : vals){ v = rng.next() };
+   for(auto& v : vals){ v = rng.next(); };
    return vals;
 }();
 //expected values for the above seed and sequence from: https://www.pcg-random.org/using-pcg-c-basic.html

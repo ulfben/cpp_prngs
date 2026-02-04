@@ -14,6 +14,8 @@
 */
 class SmallFast32 final{
    using u32 = std::uint32_t;
+   using u64 = std::uint64_t;
+
    u32 a;
    u32 b;
    u32 c;
@@ -25,18 +27,24 @@ class SmallFast32 final{
 
 public:
    using result_type = u32;
+   using seed_type = u64;
 
    constexpr SmallFast32() noexcept
       : SmallFast32(0xBADC0FFEu){}
 
-   explicit constexpr SmallFast32(result_type seed) noexcept : a(0xf1ea5eedu), b(seed), c(seed), d(seed){
-      discard(20); //warmup
+   explicit constexpr SmallFast32(seed_type seed) noexcept
+       : a(0xf1ea5eedu)
+       , b(static_cast<u32>(seed))
+       , c(static_cast<u32>(seed >> 32))
+       , d(static_cast<u32>(seed ^ (seed >> 32)))
+   {
+       discard(20); //warmup
    }
 
    constexpr void seed() noexcept{
       *this = SmallFast32{};
    }
-   constexpr void seed(result_type seed) noexcept{
+   constexpr void seed(seed_type seed) noexcept{
       *this = SmallFast32{seed};
    }
 
@@ -63,10 +71,6 @@ public:
       while(n--){
          next();
       }
-   }
-
-   constexpr SmallFast32 split() noexcept{
-      return SmallFast32{next()};
    }
 
    constexpr bool operator==(const SmallFast32& rhs) const noexcept = default;

@@ -25,13 +25,23 @@
 namespace rnd {
 	namespace detail {
 		// detail: private helpers to keep Random<E> constexpr and portable.
-		// Provides a constexpr 64x64->128 multiply fallback on MSVC,
+		[[nodiscard]] constexpr std::uint64_t moremur(std::uint64_t x) noexcept{
+			x += 0x9E3779B97F4A7C15ULL;
+			x ^= x >> 27;
+			x *= 0x3C79AC492BA7B653ULL;
+			x ^= x >> 33;
+			x *= 0x1C69B3F74AC4AE35ULL;
+			x ^= x >> 27;
+			return x;
+		}
+
+		// A constexpr 64x64->128 multiply fallback on MSVC,
 		// where _umul128 is not constexpr (used for Lemire's fastrange).
 		struct u128_parts final{
 			std::uint64_t lo;
 			std::uint64_t hi;
 		};
-		
+
 		[[nodiscard]] constexpr u128_parts mul64_to_128_parts(std::uint64_t a, std::uint64_t b) noexcept{
 			// split 32-bit limbs
 			const std::uint64_t a0 = static_cast<std::uint32_t>(a);
@@ -47,7 +57,7 @@ namespace rnd {
 
 			// combine:			
 			constexpr std::uint64_t lo32_mask = 0xFFFF'FFFFull;
-			const std::uint64_t mid = p01 + p10;		
+			const std::uint64_t mid = p01 + p10;
 			const std::uint64_t mid_carry = (mid < p01) ? (1ull << 32) : 0ull;
 			const std::uint64_t mid_lo = (mid & lo32_mask) << 32;
 			const std::uint64_t mid_hi = mid >> 32;
@@ -102,7 +112,7 @@ namespace rnd {
 	namespace detail::selftest {
 		//quick-and-dirty test suite to make sure our 128-bit helper is constexpr and correct
 		// feel free to delete this namespace or gate it behind a macro so headers don’t spam every TU. :)
-		
+
 		// 1. Verify Shift Logic
 		constexpr std::uint64_t HI = 0x0123'4567'89AB'CDEFull;
 		constexpr std::uint64_t LO = 0xFEDC'BA98'7654'3210ull;
@@ -169,7 +179,7 @@ namespace rnd {
 
 		//advance the random engine n steps.
 		//some engines (like PCG32) can do this faster than linear time
-		constexpr void discard(unsigned long long n) noexcept{
+		constexpr void discard(result_type n) noexcept{
 			_e.discard(n);
 		}
 
@@ -184,7 +194,24 @@ namespace rnd {
 		// returns a decorrelated, forked engine; advances this engine's state
 		// use for parallel or independent streams use (think: task/thread-local randomness)
 		constexpr Random<E> split() noexcept{
-			return Random<E>(_e.split());
+			constexpr std::uint64_t tag = 0x53504C49542D3031ULL;
+			if constexpr(value_bits == 64){
+				const std::uint64_t s = detail::moremur((next() ^ std::rotl(next(), 32)) ^ tag);
+				return Random{E{ static_cast<result_type>(s) }};
+			} else{ // 32-bit
+				const std::uint64_t a =
+					static_cast<std::uint64_t>(next()) |
+					(static_cast<std::uint64_t>(next()) << 32);
+				const std::uint64_t b =
+					static_cast<std::uint64_t>(next()) |
+					(static_cast<std::uint64_t>(next()) << 32);
+
+				const std::uint64_t m = detail::moremur((a ^ std::rotl(b, 32)) ^ tag);
+				const std::uint32_t folded =
+					static_cast<std::uint32_t>(m) ^ static_cast<std::uint32_t>(m >> 32);
+
+				return Random{E{ static_cast<result_type>(folded) }};
+			}
 		}
 
 		static constexpr auto min() noexcept{

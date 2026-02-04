@@ -41,7 +41,7 @@ TYPED_TEST(RandomTypedTest, DefaultConstructedEnginesAreDeterministic){
     using Rng = typename RandomTypedTest<Engine>::Rng;
     Rng a{};
     Rng b{};
-    for(int i = 0; i < 16; ++i){
+    for(int i = 0; i < 1024; ++i){
         auto va = a.next();
         auto vb = b.next();
         EXPECT_EQ(va, vb) << "Default constructed RNGs must produce same sequence";
@@ -239,7 +239,7 @@ TYPED_TEST(RandomTypedTest, SameSeedProducesSameSequence){
     Rng a{seed};
     Rng b{seed};
 
-    for(int i = 0; i < 32; ++i){
+    for(int i = 0; i < 1024; ++i){
         auto va = a.next();
         auto vb = b.next();
         EXPECT_EQ(va, vb);

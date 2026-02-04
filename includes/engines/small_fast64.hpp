@@ -26,18 +26,19 @@ class SmallFast64{
 
 public:
    using result_type = u64;
+   using seed_type = u64;
 
    constexpr SmallFast64() noexcept
       : SmallFast64(0xBADC0FFEE0DDF00DuLL){}
 
-   explicit constexpr SmallFast64(result_type seed) noexcept : a(0xf1ea5eeduLL), b(seed), c(seed), d(seed){
+   explicit constexpr SmallFast64(seed_type seed) noexcept : a(0xf1ea5eeduLL), b(seed), c(seed), d(seed){
       discard(20);// warmup: run the generator a couple of cycles to mix the state thoroughly
    }
 
    constexpr void seed() noexcept{
       *this = SmallFast64{};
    }
-   constexpr void seed(result_type seed) noexcept{
+   constexpr void seed(seed_type seed) noexcept{
       *this = SmallFast64{seed};
    }
 
@@ -62,14 +63,12 @@ public:
       return next();
    }
 
-   constexpr void discard(unsigned long long n) noexcept{
+   constexpr void discard(result_type n) noexcept{
       while(n--){
          next();
       }
    }
-   constexpr SmallFast64 split() noexcept{
-      return SmallFast64{next()};
-   }
+
    constexpr bool operator==(const SmallFast64& rhs) const noexcept = default;
 };
 static_assert(RandomBitEngine<SmallFast64>);

@@ -62,9 +62,10 @@ class Konadare192 final{
    }
 public:
    using result_type = std::uint64_t;
+   using seed_type = u64;
 
    constexpr Konadare192() : Konadare192(DEFAULT_SEED){}
-   constexpr explicit Konadare192(result_type seed_val) : a_(seed_val), b_(seed_val+1), c_(seed_val+2){       
+   constexpr explicit Konadare192(seed_type seed_val) : a_(seed_val), b_(seed_val+1), c_(seed_val+2){
       for(int m = 0; m < 2; ++m){ //two rounds of mixing to warm up the state
          result_type t0 = mix(a_, c_);
          result_type t1 = mix(b_, a_);
@@ -86,7 +87,7 @@ public:
    }
    constexpr result_type operator()() noexcept{ return next(); }
 
-   constexpr void discard(uint64_t n) noexcept{
+   constexpr void discard(result_type n) noexcept{
       while(n--){
          next();
       }
@@ -98,10 +99,6 @@ public:
 
    constexpr void seed() noexcept{ 
       *this = Konadare192{}; 
-   }
-
-   constexpr Konadare192 split() noexcept{
-      return Konadare192{next()};
    }
    
    static constexpr result_type min() noexcept{ 

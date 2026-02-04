@@ -37,12 +37,13 @@ class Xoshiro256SS{
    }
 public:
    using result_type = u64;
+   using seed_type = u64;
    using state_type = u64;
 
    constexpr Xoshiro256SS() noexcept
       : Xoshiro256SS(0xFEEDFACECAFEBEEFuLL){}
 
-   explicit constexpr Xoshiro256SS(result_type seed) noexcept{
+   explicit constexpr Xoshiro256SS(seed_type seed) noexcept{
    // Seed initialization: instead of copying the same splitmix64(seed)
    // into all 4 state words, I  chain splitmix64 calls with added constants. 
    // Each constant is chosen to be large, odd, and distinct so that a poor 
@@ -59,7 +60,7 @@ public:
    constexpr void seed() noexcept{
       *this = Xoshiro256SS{};
    }
-   constexpr void seed(result_type seed) noexcept{
+   constexpr void seed(seed_type seed) noexcept{
       *this = Xoshiro256SS{seed};
    }
    static constexpr result_type min() noexcept{
@@ -126,7 +127,7 @@ constexpr uint64_t rotl(const uint64_t x, int k) noexcept{
 }
 static uint64_t s[4]{0xFEEDFACECAFEBEEFuLL,0,0,0};
 constexpr uint64_t next(void) noexcept{
-   const uint64_t result = rotl(s[1] * 5, 7) * 9;
+   constexpr uint64_t result = rotl(s[1] * 5, 7) * 9;
    const uint64_t t = s[1] << 17;
    s[2] ^= s[0];
    s[3] ^= s[1];

@@ -37,12 +37,13 @@ class RomuDuoJr final{
       : x(xstate), y(ystate){}
 public:
    using result_type = u64;
-   using state_type = u64;
+   using seed_type = u64;
+   using state_type = u64; //TODO: why is this public? 
 
    constexpr RomuDuoJr() noexcept : RomuDuoJr(0xFEEDFACEFEEDFACEULL){}
 
-   explicit constexpr RomuDuoJr(u64 seed) noexcept
-      : x(0x9E6C63D0676A9A99ULL), y(!seed - seed){
+   explicit constexpr RomuDuoJr(seed_type seed) noexcept
+      : x(0x9E6C63D0676A9A99ULL), y(~seed - seed){
       // Initialize x to a fixed odd constant, y to ~seed – seed.
       // Then do two rounds of NASAM mixing + a rotate‐multiply step on x.  
       // This is proven robust even with low-entropy seeds:
@@ -60,7 +61,7 @@ public:
       *this = RomuDuoJr{};
    }
 
-   constexpr void seed(result_type seed) noexcept{
+   constexpr void seed(seed_type seed) noexcept{
       *this = RomuDuoJr{seed};
    }
    //factory function to create a RomuDuoJr from a state, bypassing the seeding routines.
@@ -79,14 +80,10 @@ public:
       return next();
    }
 
-   constexpr void discard(unsigned long long n) noexcept{
+   constexpr void discard(result_type n) noexcept{
       while(n--){
          next();
       }
-   }
-
-   constexpr RomuDuoJr split() noexcept{
-      return RomuDuoJr{next()};
    }
 
    static constexpr result_type min() noexcept{
