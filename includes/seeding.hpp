@@ -9,7 +9,7 @@
 #include <thread>
 #include <type_traits>
 // Source: https://github.com/ulfben/cpp_prngs/
-// Utility functions for seeding PRNGs (Pseudo Random Number Generators).
+// Utility functions for seeding Pseudo Random Number Generators.
 // 
 // This file provides several approaches to generating high-quality seed values,
 // both at compile-time and runtime. Each entropy source has different properties
@@ -24,40 +24,61 @@
 // The entropy sources are designed to be composable - you can use them individually
 // or combine them for maximum entropy when needed. See `from_all()` for an example of combining multiple sources.
 namespace seed {
-   using u64 = std::uint64_t;
-   using u32 = std::uint32_t;
+	using u64 = std::uint64_t;
+	using u32 = std::uint32_t;
 
-   // "moremur" mixing function by Pelle Evensen (2019); see: https://mostlymangling.blogspot.com/2019/12/stronger-better-morer-moremur-better.html
-   // Fast, strong 64-bit mixer for hashing and PRNG seeding; outperforms SplitMix64 in avalanche and diffusion tests.
-   // Modified to add a fixed constant, avoiding the trivial zero state for low-entropy seeds.
-   constexpr u64 moremur(u64 x) noexcept{
-      x += 0x9E3779B97F4A7C15ULL; // golden ratio increment
-      x ^= x >> 27;
-      x *= 0x3C79AC492BA7B653ULL;
-      x ^= x >> 33;
-      x *= 0x1C69B3F74AC4AE35ULL;
-      x ^= x >> 27;
-      return x;
-   }
-      
-   constexpr u64 from_text(std::string_view str) noexcept{
-       // FNV1a for string hashing        
-      u64 hash = 14695981039346656037ULL;
-      for(const char c : str){
-         hash ^= c;
-         hash *= 1099511628211ULL;
-      }
-      return hash;
-   }
+	// "moremur" mixing function by Pelle Evensen (2019); see: https://mostlymangling.blogspot.com/2019/12/stronger-better-morer-moremur-better.html
+	// Fast, strong 64-bit mixer for hashing and PRNG seeding; outperforms SplitMix64 in avalanche and diffusion tests.
+	// Modified to add a constant to avoid the 0 fixed point and to decorrelate low-entropy sequential seeds
+	[[nodiscard]] constexpr u64 moremur(u64 x) noexcept{
+		x += 0x9E3779B97F4A7C15ULL; // golden ratio increment
+		x ^= x >> 27;
+		x *= 0x3C79AC492BA7B653ULL;
+		x ^= x >> 33;
+		x *= 0x1C69B3F74AC4AE35ULL;
+		x ^= x >> 27;
+		return x;
+	}
 
-   // Compile-time source information
-   // Properties:
-   // - Constant during compilation but varies between compilations
-   // - Different for each source file
-   // - Useful for creating different seeds for different compilation units
-   constexpr u64 from_source() noexcept{
-      return from_text(__FILE__ ":" __DATE__ ":" __TIME__);
-   }
+	// xNASAM mixing function by Pelle Evensen (2020).
+	// https://mostlymangling.blogspot.com/2020/01/nasam-not-another-strange-acronym-mixer.html
+	//
+	// Strong mixer intended for seeding and stream derivation.
+	// Compared to classic Murmur/SplitMix-style finalizers (including moremur),
+	// xNASAM uses a NASAM-style (rotate/xor/multiply) structure which provides
+	// stronger diffusion and fewer detectable correlations in permutation tests.
+	//
+	// The extra parameter `c` acts as a domain-separation key 
+	// allowing independent derivations (e.g. seeding vs. split streams) without
+	// introducing simple linear offsets between streams. `c` must be non-zero.	
+	[[nodiscard]] constexpr std::uint64_t xnasam(std::uint64_t x, std::uint64_t c = 0x534545442D3031ULL) noexcept{
+		x ^= c;
+		x ^= std::rotr(x, 25) ^ std::rotr(x, 47);
+		x *= 0x9E6C63D0676A9A99ULL; 
+		x ^= (x >> 23) ^ (x >> 51);
+		x *= 0x9E6D62D06F6A9A9BULL;
+		x ^= (x >> 23) ^ (x >> 51);
+		return x;
+	}
+
+	constexpr u64 from_text(std::string_view str) noexcept{
+		// FNV1a for string hashing        
+		u64 hash = 14695981039346656037ULL;
+		for(const char c : str){
+			hash ^= c;
+			hash *= 1099511628211ULL;
+		}
+		return xnasam(hash);
+	}
+
+	// Compile-time source information
+	// Properties:
+	// - Constant during compilation but varies between compilations
+	// - Different for each source file
+	// - Useful for creating different seeds for different compilation units
+	constexpr u64 from_source() noexcept{
+		return from_text(__FILE__ ":" __DATE__ ":" __TIME__);
+	}
 
 #ifdef __COUNTER__   
    // Generate unique compile-time seeds even within the same compilation unit
@@ -69,112 +90,121 @@ namespace seed {
    // SEED_UNIQUE_FROM_SOURCE: expands to a unique value per macro expansion.
 #define STRINGIFY(x) #x
 #define STR(x) STRINGIFY(x)
-   constexpr u64 unique_from_source() noexcept{
-      return from_text(__FILE__ " " __DATE__ " " __TIME__ " " STR(__COUNTER__));
-   }
+	constexpr u64 unique_from_source() noexcept{
+		return from_text(__FILE__ " " __DATE__ " " __TIME__ " " STR(__COUNTER__));
+	}
 #define SEED_UNIQUE_FROM_SOURCE (seed::from_text(__FILE__ " " __DATE__ " " __TIME__ " " STR(__COUNTER__)))
 #endif // __COUNTER__
 
-    // Wall clock time
-    // Properties:
-    // - High resolution (typically nanoseconds)
-    // - Monotonic (always increases)
-    // - Reflects real-world time progression
-    // - May be synchronized across machines
-    // - Useful default! Seeds will vary with time
-   inline u64 from_time() noexcept{
-      const auto now = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-      return moremur(now);
-   }
+	// Time-based entropy
+	// Properties:	
+	// - Uses the platform’s highest-resolution clock.
+	// - Good general-purpose default: seeds will usually differ between runs.
+	inline u64 from_time() noexcept{
+		const auto now = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+		return xnasam(now);
+	}
 
-   // CPU time consumed by the program
-   // Properties:
-   // - Varies with CPU frequency scaling
-   // - Affected by system load and power states
-   // - Can differ significantly from wall time in multi-threaded programs
-   inline u64 from_cpu_time() noexcept{
-      return moremur(static_cast<u64>(std::clock()));
-   }
+	// CPU time consumed by the program
+	// Properties:
+	// - Varies with CPU frequency scaling
+	// - Affected by system load and power states
+	// - Can differ significantly from wall time in multi-threaded programs
+	inline u64 from_cpu_time() noexcept{
+		return xnasam(static_cast<u64>(std::clock()));
+	}
 
-   // Thread identifier
-   // Properties:
-   // - Unique per thread within the process
-   // - Stable during thread lifetime
-   // - Useful for generating different seeds in multi-threaded contexts
-   inline u64 from_thread() noexcept{
-      // Uses std::hash to portably convert thread::id to a 64-bit value.
-      const std::thread::id tid = std::this_thread::get_id();
-      const size_t value = std::hash<std::thread::id>{}(tid);
-      return moremur(value);
-   }
+	// Thread identifier
+	// Properties:
+	// - Unique per thread within the process
+	// - Stable during thread lifetime
+	// - Useful for generating different seeds in multi-threaded contexts
+	inline u64 from_thread() noexcept{
+	   // Uses std::hash to portably convert thread::id to a 64-bit value.
+		const std::thread::id tid = std::this_thread::get_id();
+		const size_t value = std::hash<std::thread::id>{}(tid);
+		return xnasam(value);
+	}
 
-   // Stack address
-   // Properties:
-   // - Varies between runs due to ASLR (Address Space Layout Randomization)
-   // - May be predictable if ASLR is disabled
-   // - Usually aligned to specific boundaries
-   // - Cheap to obtain
-   // - Potentially useful as supplementary entropy source
-   inline u64 from_stack() noexcept{
-      const u64 dummy = 0;
-      return moremur(reinterpret_cast<std::uintptr_t>(&dummy));
-   }
+	// Stack address
+	// Properties:
+	// - Varies between runs due to ASLR (Address Space Layout Randomization)
+	// - May be predictable if ASLR is disabled
+	// - Usually aligned to specific boundaries
+	// - Cheap to obtain
+	// - Potentially useful as supplementary entropy source
+	inline u64 from_stack() noexcept{
+		const u64 dummy = 0;
+		return xnasam(reinterpret_cast<std::uintptr_t>(&dummy));
+	}
 
-   inline u64 from_heap() noexcept{
-      std::unique_ptr<u64> dummy{new (std::nothrow) u64()};
-      if(!dummy){ return from_stack(); } // Fallback to stack if allocation fails
-      return moremur(reinterpret_cast<std::uintptr_t>(dummy.get()));
-   }
+	inline u64 from_heap() noexcept{
+		std::unique_ptr<u64> dummy{new (std::nothrow) u64()};
+		if(!dummy){ return from_stack(); } // Fallback to stack if allocation fails
+		return xnasam(reinterpret_cast<std::uintptr_t>(dummy.get()));
+	}
 
-   inline u64 from_global() noexcept{
-       // static = stored in global memory, but scoped locally to the function
-       // alignas(8) ensures 3 low address bits are zero (more entropy in high bits)
-      alignas(8) static const u64 dummy = 0;
-      return moremur(reinterpret_cast<std::uintptr_t>(&dummy));
-   }
+	inline u64 from_global() noexcept{
+		// static = stored in global memory, but scoped locally to the function
+		// alignas(8) ensures 3 low address bits are zero (more entropy in high bits)
+		alignas(8) static const u64 dummy = 0;
+		return xnasam(reinterpret_cast<std::uintptr_t>(&dummy));
+	}
 
-   // Hardware entropy
-   // Properties:
-   // - High-quality entropy from system source (when available)
-   // - May be slow or limited on some platforms
-   // - May fall back to pseudo-random implementation
-   // - Best option when available but worth having alternatives
-   inline u64 from_system_entropy() noexcept{
-      std::random_device rd;
-      const auto entropy = (static_cast<u64>(rd()) << 32) | rd();
-      return moremur(entropy);
-   }
+	// Hardware entropy
+	// Properties:
+	// - High-quality entropy from system source (when available)
+	// - May be slow or limited on some platforms
+	// - May fall back to pseudo-random implementation
+	// - Best option when available but worth having alternatives
+	inline u64 from_system_entropy() noexcept{
+		std::random_device rd;
+		const auto entropy = (static_cast<u64>(rd()) << 32) | rd();
+		return xnasam(entropy);
+	}
 
-   // Combines all available entropy sources
-   // Properties:
-   // - Maximum entropy mixing
-   // - Higher overhead
-   // - Useful when seed quality is critical
-   constexpr u64 from_all() noexcept{
-      constexpr u64 source =
+	// Combines all available entropy sources in "paranoia mode"
+	// Aggressively mixing multiple entropy sources so that
+	// overlapping, repeated, or low-quality inputs still produce a robust seed.
+	// Properties:
+	// - Maximum entropy mixing
+	// - Higher overhead
+	// - Useful when seed quality is critical
+	constexpr u64 from_all() noexcept{
+		constexpr u64 source =
 #ifdef SEED_UNIQUE_FROM_SOURCE
-         SEED_UNIQUE_FROM_SOURCE;
+			SEED_UNIQUE_FROM_SOURCE;
 #else
-         from_source();
-#endif
-      if consteval{
-         return moremur(source);
-      }
-      return moremur(
-         moremur(from_time())         
-         ^ moremur(from_thread())
-         ^ moremur(from_stack())
-         ^ moremur(from_global())
-         ^ moremur(from_heap())
-         ^ moremur(from_system_entropy())
-         ^ moremur(from_cpu_time())
-         ^ moremur(source)
-      );
-   }
+			from_source();
+#endif	
+		if consteval{
+			return xnasam(source);
+		}		
+		u64 s = 0xD1B54A32D192ED03ULL; // non-zero init
+		s = absorb(s, from_time());
+		s = absorb(s, from_thread());
+		s = absorb(s, from_stack());
+		s = absorb(s, from_global());
+		s = absorb(s, from_heap());
+		s = absorb(s, from_system_entropy());
+		s = absorb(s, from_cpu_time());
+		s = absorb(s, source);
+		return xnasam(s, 0x534545442D3031ULL); // "SEED-01"
+	}
 
-   constexpr u32 to_32(u64 seed) noexcept{
-      return static_cast<u32>(seed ^ (seed >> 32)); //XOR-fold to mix high and low bits when casting to 32 bits.
-   }
+	[[nodiscard]] constexpr u32 to_32(u64 seed) noexcept{
+		return static_cast<u32>(seed ^ (seed >> 32)); //XOR-fold to mix high and low bits when casting to 32 bits.
+	}
+
+	// Mix one entropy value into the running accumulator.
+	// The value is combined and then re-mixed so that even small
+	// or repeated inputs still significantly change the result.
+	[[nodiscard]] constexpr u64 absorb(u64 state, u64 v) noexcept{		
+		state ^= v;
+		state += 0x9E3779B97F4A7C15ULL;
+		return xnasam(state, 0x4D49582D3031ULL); // "MIX-01"
+	}
+
 
 #undef STRINGIFY
 #undef STR
