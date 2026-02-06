@@ -67,17 +67,18 @@ namespace rnd {
 		}
 
 		// returns a decorrelated, forked engine; advances this engine's state
-		// use for parallel or independent streams use (think: task/thread-local randomness)		
+		// use for parallel or independent streams use (think: task/thread-local randomness)
+		// consumes two outputs from the current engine to ensure the new engine's state is well-separated from the current one		
 		constexpr Random<E> split() noexcept{
-			constexpr std::uint64_t tag = 0x53504C49542D3031ULL; //the tag ensures split() uses a distinct, non-overlapping seed domain
-			std::uint64_t seed = (next() ^ std::rotl(next(), 32)) ^ tag; //mix two consecutive outputs to reduce linear correlations before avalanche mixing
-			seed += 0x9E3779B97F4A7C15ULL; //inline moremur mixing. See: seeding.hpp for details.
-			seed ^= seed >> 27;
-			seed *= 0x3C79AC492BA7B653ULL;
-			seed ^= seed >> 33;
-			seed *= 0x1C69B3F74AC4AE35ULL;
-			seed ^= seed >> 27;
-			return Random{E{ static_cast<seed_type>(seed) }};
+			constexpr std::uint64_t tag = 0x53504C49542D3031ULL; //the tag ensures split() uses a distinct seed domain
+			std::uint64_t seed = (next() ^ std::rotl(next(), 32)) ^ tag; //mix two consecutive outputs to reduce linear correlations before avalanche mixing			
+			seed ^= 0x9E3779B97F4A7C15ULL; //inline xnasam mixing. See: seeding.hpp for details.
+			seed ^= std::rotr(seed, 25) ^ std::rotr(seed, 47);
+			seed *= 0x9E6C63D0676A9A99ULL;
+			seed ^= (seed >> 23) ^ (seed >> 51);
+			seed *= 0x9E6D62D06F6A9A9BULL;
+			seed ^= (seed >> 23) ^ (seed >> 51);
+			return Random{E{ seed }};
 		}
 
 		static constexpr auto min() noexcept{
