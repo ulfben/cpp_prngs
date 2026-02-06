@@ -2,6 +2,7 @@
 #include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
+#include <numeric>
 /*
   SmallFast64 PRNG - a modern C++ 32-bit two-rotate implementation of Jenkins Small Fast PRNG.
 
@@ -20,10 +21,6 @@ class SmallFast32 final{
    u32 b;
    u32 c;
    u32 d;
-
-   static constexpr u32 rot(u32 x, u32 k) noexcept{
-      return (x << k) | (x >> (32 - k));
-   }
 
 public:
    using result_type = u32;
@@ -59,8 +56,8 @@ public:
    }
 
    constexpr result_type next() noexcept{
-      const u32 e = a - rot(b, 27);
-      a = b ^ rot(c, 17);
+      const u32 e = a - std::rotl(b, 27);
+      a = b ^ std::rotl(c, 17);
       b = c + d;
       c = d + e;
       d = e + a;

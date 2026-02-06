@@ -2,6 +2,7 @@
 #include "../concepts.hpp" //for RandomBitEngine
 #include <cstdint>
 #include <limits>
+#include <numeric> //for std::rotl
 /*
   RomuDuoJr - Modern C++ Port
 
@@ -21,10 +22,6 @@ class RomuDuoJr final{
    using u64 = std::uint64_t;
    u64 x;
    u64 y;
-
-   static constexpr u64 rotl(u64 x, int r) noexcept{
-      return (x << r) | (x >> (64 - r));
-   }
 
    // NASAM-style mixing (Pelle Evensen): diffuses entropy across word 
    // https://mostlymangling.blogspot.com/2020/01/nasam-not-another-strange-acronym-mixer.html    
@@ -53,7 +50,7 @@ public:
       y *= x;
       y = mix(y);
       y *= x;
-      x *= rotl(y, 27);
+      x *= std::rotl(y, 27);
       y = mix(y);
    }
 
@@ -72,7 +69,7 @@ public:
    constexpr result_type next() noexcept{
       const u64 old_x = x;
       x = y * 0xD3833E804F4C574BULL;
-      y = rotl(y - old_x, 27);
+      y = std::rotl(y - old_x, 27);
       return old_x;
    }
 

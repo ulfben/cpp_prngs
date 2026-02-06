@@ -2,6 +2,7 @@
 #include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
+#include <numeric> //std::rotl
 /*
   SmallFast64 PRNG - a modern C++ 64-bit three-rotate implementation of Jenkins Small Fast PRNG.
 
@@ -19,10 +20,6 @@ class SmallFast64{
    u64 b;
    u64 c;
    u64 d;
-
-   static constexpr u64 rot(u64 x, u64 k) noexcept{
-      return (x << k) | (x >> (64 - k));
-   }
 
 public:
    using result_type = u64;
@@ -51,9 +48,9 @@ public:
    constexpr result_type next() noexcept{
        // The rotate constants (7, 13, 37) are chosen specifically for 64-bit terms, to provide
        // better avalanche characteristics, achieving 18.4 bits of avalanche after 5 rounds.
-      const u64 e = a - rot(b, 7);
-      a = b ^ rot(c, 13);
-      b = c + rot(d, 37);
+      const u64 e = a - std::rotl(b, 7);
+      a = b ^ std::rotl(c, 13);
+      b = c + std::rotl(d, 37);
       c = d + e;
       d = e + a;
       return d;

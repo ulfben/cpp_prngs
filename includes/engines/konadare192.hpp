@@ -2,6 +2,7 @@
 #include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
+#include <numeric> //for std::rotr and std::rotl
 
 /*
  * konadare192.hpp - a minimal header-only C++26 port of Pelle Evensen's "konadare192px++" PRNG,
@@ -39,20 +40,13 @@ class Konadare192 final{
    u64 a_{};
    u64 b_{};
    u64 c_{};
-
-   static constexpr u64 rotl(u64 x, int r) noexcept{
-      return (x << r) | (x >> (64 - r));
-   }
-   static constexpr u64 rotr(u64 x, int r) noexcept{
-      return (x >> r) | (x << (64 - r));
-   }
    
    static constexpr u64 mix(u64 a, u64 b) noexcept{ 
       // "kMixNoMul" from Evensen original repo
       u64 c = b;
       u64 x = a;
       for(u64 i = 0; i < 5; ++i){
-         x ^= rotr(x, 25) ^ rotr(x, 49);
+         x ^= std::rotr(x, 25) ^ std::rotr(x, 49);
          c += INC + (c << 15) + (c << 7) + i;
          c ^= (c >> 47) ^ (c >> 23);
          x += c;
@@ -81,8 +75,8 @@ public:
       result_type out = b_ ^ c_;
       result_type a0 = a_ ^ (a_ >> 32);
       a_ += INC;
-      b_ = rotr(b_ + a0, 11);
-      c_ = rotl(c_ + b_, 8);
+      b_ = std::rotr(b_ + a0, 11);
+      c_ = std::rotl(c_ + b_, 8);
       return out;
    }
    constexpr result_type operator()() noexcept{ return next(); }

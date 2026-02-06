@@ -3,6 +3,7 @@
 #include <limits>
 #include <cstdint>
 #include <span>
+#include <numeric> //std::rotl
 
 /*
   Xoshiro256SS - a modern C++ port of xoshiro256** 1.0.
@@ -21,10 +22,7 @@
 class Xoshiro256SS{
    using u64 = std::uint64_t;
    u64 s[4]{};
-
-   static constexpr u64 rotl(u64 x, int k) noexcept{
-      return (x << k) | (x >> (64 - k));
-   }
+    
    static constexpr u64 splitmix64(u64 x) noexcept{
       u64 z = (x + 0x9e3779b97f4a7c15uLL);
       z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9uLL;
@@ -70,14 +68,14 @@ public:
       return std::numeric_limits<result_type>::max();
    }
    constexpr result_type next() noexcept{
-      const auto result = rotl(s[1] * 5, 7) * 9;
+      const auto result = std::rotl(s[1] * 5, 7) * 9;
       const auto t = s[1] << 17;
       s[2] ^= s[0];
       s[3] ^= s[1];
       s[1] ^= s[2];
       s[0] ^= s[3];
       s[2] ^= t;
-      s[3] = rotl(s[3], 45);
+      s[3] = std::rotl(s[3], 45);
       return result;
    }
    constexpr result_type operator()() noexcept{
@@ -111,9 +109,6 @@ public:
         }
         s = temp;
     } */
-   constexpr Xoshiro256SS split() noexcept{
-      return Xoshiro256SS{next()};
-   }
 
    constexpr bool operator==(const Xoshiro256SS& rhs) const noexcept = default; //will do the right thing since C++20! 
 };

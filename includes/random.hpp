@@ -12,6 +12,7 @@
 #include <intrin.h>    // for _umul128, 64x64 multiplication
 #endif
 #include "concepts.hpp" //for RandomBitEngine concept
+#include "detail.hpp"   //for constexpr and portable 128-bit multiplication
 
 // This is an RNG interface that wraps around any engine that meets the RandomBitEngine concept.
 // It provides useful functions for generating values, including integers, floating-point numbers, and colors
@@ -23,133 +24,6 @@
    // Quick Bench for generating normalized floats: https://quick-bench.com/q/GARc3WSfZu4sdVeCAMSWWPMQwSE
    // Quick Bench for generating bounded values: https://quick-bench.com/q/WHEcW9iSV7I8qB_4eb1KWOvNZU0
 namespace rnd {
-	namespace detail {
-		// detail: private helpers to keep Random<E> constexpr and portable.
-		[[nodiscard]] constexpr std::uint64_t moremur(std::uint64_t x) noexcept{
-			x += 0x9E3779B97F4A7C15ULL;
-			x ^= x >> 27;
-			x *= 0x3C79AC492BA7B653ULL;
-			x ^= x >> 33;
-			x *= 0x1C69B3F74AC4AE35ULL;
-			x ^= x >> 27;
-			return x;
-		}
-
-		// A constexpr 64x64->128 multiply fallback on MSVC,
-		// where _umul128 is not constexpr (used for Lemire's fastrange).
-		struct u128_parts final{
-			std::uint64_t lo;
-			std::uint64_t hi;
-		};
-
-		[[nodiscard]] constexpr u128_parts mul64_to_128_parts(std::uint64_t a, std::uint64_t b) noexcept{
-			// split 32-bit limbs
-			const std::uint64_t a0 = static_cast<std::uint32_t>(a);
-			const std::uint64_t a1 = a >> 32;
-			const std::uint64_t b0 = static_cast<std::uint32_t>(b);
-			const std::uint64_t b1 = b >> 32;
-
-			// partial products
-			const std::uint64_t p00 = a0 * b0;
-			const std::uint64_t p01 = a0 * b1;
-			const std::uint64_t p10 = a1 * b0;
-			const std::uint64_t p11 = a1 * b1;
-
-			// combine:			
-			constexpr std::uint64_t lo32_mask = 0xFFFF'FFFFull;
-			const std::uint64_t mid = p01 + p10;
-			const std::uint64_t mid_carry = (mid < p01) ? (1ull << 32) : 0ull;
-			const std::uint64_t mid_lo = (mid & lo32_mask) << 32;
-			const std::uint64_t mid_hi = mid >> 32;
-			const std::uint64_t lo = p00 + mid_lo;
-			const std::uint64_t lo_carry = (lo < p00) ? 1ull : 0ull;
-
-			const std::uint64_t hi = p11 + mid_hi + mid_carry + lo_carry;
-			return {lo, hi};
-		}
-
-		// Computes (hi:lo) >> digits for digits in [1, 64], returning the low 64 bits of the shifted result.
-		template <unsigned digits>
-		[[nodiscard]] constexpr std::uint64_t shr128_to_u64(std::uint64_t hi, std::uint64_t lo) noexcept{
-			static_assert(digits > 0 && digits <= 64);
-			if constexpr(digits == 64){
-				return hi;
-			} else{
-				return (lo >> digits) | (hi << (64u - digits));
-			}
-		}
-
-		// mul_shift_u64 - the helper we actually want.
-		// Computes (x * bound) >> digits, truncated to u64.
-		// Used to implement Daniel Lemire's fastrange trick portably.		
-		template <unsigned digits>
-		[[nodiscard]] constexpr std::uint64_t mul_shift_u64(std::uint64_t x, std::uint64_t bound) noexcept{
-			static_assert(digits >= 1 && digits <= 64, "digits must be in [1, 64]");
-
-#if defined(__SIZEOF_INT128__)
-			return static_cast<std::uint64_t>(
-				(static_cast<__uint128_t>(x) * static_cast<__uint128_t>(bound)) >> digits
-				);
-
-#elif defined(_MSC_VER)
-			std::uint64_t hi = 0;
-			std::uint64_t lo = 0;
-			if consteval{
-				const auto p = mul64_to_128_parts(x, bound); // constexpr fallback
-				lo = p.lo;
-				hi = p.hi;
-			} else{ // runtime path				
-				lo = _umul128(x, bound, &hi);
-			}
-			return shr128_to_u64<digits>(hi, lo);
-
-#else
-			static_assert(false, "mul_shift_high64 requires either __uint128_t or MSVC _umul128");
-#endif
-		}
-	} //detail namespace
-
-	namespace detail::selftest {
-		//quick-and-dirty test suite to make sure our 128-bit helper is constexpr and correct
-		// feel free to delete this namespace or gate it behind a macro so headers don’t spam every TU. :)
-
-		// 1. Verify Shift Logic
-		constexpr std::uint64_t HI = 0x0123'4567'89AB'CDEFull;
-		constexpr std::uint64_t LO = 0xFEDC'BA98'7654'3210ull;
-		static_assert(shr128_to_u64<64>(HI, LO) == HI); // digits = 64 -> returns hi		
-		static_assert(shr128_to_u64<1>(HI, LO) == ((LO >> 1) | (HI << 63))); // digits = 1 -> cross-word shift		
-		static_assert(shr128_to_u64<63>(HI, LO) == ((LO >> 63) | (HI << 1)));
-
-		// 2. Verify 128-bit Multiply Logic
-		constexpr bool check_mul(std::uint64_t a, std::uint64_t b, std::uint64_t expect_lo, std::uint64_t expect_hi){
-			const auto p = mul64_to_128_parts(a, b);
-			return p.lo == expect_lo && p.hi == expect_hi;
-		}
-
-		// Identity & Zero
-		static_assert(check_mul(0, 0, 0, 0));
-		static_assert(check_mul(UINT64_MAX, 1, UINT64_MAX, 0));
-
-		// Boundary: 2^32 * 2^32 = 2^64 (Result: Lo=0, Hi=1)
-		static_assert(check_mul(1ULL << 32, 1ULL << 32, 0, 1));
-
-		// Stress Test: Max * Max = (2^64 - 1)^2 = 2^128 - 2^65 + 1
-		// Result: Lo = 1, Hi = F...FE
-		static_assert(check_mul(UINT64_MAX, UINT64_MAX, 1, 0xFFFFFFFFFFFFFFFEull));
-
-		// Middle Carry: (2^64 - 1) * 2^32 = 2^96 - 2^32
-		// Result: Hi = 2^32 - 1, Lo = -2^32 (wrapped)
-		static_assert(check_mul(UINT64_MAX, 1ULL << 32, 0xFFFFFFFF00000000ull, 0x00000000FFFFFFFFull));
-
-		// Low carry stress
-		static_assert(check_mul(0x0000'0001'FFFF'FFFFull, 0x0000'0001'FFFF'FFFFull, 0xFFFF'FFFC'0000'0001ull, 0x0000'0000'0000'0003ull));
-
-		// 3. Verify constexpr instantiation
-		template <std::uint64_t> struct require_constexpr{};
-		using test_inst_1 = require_constexpr<mul_shift_u64<1>(HI, LO)>;
-		using test_inst_64 = require_constexpr<mul_shift_u64<64>(HI, LO)>;
-	} // namespace detail::selftest
-
 	template <RandomBitEngine E>
 	class Random final{
 		static constexpr unsigned value_bits = std::numeric_limits<E::result_type>::digits;
@@ -158,13 +32,14 @@ namespace rnd {
 	public:
 		using engine_type = E;
 		using result_type = typename E::result_type;
+		using seed_type = typename E::seed_type;
 		static_assert(std::is_unsigned_v<result_type>);
 
 		constexpr Random() noexcept = default; //the engine will default initialize
 
 		explicit constexpr Random(engine_type engine) noexcept : _e(engine){}
 
-		explicit constexpr Random(result_type seed_val) noexcept : _e(seed_val){};
+		explicit constexpr Random(seed_type seed_val) noexcept : _e(seed_val){};
 
 		constexpr bool operator==(const Random& rhs) const noexcept = default;
 
@@ -187,31 +62,22 @@ namespace rnd {
 			_e = E{};
 		}
 
-		constexpr void seed(result_type v) noexcept{
+		constexpr void seed(seed_type v) noexcept{
 			_e.seed(v);
 		}
 
 		// returns a decorrelated, forked engine; advances this engine's state
-		// use for parallel or independent streams use (think: task/thread-local randomness)
+		// use for parallel or independent streams use (think: task/thread-local randomness)		
 		constexpr Random<E> split() noexcept{
-			constexpr std::uint64_t tag = 0x53504C49542D3031ULL;
-			if constexpr(value_bits == 64){
-				const std::uint64_t s = detail::moremur((next() ^ std::rotl(next(), 32)) ^ tag);
-				return Random{E{ static_cast<result_type>(s) }};
-			} else{ // 32-bit
-				const std::uint64_t a =
-					static_cast<std::uint64_t>(next()) |
-					(static_cast<std::uint64_t>(next()) << 32);
-				const std::uint64_t b =
-					static_cast<std::uint64_t>(next()) |
-					(static_cast<std::uint64_t>(next()) << 32);
-
-				const std::uint64_t m = detail::moremur((a ^ std::rotl(b, 32)) ^ tag);
-				const std::uint32_t folded =
-					static_cast<std::uint32_t>(m) ^ static_cast<std::uint32_t>(m >> 32);
-
-				return Random{E{ static_cast<result_type>(folded) }};
-			}
+			constexpr std::uint64_t tag = 0x53504C49542D3031ULL; //the tag ensures split() uses a distinct, non-overlapping seed domain
+			std::uint64_t seed = (next() ^ std::rotl(next(), 32)) ^ tag; //mix two consecutive outputs to reduce linear correlations before avalanche mixing
+			seed += 0x9E3779B97F4A7C15ULL; //inline moremur mixing. See: seeding.hpp for details.
+			seed ^= seed >> 27;
+			seed *= 0x3C79AC492BA7B653ULL;
+			seed ^= seed >> 33;
+			seed *= 0x1C69B3F74AC4AE35ULL;
+			seed ^= seed >> 27;
+			return Random{E{ static_cast<seed_type>(seed) }};
 		}
 
 		static constexpr auto min() noexcept{
