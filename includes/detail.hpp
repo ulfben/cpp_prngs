@@ -1,9 +1,12 @@
+#pragma once
 // detail.hpp: private helpers to keep Random<E> constexpr and portable.		
 // Provides a constexpr 128-bit multiply and shift for platforms without native __uint128_t support, such as MSVC.
 // including a fully constexpr fallback on MSVC, where _umul128 is not constexpr
 // This is all used to implement Daniel Lemire's fastrange trick (see Random<E> for useage)
+#ifndef RND_ENABLE_SELFTESTS
+#define RND_ENABLE_SELFTESTS 0 // define to enable compile-time self-tests for the constexpr 128-bit multiply helper.
+#endif
 
-#define RND_ENABLE_SELFTESTS // Enable compile-time self-tests for detail functions
 namespace rnd{
 	namespace detail {
 		// Helper for constexpr 128-bit multiply on MSVC, where _umul128 is not constexpr.
@@ -79,7 +82,7 @@ namespace rnd{
 		}
 	} //detail namespace
 
-#ifdef RND_ENABLE_SELFTESTS
+#if RND_ENABLE_SELFTESTS
 	namespace detail::selftest {
 		//quick-and-dirty test suite to make sure our 128-bit helper is constexpr and correct
 		// feel free to delete this namespace or gate it behind a macro so headers don’t spam every TU. :)

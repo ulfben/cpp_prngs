@@ -34,6 +34,8 @@ namespace rnd {
 		using result_type = typename E::result_type;
 		using seed_type = typename E::seed_type;
 		static_assert(std::is_unsigned_v<result_type>);
+		static_assert(E::min() == 0);
+		static_assert(E::max() == std::numeric_limits<result_type>::max());
 
 		constexpr Random() noexcept = default; //the engine will default initialize
 
