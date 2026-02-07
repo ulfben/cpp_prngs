@@ -84,7 +84,7 @@ namespace rnd {
 		}
 
 		static constexpr auto min() noexcept{
-			return E::min();
+			return 0; 
 		}
 
 		static constexpr auto max() noexcept{
