@@ -102,12 +102,14 @@ namespace rnd {
 		// use for parallel or independent streams use (think: task/thread-local randomness)
 		// consumes two outputs from the current engine to ensure the new engine's state is well-separated from the current one			
 		constexpr Random<E> split() noexcept{
-			constexpr std::uint64_t tag = 0x53504C49542D3031ULL;  //the tag ensures split() uses a distinct seed domain			
-			std::uint64_t a = bits_as<std::uint64_t>(); // Always get full-width 64-bit material, even from 16/32-bit engines.
-			std::uint64_t b = bits_as<std::uint64_t>();			
-			std::uint64_t seed = (a ^ std::rotl(b, 32)) ^ tag; // Mix two consecutive pulls + domain-separating tag			
+			using S = seed_type;
+			constexpr S tag = static_cast<S>(0x53504C49542D3031ULL); //the tag ensures split() uses a distinct seed domain						
+			S a = bits_as<S>(); 
+			S b = bits_as<S>();						
+			S seed = (a ^ std::rotl(b, std::min<unsigned>(32, std::numeric_limits<S>::digits - 1))) ^ tag; // Mix two consecutive pulls + domain-separating tag			
 			
 			// xnasam avalanche, inlined. See: seeding.hpp for details.
+			//TODO: this is a 64-bit mixer. Delegate to something more appropriate on smaller engines!
 			seed ^= 0x9E3779B97F4A7C15ULL;
 			seed ^= std::rotr(seed, 25) ^ std::rotr(seed, 47);
 			seed *= 0x9E6C63D0676A9A99ULL;
