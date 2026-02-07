@@ -28,7 +28,37 @@ namespace rnd {
 	class Random final{
 		static constexpr unsigned value_bits = std::numeric_limits<E::result_type>::digits;
 		E _e{}; //the underlying engine providing random bits. This class will turn those into useful values.
-
+		
+		template <class T>
+		static constexpr T mask_low(unsigned n) noexcept{			
+			assert(n <= std::numeric_limits<T>::digits); // n in [0, digits(T)]
+			constexpr unsigned W = std::numeric_limits<T>::digits;
+			if(n == 0) return T{0};
+			if(n >= W) return std::numeric_limits<T>::max(); // avoid UB on (1<<W)
+			return (T{1} << n) - T{1};
+		}
+			
+		template <class T>
+		constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
+			assert(1 <= n && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= value_bits, and n <= digits(T)
+			const unsigned shift = value_bits - n;    // shift in [0, value_bits-1]
+			return static_cast<T>(x >> shift) & mask_low<T>(n);
+		}
+		
+		template <class T>
+		constexpr T gather_bits_runtime(unsigned n) noexcept{
+			assert(1 <= n && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= digits(T)			
+			T acc = 0;
+			unsigned filled = 0;
+			while(filled < n){
+				const unsigned take = std::min<unsigned>(value_bits, n - filled);
+				const T chunk = take_high_bits<T>(next(), take);
+				acc |= (chunk << filled);             // filled < digits(T) always holds here
+				filled += take;
+			}
+			// If n == digits(T), mask_low returns all-ones, so this is cheap and safe.
+			return acc & mask_low<T>(n);
+		}
 	public:
 		using engine_type = E;
 		using result_type = typename E::result_type;
@@ -70,18 +100,24 @@ namespace rnd {
 
 		// returns a decorrelated, forked engine; advances this engine's state 2 steps.
 		// use for parallel or independent streams use (think: task/thread-local randomness)
-		// consumes two outputs from the current engine to ensure the new engine's state is well-separated from the current one		
+		// consumes two outputs from the current engine to ensure the new engine's state is well-separated from the current one			
 		constexpr Random<E> split() noexcept{
-			constexpr std::uint64_t tag = 0x53504C49542D3031ULL; //the tag ensures split() uses a distinct seed domain
-			std::uint64_t seed = (next() ^ std::rotl(next(), 32)) ^ tag; //mix two consecutive outputs to reduce linear correlations before avalanche mixing			
-			seed ^= 0x9E3779B97F4A7C15ULL; //inline xnasam mixing. See: seeding.hpp for details.
+			constexpr std::uint64_t tag = 0x53504C49542D3031ULL;  //the tag ensures split() uses a distinct seed domain			
+			std::uint64_t a = bits_as<std::uint64_t>(); // Always get full-width 64-bit material, even from 16/32-bit engines.
+			std::uint64_t b = bits_as<std::uint64_t>();			
+			std::uint64_t seed = (a ^ std::rotl(b, 32)) ^ tag; // Mix two consecutive pulls + domain-separating tag			
+			
+			// xnasam avalanche, inlined. See: seeding.hpp for details.
+			seed ^= 0x9E3779B97F4A7C15ULL;
 			seed ^= std::rotr(seed, 25) ^ std::rotr(seed, 47);
 			seed *= 0x9E6C63D0676A9A99ULL;
 			seed ^= (seed >> 23) ^ (seed >> 51);
 			seed *= 0x9E6D62D06F6A9A9BULL;
 			seed ^= (seed >> 23) ^ (seed >> 51);
+
 			return Random<E>{ seed };
 		}
+
 
 		static constexpr auto min() noexcept{
 			return 0; 
@@ -240,39 +276,39 @@ namespace rnd {
 			return mean + (sum - F(6)) * stddev;
 		}
 
-		// Returns n random bits as T, taking the high n bits of the engine output.
-		// Preconditions: 0 < n <= value_bits and n <= digits(T).		
+		// Runtime: returns n random bits in the low n bits of T.
+		// Works for n > value_bits by concatenating successive outputs (high bits from each draw).
 		template <class T = result_type>
 		constexpr T bits(unsigned n) noexcept{
 			static_assert(std::is_unsigned_v<T>, "bits<T>(n) requires an unsigned T");
-			assert(n > 0 && n <= value_bits);
+			assert(n > 0);
 			assert(n <= std::numeric_limits<T>::digits);
-			const result_type x = next();
-			if(n >= value_bits){  // take all bits; safe fallback if asserts are disabled in release builds
-				return static_cast<T>(x);
+			if(n <= value_bits){
+				return take_high_bits<T>(next(), n);
 			}
-			const auto mask = (result_type(1) << n) - 1;
-			const auto shift = value_bits - n;
-			const auto v = (x >> shift) & mask;
-			return static_cast<T>(v);
+			return gather_bits_runtime<T>(n);
 		}
 
-		// Compile-time overload, when number of bits are known at compile time
-		// Example: rng.bits<8>() or rng.bits<16, std::uint32_t>()
+		// Compile-time: returns N random bits in the low N bits of T.
 		template <unsigned N, class T = result_type>
 		constexpr T bits() noexcept{
-			static_assert(N > 0 && N <= value_bits, "Can only extract [1 – std::numeric_limits<result_type>::digits] bits");
-			static_assert(std::is_unsigned_v<T>, "bits<N, T> requires an unsigned T");
-			static_assert(N <= std::numeric_limits<T>::digits, "Not enough bits in return type T to hold N bits");
-			return bits<T>(N); //N is a constant; the optimizer will inline and constant-fold this call
+			static_assert(N > 0, "Need at least 1 bit");
+			static_assert(std::is_unsigned_v<T>, "bits<N,T> requires an unsigned T");
+			static_assert(N <= std::numeric_limits<T>::digits, "T cannot hold N bits");
+
+			if constexpr(N <= value_bits){
+				return take_high_bits<T>(next(), N);
+			} else{
+				// Still centralized: reuse runtime gather (the loop count is deterministic anyway).
+				return gather_bits_runtime<T>(N);
+			}
 		}
 
-		//convenience overload: fill a T with random bits
+		// Convenience: fill T with random bits.
 		template <class T>
 		constexpr T bits_as() noexcept{
-			static_assert(std::is_unsigned_v<T>, "bits<T>() requires an unsigned T");
-			constexpr unsigned N = std::numeric_limits<T>::digits;
-			return bits<N, T>();
-		}
+			static_assert(std::is_unsigned_v<T>, "bits_as<T>() requires an unsigned T");
+			return bits<std::numeric_limits<T>::digits, T>();
+		}		
 	};
 } //namespace rnd
