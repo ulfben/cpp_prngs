@@ -163,8 +163,17 @@ namespace seed {
 		return xnasam(entropy);
 	}
 
-	// Combines all available entropy sources in "paranoia mode"
-	// Aggressively mixing multiple entropy sources so that
+	// Absorb one entropy value into the running accumulator.
+	// The value is combined and then re-mixed so that even small
+	// or repeated inputs still significantly change the result.
+	[[nodiscard]] constexpr u64 absorb(u64 state, u64 v) noexcept{
+		state ^= v;
+		state += 0x9E3779B97F4A7C15ULL;
+		return xnasam(state, 0x4D49582D3031ULL); // "MIX-01"
+	}
+
+	// Aggressively mixes all available entropy sources in "paranoia mode"
+	// Any single source can be weak or predictable, but the combination ensures that
 	// overlapping, repeated, or low-quality inputs still produce a robust seed.
 	// Properties:
 	// - Maximum entropy mixing
@@ -177,34 +186,24 @@ namespace seed {
 #else
 			from_source();
 #endif	
-		if consteval{
-			return xnasam(source);
-		}		
-		u64 s = 0xD1B54A32D192ED03ULL; // non-zero init
-		s = absorb(s, from_time());
-		s = absorb(s, from_thread());
-		s = absorb(s, from_stack());
-		s = absorb(s, from_global());
-		s = absorb(s, from_heap());
-		s = absorb(s, from_system_entropy());
-		s = absorb(s, from_cpu_time());
-		s = absorb(s, source);
-		return xnasam(s, 0x534545442D3031ULL); // "SEED-01"
+		u64 seed = absorb(0xD1B54A32D192ED03ULL, source); // mix entropy from source information into a non-zero initial value
+		if consteval{			
+			return seed;
+		} else{ //runtime seeding, so more entropy is available to absorb:
+			seed = absorb(seed, from_time());
+			seed = absorb(seed, from_thread());
+			seed = absorb(seed, from_stack());
+			seed = absorb(seed, from_global());
+			seed = absorb(seed, from_heap());
+			seed = absorb(seed, from_system_entropy());
+			seed = absorb(seed, from_cpu_time());		
+		}
+		return seed;
 	}
 
 	[[nodiscard]] constexpr u32 to_32(u64 seed) noexcept{
 		return static_cast<u32>(seed ^ (seed >> 32)); //XOR-fold to mix high and low bits when casting to 32 bits.
 	}
-
-	// Mix one entropy value into the running accumulator.
-	// The value is combined and then re-mixed so that even small
-	// or repeated inputs still significantly change the result.
-	[[nodiscard]] constexpr u64 absorb(u64 state, u64 v) noexcept{		
-		state ^= v;
-		state += 0x9E3779B97F4A7C15ULL;
-		return xnasam(state, 0x4D49582D3031ULL); // "MIX-01"
-	}
-
 
 #undef STRINGIFY
 #undef STR
@@ -217,7 +216,7 @@ using seed::to_32; // Convenience alias for converting a 64-bit seed to 32 bits 
 // Compile-time seeding:
 constexpr auto seed1 = seed::from_text("my_game_seed");
 constexpr auto seed2 = seed::from_source();           // Different for each compilation unit (source file)
-constexpr auto seed3 = SEED_UNIQUE_FROM_SOURCE;     // Different for each macro expansion, even within the same source file
+constexpr auto seed3 = SEED_UNIQUE_FROM_SOURCE;		  // Different for each macro expansion, even within the same source file. Only available if __COUNTER__ is supported
 
 // Runtime seeding:
 Random<SmallFast32> rng1(to_32(seed::from_time()));   // Wall clock time, folded down to 32 bits for SmallFast32
