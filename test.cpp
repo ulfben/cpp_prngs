@@ -5,7 +5,7 @@
 #include "./engines/pcg32.hpp"
 #include "./engines/small_fast32.hpp"
 #include "./engines/small_fast64.hpp"
-#include "./engines/xoshiro256ss.h"
+#include "./engines/xoshiro256ss.hpp"
 #include "random.hpp"
 
 // Source: https://github.com/ulfben/cpp_prngs/
