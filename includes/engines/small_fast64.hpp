@@ -43,7 +43,7 @@ public:
       return std::numeric_limits<u64>::max();
    }
    static constexpr result_type min() noexcept{
-      return std::numeric_limits<u64>::min();
+       return result_type{0};
    }
    constexpr result_type next() noexcept{
        // The rotate constants (7, 13, 37) are chosen specifically for 64-bit terms, to provide
@@ -70,7 +70,7 @@ public:
 };
 static_assert(RandomBitEngine<SmallFast64>);
 
-#ifdef VALIDATE_PRNGS
+#if VALIDATE_PRNGS
 //Reference implementation of JSF (Jenkins Small Fast) PRNG
 // https://burtleburtle.net/bob/rand/smallprng.html
 // used to verify the SmallFast64 implementation

@@ -62,7 +62,7 @@ public:
       *this = Xoshiro256SS{seed};
    }
    static constexpr result_type min() noexcept{
-      return std::numeric_limits<result_type>::min();
+       return result_type{0};
    }
    static constexpr result_type max() noexcept{
       return std::numeric_limits<result_type>::max();
@@ -114,7 +114,7 @@ public:
 };
 static_assert(RandomBitEngine<Xoshiro256SS>);
 
-#ifdef VALIDATE_PRNGS
+#if VALIDATE_PRNGS
 //original implementation of xoshiro256** 1.0 by David Blackman and Sebastiano Vigna
 // https://prng.di.unimi.it/xoshiro256starstar.c
 constexpr uint64_t rotl(const uint64_t x, int k) noexcept{

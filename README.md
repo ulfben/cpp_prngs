@@ -24,42 +24,47 @@ And so; if you're making games and need your random number generator to be:
 To use a PRNG:
 
 ```cpp
+#include "seeding.hpp" //optional: for convenient, high-entropy seeding strategies, at compile time and runtime!
 #include "small_fast64.hpp"
 #include "random.hpp"
 
-rnd::Random<SmallFast64> rng{1234}; // Seeded generator, powered by the SmallFast64 engine.
+using rnd::Random;
+
+Random<SmallFast64> rng{1234}; // generator with fixed seed, powered by the SmallFast64 engine.
 int damage = rng.between(10, 20);   // Random int in [10, 20)
+
+Random<SmallFast64> rng{ seed::from_all() }; // generator seeded with high-entropy value from multiple sources (time, thread, stack, system entropy, etc.)
 ````
 
 Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#randomhpp) like floats, coin flips, Gaussian samples, picking from containers, color packing, and more.
 
 [Try it on Compiler Explorer!](https://compiler-explorer.com/z/nzK9joeYE)
 
-Want to use your own engine? It only needs to satisfy the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp)).
+Want to use your own engine? It only needs to satisfy the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp)).
 
 ---
 
-## [Engines](https://github.com/ulfben/cpp_prngs/tree/main/engines)
+## [Engines](https://github.com/ulfben/cpp_prngs/tree/main/includes/engines)
 All the provided engines [are very fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks):
 
-They are also compact (16 or 32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (over about 4.2 million elements). Such large containers are rare through and, in debug builds, the `Random<E>` code will alert you if this problem occurs.
+They are also compact (16 or 32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (~4.29 billion elements). Such large containers are rare though and, in debug builds, the `Random<E>` code will alert you if this problem occurs.
 
 | File Name           | Output Width | Description                                                                                                                                |
 |---------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
-| [`romuduojr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/romuduojr.hpp) | 64 bits | C++ port of [Mark Overton’s RomuDuoJr](https://romu-random.org/). Winner of Rhet Butler’s [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/)! |
-| [`konadare192.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/konadare192.hpp)         | 64 bits      | C++ port of [Pelle Evensen's konadare192px++](https://github.com/pellevensen/PReenactiNG). Second fastest and second smallest 64-bit PRNG in this lineup!  |
-| [`pcg32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/pcg32.hpp)         | 32 bits      | C++ port of [Melissa O’Neill’s minimal PCG32](https://www.pcg-random.org/download.html#minimal-c-implementation). Wikipedia: [Permuted congruential generator](https://en.wikipedia.org/wiki/Permuted_congruential_generator) |
-| [`xoshiro256ss.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/xoshiro256ss.h)  | 64 bits      | C++ port of [David Blackman & Sebastiano Vigna's xoshiro256\*\* 1.0](https://prng.di.unimi.it/) generator. Wikipedia: [Xorshift](https://en.wikipedia.org/wiki/Xorshift). |
-| [`small_fast32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/small_fast32.hpp)  | 32 bits      | C++ port of [Bob Jenkins’ 32-bit “Small Fast”](https://burtleburtle.net/bob/rand/smallprng.html) PRNG (two-rotate). |
-| [`small_fast64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/engines/small_fast64.hpp)  | 64 bits      | A 64-bit three-rotate implementation of the above. Three rotates (7, 13, 37) ensure stronger avalanche behavior than a naïve two-rotate 64-bit variant. |
+| [`romuduojr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/romuduojr.hpp) | 64 bits | C++ port of [Mark Overton’s RomuDuoJr](https://romu-random.org/). Winner of Rhet Butler’s [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/)! |
+| [`konadare192.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/konadare192.hpp)         | 64 bits      | C++ port of [Pelle Evensen's konadare192px++](https://github.com/pellevensen/PReenactiNG). Second fastest and second smallest 64-bit PRNG in this lineup!  |
+| [`pcg32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/pcg32.hpp)         | 32 bits      | C++ port of [Melissa O’Neill’s minimal PCG32](https://www.pcg-random.org/download.html#minimal-c-implementation). Wikipedia: [Permuted congruential generator](https://en.wikipedia.org/wiki/Permuted_congruential_generator) |
+| [`xoshiro256ss.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xoshiro256ss.hpp)  | 64 bits      | C++ port of [David Blackman & Sebastiano Vigna's xoshiro256\*\* 1.0](https://prng.di.unimi.it/) generator. Wikipedia: [Xorshift](https://en.wikipedia.org/wiki/Xorshift). |
+| [`small_fast32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast32.hpp)  | 32 bits      | C++ port of [Bob Jenkins’ 32-bit “Small Fast”](https://burtleburtle.net/bob/rand/smallprng.html) PRNG (two-rotate). |
+| [`small_fast64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast64.hpp)  | 64 bits      | A 64-bit three-rotate implementation of the above. Three rotates (7, 13, 37) ensure stronger avalanche behavior than a naïve two-rotate 64-bit variant. |
 
-Each engine satisfies the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/concepts.hpp) concept, which extends the C++20 [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) to ensure compatibility with the STL. You can use the engines directly, but `RandomBitEngine` provides only a minimal set of features: seeding, advancing, reporting `min()` and `max()`, comparison (of state) and generating random unsigned integers.
+Each engine satisfies the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp) concept, which extends the C++20 [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) to ensure compatibility with the STL. You can use the engines directly, but `RandomBitEngine` provides only a minimal set of features: seeding, advancing, reporting `min()` and `max()`, comparison (of state) and generating random unsigned integers.
 
 The engines are kept simple so they can be swapped easily with the [`Random<E>`](https://github.com/ulfben/cpp_prngs/blob/main/random.hpp) template. `Random<E>` wraps any engine - including your own - to provide a consistent, user-friendly interface designed for game development. See the full interface below.
 
 ---
 
-## [random.hpp](https://github.com/ulfben/cpp_prngs/blob/main/random.hpp)
+## [random.hpp](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp)
 
 | Method                              | Description                                                                                                                                                         |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -69,8 +74,8 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 | `operator==(other)`                 | Returns `true` if two generators have identical state                                                                                                               |
 | `min()`                             | Returns the engine’s minimum possible value (typically 0)                                                                                                           |
 | `max()`                             | Returns the engine’s maximum possible value                                                                                                                         |
-| `next()` / `operator()()`           | Returns the next random number in `[min(), max())`                                                                                                                  |
-| `next(bound)` / `operator()(bound)` | Random integer in `[0, bound)`, using [Lemire’s FastRange](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) (minimal bias, very fast) |
+| `next()` / `operator()()`           | Returns the next random number in `[min(), max()]`                                                                                                                  |
+| `next(bound)` / `operator()(bound)` | Random integer in `[0, bound)`, using [Lemire’s FastRange](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) without rejection (so: minimal bias, very fast) |
 | `next<N, T>()`                      | Compile-time bounded integer in `[0, N)`, optionally returned as type `T`; optimized for power-of-2 bounds[^1]                                                      |
 | `between(lo, hi)`                   | Random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float)                                                                                |
 | `bits(n)`                           | Runtime: returns the top `n` random bits (`1 ≤ n ≤ digits(result_type)`), packed into `T` (default: `result_type`)[^1]                                              |
@@ -109,7 +114,7 @@ Each benchmark loops over one million values and compares multiple engines side 
 
 ---
 
-## [`seeding.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/seeding.hpp)
+## [`seeding.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/seeding.hpp)
 
 **TL;DR**: `seeding.hpp` is a grab bag of portable, high-entropy seeding strategies - for tools, tests, or procedural generation, at runtime or compile time.
 
@@ -158,6 +163,7 @@ This project includes, or is based on, the following PRNG engines and reference 
 - **PCG32**: Based on M.E. O’Neill’s reference implementation ([Apache License 2.0](https://github.com/imneme/pcg-c-basic/)).
 - **konadare192px++**: By Pelle Evensen ([Apache License 2.0](https://github.com/pellevensen/PReenactiNG)).
 - **moremur**: By Pelle Evensen ([public domain](https://mostlymangling.blogspot.com/2019/12/stronger-better-morer-moremur-better.html)).
+- **xnasam**: By Pelle Evensen ([public domain](https://mostlymangling.blogspot.com/2020/01/nasam-not-another-strange-acronym-mixer.html)).
 
 Where applicable, copyright and license information is included in the header of each source file.
 

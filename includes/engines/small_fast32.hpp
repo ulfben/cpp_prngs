@@ -14,98 +14,97 @@
   https://github.com/ulfben/cpp_prngs/
 */
 class SmallFast32 final{
-   using u32 = std::uint32_t;
-   using u64 = std::uint64_t;
+	using u32 = std::uint32_t;
+	using u64 = std::uint64_t;
 
-   u32 a;
-   u32 b;
-   u32 c;
-   u32 d;
+	u32 a;
+	u32 b;
+	u32 c;
+	u32 d;
 
 public:
-   using result_type = u32;
-   using seed_type = u64;
+	using result_type = u32;
+	using seed_type = u64;
 
-   constexpr SmallFast32() noexcept
-      : SmallFast32(0xBADC0FFEu){}
+	constexpr SmallFast32() noexcept
+		: SmallFast32(0xBADC0FFEu){}
 
-   explicit constexpr SmallFast32(seed_type seed) noexcept
-       : a(0xf1ea5eedu)
-       , b(static_cast<u32>(seed))
-       , c(static_cast<u32>(seed >> 32))
-       , d(static_cast<u32>(seed ^ (seed >> 32)))
-   {
-       discard(20); //warmup
-   }
+	explicit constexpr SmallFast32(seed_type seed) noexcept
+		: a(0xf1ea5eedu)
+		, b(static_cast<u32>(seed))
+		, c(static_cast<u32>(seed >> 32))
+		, d(static_cast<u32>(seed ^ (seed >> 32))){
+		discard(20); //warmup
+	}
 
-   constexpr void seed() noexcept{
-      *this = SmallFast32{};
-   }
-   constexpr void seed(seed_type seed) noexcept{
-      *this = SmallFast32{seed};
-   }
+	constexpr void seed() noexcept{
+		*this = SmallFast32{};
+	}
+	constexpr void seed(seed_type seed) noexcept{
+		*this = SmallFast32{seed};
+	}
 
-   static constexpr result_type min() noexcept{
-      return std::numeric_limits<result_type>::min();
-   }
-   static constexpr result_type max() noexcept{
-      return std::numeric_limits<result_type>::max();
-   }
-   constexpr result_type operator()() noexcept{
-      return next();
-   }
+	static constexpr result_type min() noexcept{
+		return result_type{0};
+	}
+	static constexpr result_type max() noexcept{
+		return std::numeric_limits<result_type>::max();
+	}
+	constexpr result_type operator()() noexcept{
+		return next();
+	}
 
-   constexpr result_type next() noexcept{
-      const u32 e = a - std::rotl(b, 27);
-      a = b ^ std::rotl(c, 17);
-      b = c + d;
-      c = d + e;
-      d = e + a;
-      return d;
-   }
+	constexpr result_type next() noexcept{
+		const u32 e = a - std::rotl(b, 27);
+		a = b ^ std::rotl(c, 17);
+		b = c + d;
+		c = d + e;
+		d = e + a;
+		return d;
+	}
 
-   constexpr void discard(unsigned long long n) noexcept{
-      while(n--){
-         next();
-      }
-   }
+	constexpr void discard(unsigned long long n) noexcept{
+		while(n--){
+			next();
+		}
+	}
 
-   constexpr bool operator==(const SmallFast32& rhs) const noexcept = default;
+	constexpr bool operator==(const SmallFast32& rhs) const noexcept = default;
 };
 static_assert(RandomBitEngine<SmallFast32>);
 
-#ifdef VALIDATE_PRNGS
+#if VALIDATE_PRNGS
 //Reference implementation of JSF (Jenkins Small Fast) PRNG
 // https://burtleburtle.net/bob/rand/smallprng.html
 // used to verify the SmallFast32 implementation
 using u4 = std::uint32_t;
 struct ranctx{
-   u4 a, b, c, d;
+	u4 a, b, c, d;
 };
 constexpr u4 ranval(ranctx& x) noexcept{
-   constexpr auto rot32 = [](u4 x, unsigned k) noexcept -> u4{
-      return (((x) << (k)) | ((x) >> (32 - (k))));
-      };
-   const u4 e = x.a - rot32(x.b, 27);
-   x.a = x.b ^ rot32(x.c, 17);
-   x.b = x.c + x.d;
-   x.c = x.d + e;
-   x.d = e + x.a;
-   return x.d;
+	constexpr auto rot32 = [](u4 x, unsigned k) noexcept -> u4{
+		return (((x) << (k)) | ((x) >> (32 - (k))));
+		};
+	const u4 e = x.a - rot32(x.b, 27);
+	x.a = x.b ^ rot32(x.c, 17);
+	x.b = x.c + x.d;
+	x.c = x.d + e;
+	x.d = e + x.a;
+	return x.d;
 }
 constexpr ranctx raninit(u4 seed) noexcept{
-   ranctx x{0xf1ea5eedu, seed, seed, seed};
-   for(unsigned i = 0; i < 20; ++i){
-      ranval(x);
-   }
-   return x;
+	ranctx x{0xf1ea5eedu, seed, seed, seed};
+	for(unsigned i = 0; i < 20; ++i){
+		ranval(x);
+	}
+	return x;
 }
 static constexpr auto JSF_REFERENCE = []{
-   ranctx ctx = raninit(123);
-   std::array<SmallFast32::result_type, 6> out{};
-   for(auto& v : out){ v = ranval(ctx); }
-   return out;
-   }();
+	ranctx ctx = raninit(123);
+	std::array<SmallFast32::result_type, 6> out{};
+	for(auto& v : out){ v = ranval(ctx); }
+	return out;
+	}();
 
 static_assert(prng_outputs(SmallFast32(123)) == JSF_REFERENCE, "SmallFast32 output does not match JSF reference");
 

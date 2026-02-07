@@ -73,7 +73,7 @@ TYPED_TEST(RandomTypedTest, NextBoundedRespectsUpperBound){
 // next<N, T>() returns values in [0, N)
 // -----------------------------------------------------------------------------
 TYPED_TEST(RandomTypedTest, NextCompileTimeBoundedRespectsBound){
-    constexpr unsigned N = 10;
+    constexpr std::uint32_t N = 10;
 
     for(int i = 0; i < 1024; ++i){
         auto v = this->rng.template next<N, std::uint32_t>();
@@ -85,15 +85,18 @@ TYPED_TEST(RandomTypedTest, NextCompileTimeBoundedRespectsBound){
 // min(), max(), and range of next()
 // -----------------------------------------------------------------------------
 TYPED_TEST(RandomTypedTest, NextRespectsMinMaxRange){
-    auto lo = this->rng.min();
-    auto hi = this->rng.max();
+    using Engine = TypeParam;
+    using result_type = typename Engine::result_type;
+
+    const result_type lo = this->rng.min();
+    const result_type hi = this->rng.max();
 
     EXPECT_LT(lo, hi);
 
     for(int i = 0; i < 1024; ++i){
-        auto v = this->rng.next();
+        const result_type v = this->rng.next();
         EXPECT_GE(v, lo);
-        EXPECT_LT(v, hi) << "next() must be in [min(), max())";
+        EXPECT_LE(v, hi) << "next() must be in [min(), max()]";
     }
 }
 
@@ -126,16 +129,16 @@ TYPED_TEST(RandomTypedTest, EqualityTracksState){
 
 
 // -----------------------------------------------------------------------------
-// Between(lo, hi)
+// Between(lo, hi) produced values in [lo, hi)
 // -----------------------------------------------------------------------------
-TYPED_TEST(RandomTypedTest, BetweenProducesValuesWithinInclusiveRange){
+TYPED_TEST(RandomTypedTest, BetweenProducesExclusiveRange){
     constexpr int lo = -5;
     constexpr int hi = 7;
 
     for(int i = 0; i < 1024; ++i){
         auto v = this->rng.between(lo, hi);
         EXPECT_GE(v, lo);
-        EXPECT_LE(v, hi);
+        EXPECT_LT(v, hi);
     }
 }
 
@@ -278,7 +281,7 @@ TYPED_TEST(RandomTypedTest, DiscardSkipsValues){
 
     a.discard(skip);
     for(std::uint64_t i = 0; i < skip; ++i){
-        b.next();
+        b.next(); 
     }
 
     EXPECT_EQ(a.next(), b.next());
@@ -292,7 +295,7 @@ TYPED_TEST(RandomTypedTest, BitsRuntimeReturnsOnlyRequestedBits){
     using result_type = typename Engine::result_type;
 
     for(unsigned n : {1u, 8u, 16u}){
-        auto v = this->rng.bits(n);
+        result_type v = this->rng.bits(n);
         const auto max_val = (n == 0u)
             ? result_type{0}
         : (result_type(1) << n) - 1;

@@ -17,7 +17,7 @@
 //
 // Features:
 // - Compile-time seeding via string hashing (FNV1a) and source information
-// - 'moremur' for high-quality mixing of numeric values
+// - 'moremur' and 'xnasam' for high-quality mixing of numeric values
 // - Runtime entropy from various sources (time, thread ID, stack pointer, hardware, etc.)
 // - Utilities for converting from 64-bit to 32-bit seeds
 //

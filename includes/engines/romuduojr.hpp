@@ -84,7 +84,7 @@ public:
    }
 
    static constexpr result_type min() noexcept{
-      return std::numeric_limits<result_type>::min();
+       return result_type{0};
    }
 
    static constexpr result_type max() noexcept{
@@ -95,7 +95,7 @@ public:
 };
 static_assert(RandomBitEngine<RomuDuoJr>);
 
-#ifdef VALIDATE_PRNGS
+#if VALIDATE_PRNGS
 // Original implementation of RomuDuoJr from Mark Overton´s 2020 paperm for validation purposes 
 // see: https://www.romu-random.org/code.c
 // adjusted for constexpr evaluation, but otherwise unchanged

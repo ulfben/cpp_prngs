@@ -68,7 +68,7 @@ namespace rnd {
 			_e.seed(v);
 		}
 
-		// returns a decorrelated, forked engine; advances this engine's state
+		// returns a decorrelated, forked engine; advances this engine's state 2 steps.
 		// use for parallel or independent streams use (think: task/thread-local randomness)
 		// consumes two outputs from the current engine to ensure the new engine's state is well-separated from the current one		
 		constexpr Random<E> split() noexcept{
@@ -80,7 +80,7 @@ namespace rnd {
 			seed ^= (seed >> 23) ^ (seed >> 51);
 			seed *= 0x9E6D62D06F6A9A9BULL;
 			seed ^= (seed >> 23) ^ (seed >> 51);
-			return Random{E{ seed }};
+			return Random<E>{ seed };
 		}
 
 		static constexpr auto min() noexcept{
@@ -91,25 +91,24 @@ namespace rnd {
 			return E::max();
 		}
 
-		// Produces a random value in the range [min(), max())
+		// Produces a random value in the range [min(), max()], inclusive.
 		constexpr result_type next() noexcept{
 			return _e();
 		}
 
+		// Produces a random value in the range [min(), max()], inclusive.
 		constexpr result_type operator()() noexcept{
 			return next();
 		}
-
-		// produces a random value in [0, bound) using Lemire's fastrange.
-		// achieves very small bias without using rejection, and is much faster than naive modulo.
+						
+		// Produces a random value in [0, bound) (exclusive) via multiply-high range reduction (Lemire-style).
+		// This much faster than naive modulo and has very small bias for non power-of-two bounds, and no bias for powers of two bounds.
 		// See: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
 		constexpr result_type next(result_type bound) noexcept{
 			assert(bound > 0 && "bound must be non-zero and positive");
-
-			result_type raw_value = next(); // raw_value is in the range [0, 2^value_bits)
-
+			result_type raw_value = next(); // raw_value is [0, 2^value_bits - 1] (i.e. min()..max(), inclusive)
 			if constexpr(value_bits <= 32){ // for small engines, multiply into a 64-bit product
-				auto product = std::uint64_t(raw_value) * std::uint64_t(bound); // product is now in [0, bound * 2^value_bits)
+				auto product = std::uint64_t(raw_value) * std::uint64_t(bound);	// product < bound * 2^value_bits   (since raw_value < 2^value_bits)
 				auto result = result_type(product >> value_bits); // equivalent to floor(product / 2^value_bits)
 				return result;                    // result is now in range [0, bound)
 			} else if constexpr(value_bits <= 64){
@@ -120,6 +119,7 @@ namespace rnd {
 			}
 		}
 
+		// Produces a random value in [0, bound) (exclusive) 
 		constexpr result_type operator()(result_type bound) noexcept{
 			return next(bound);
 		}
@@ -131,9 +131,10 @@ namespace rnd {
 		constexpr T next() noexcept{
 			static_assert(Bound > 0, "Bound must be positive");
 			static_assert(Bound - 1 <= static_cast<result_type>(std::numeric_limits<T>::max()),
-				"Bound is too large for return type T");
-			// if Bound is a power of two, we can use a mask / bit-extract.
-			if constexpr((Bound & (Bound - 1)) == 0){
+				"Bound is too large for return type T");			
+			if constexpr(Bound == 1){
+				return T{0};
+			}else if constexpr((Bound & (Bound - 1)) == 0){ // if Bound is a power of two, we can use a mask / bit-extract.
 				constexpr unsigned bits_needed = std::countr_zero(Bound);
 				static_assert(bits_needed <= value_bits, "Bound is too large for this engine's result_type");
 				return bits<bits_needed, T>();
