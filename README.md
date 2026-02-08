@@ -25,20 +25,20 @@ To use a PRNG:
 
 ```cpp
 #include "seeding.hpp" //optional: for convenient, high-entropy seeding strategies, at compile time and runtime!
-#include "small_fast64.hpp"
-#include "random.hpp"
+#include "small_fast64.hpp" //the engine; pick your favorite from the provided /engines
+#include "random.hpp" //the user-friendly wrapper that provides a consistent interface and utilities across all engines
 
 using rnd::Random;
 
 Random<SmallFast64> rng{1234}; // generator with fixed seed, powered by the SmallFast64 engine.
 int damage = rng.between(10, 20);   // Random int in [10, 20)
 
-Random<SmallFast64> rng{ seed::from_all() }; // generator seeded with high-entropy value from multiple sources (time, thread, stack, system entropy, etc.)
+Random<SmallFast64> rng2{ seed::from_all() }; // generator seeded with high-entropy value from multiple sources (time, thread, stack, system entropy, etc.)
 ````
 
-Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#randomhpp) like floats, coin flips, Gaussian samples, picking from containers, color packing, and more.
+Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#randomhpp) like bounds, floats, coin flips, Gaussian samples, picking from containers, raw bits, and more.
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/nzK9joeYE)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/67ffKPv3G)
 
 Want to use your own engine? It only needs to satisfy the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp)).
 
@@ -79,8 +79,8 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 | `next<N, T>()`                      | Compile-time bounded integer in `[0, N)`, optionally returned as type `T`; optimized for power-of-2 bounds[^1]                                                      |
 | `between(lo, hi)`                   | Random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float)                                                                                |
 | `bits(n)`                           | Runtime: returns the top `n` random bits (`1 ≤ n ≤ digits(result_type)`), packed into `T` (default: `result_type`)[^1]                                              |
-| `bits<N, T>()`                      | Compile-time: returns the top `N` random bits as type `T`; constraints checked at compile time[^1]                                                                  |
-| `bits_as<T>()`                      | Convenience: returns an unsigned `T` filled with `digits(T)` high-quality random bits                                                                               |
+| `bits<N, T>()`                      | Returns the top `N` random bits as type `T`; constraints checked at compile time[^1]                                                                  |
+| `bits_as<T>()`                      | Convenience: returns an unsigned `T` filled with high-quality random bits                                                                               |
 | `normalized<F>()`                   | Returns float `F` in `[0.0, 1.0)`, using the [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/)                                                     |
 | `signed_norm<F>()`                  | Returns float `F` in `[-1.0, 1.0)`                                                                                                                                  |
 | `coin_flip()`                       | Fair coin flip (`true` ~50%)                                                                                                                                        |
@@ -118,7 +118,7 @@ Each benchmark loops over one million values and compares multiple engines side 
 
 **TL;DR**: `seeding.hpp` is a grab bag of portable, high-entropy seeding strategies - for tools, tests, or procedural generation, at runtime or compile time.
 
-All engines in this library are seeded from a single `uint64_t` or `uint32_t` value. They provide a hardcoded default seed, so default construction (`Random<E>()`) is always valid - but produces the *same* sequence every time.
+All engines in this library are seeded from a single `uint64_t` value. They provide a hardcoded default seed, so default construction (`Random<E>()`) is always valid - but produces the *same* sequence every time.
 
 To get varied sequences, you’ll want to provide a high-entropy seed. `std::random_device` is often used for this - it's typically hardware-backed and [works fine on most platforms](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/). But it can be slow, unavailable (e.g. on embedded systems, or at compile time), and is unsuitable when you need determinism.
 
@@ -135,16 +135,16 @@ constexpr auto seed2 = seed::from_source();           // Different for each comp
 constexpr auto seed3 = SEED_UNIQUE_FROM_SOURCE();     // Different for each macro expansion, even within the same source file
 
 // Runtime seeding:
-Random<SmallFast32> rng1(to_32(seed::from_time()));   // Wall clock time, folded down to 32 bits for SmallFast32
+Random<SmallFast32> rng1(seed::from_time());		  // High resolution clock
 Random<SmallFast64> rng2(seed::from_system_entropy());// Uses std::random_device (hardware/system entropy)
 
 // Pseudo-entropy sources:
 Random<RomuDuoJr> rng3(seed::from_thread());          // Unique per thread
-Random<PCG32>     rng4(to_32(seed::from_stack()));    // Varies per run of the application, if ASLR is active
-Random<PCG32>     rng5(to_32(seed::from_cpu_time())); // Varies with CPU time consumed by the process; can reflect workload or scheduling
+Random<PCG32>     rng4(seed::from_stack());			  // Varies per run of the application, if ASLR is active
+Random<PCG32>     rng5(seed::from_cpu_time());		  // Varies with CPU time consumed by the process; can reflect workload or scheduling
 
 // Maximum entropy:
-Random<Xoshiro256SS> rng6(seed::from_all());          // Combines all sources (time, thread, stack, entropy, etc.)
+Random<Xoshiro256SS> rng6(seed::from_all());          // Combines all sources (time, thread, stack, heap, compile time, source data, hw entropy, etc.)
 ```
 These utilities help you ensure that your random number generators are seeded appropriately - whether you need reproducibility, speed, or maximal entropy.
 
