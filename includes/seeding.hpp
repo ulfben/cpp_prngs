@@ -65,7 +65,7 @@ namespace seed {
 		// FNV1a for string hashing        
 		u64 hash = 14695981039346656037ULL;
 		for(const char c : str){
-			hash ^= c;
+			hash ^= static_cast<u64>(static_cast<unsigned char>(c));
 			hash *= 1099511628211ULL;
 		}
 		return xnasam(hash);
@@ -101,8 +101,11 @@ namespace seed {
 	// - Uses the platform’s highest-resolution clock.
 	// - Good general-purpose default: seeds will usually differ between runs.
 	inline u64 from_time() noexcept{
-		const auto now = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-		return xnasam(now);
+		using clock = std::chrono::high_resolution_clock;
+		using rep = typename clock::duration::rep;
+		using urep = std::make_unsigned_t<rep>;
+		const rep now = clock::now().time_since_epoch().count();
+		return xnasam(static_cast<std::uint64_t>(static_cast<urep>(now)));
 	}
 
 	// CPU time consumed by the program

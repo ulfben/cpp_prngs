@@ -26,7 +26,7 @@
 namespace rnd {
 	template <RandomBitEngine E>
 	class Random final{
-		static constexpr unsigned value_bits = std::numeric_limits<E::result_type>::digits;
+		static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;
 		E _e{}; //the underlying engine providing random bits. This class will turn those into useful values.
 		
 		template <class T>
@@ -35,7 +35,7 @@ namespace rnd {
 			constexpr unsigned W = std::numeric_limits<T>::digits;
 			if(n == 0) return T{0};
 			if(n >= W) return std::numeric_limits<T>::max(); // avoid UB on (1<<W)
-			return (T{1} << n) - T{1};
+			return static_cast<T>((T{1} << n) - T{1});
 		}
 			
 		template <class T>
@@ -106,7 +106,7 @@ namespace rnd {
 			constexpr S tag = static_cast<S>(0x53504C49542D3031ULL); //the tag ensures split() uses a distinct seed domain						
 			S a = bits_as<S>(); 
 			S b = bits_as<S>();						
-			S seed = (a ^ std::rotl(b, std::min<unsigned>(32, std::numeric_limits<S>::digits - 1))) ^ tag; // Mix two consecutive pulls + domain-separating tag			
+			S seed = (a ^ std::rotl(b, std::min<int>(32, std::numeric_limits<S>::digits - 1))) ^ tag; // Mix two consecutive pulls + domain-separating tag			
 			
 			// xnasam avalanche, inlined. See: seeding.hpp for details.
 			//TODO: this is a 64-bit mixer. Delegate to something more appropriate on smaller engines!
@@ -200,14 +200,14 @@ namespace rnd {
 		}
 
 		// real in [lo, hi)
-		template <std::floating_point F> constexpr F between(F lo, F hi) noexcept{
+		template <std::floating_point F = float> constexpr F between(F lo, F hi) noexcept{
 			return lo + (hi - lo) * normalized<F>();
 		}
 
 		// real in [0.0,1.0) using the "IQ float hack"
 		//   see Iñigo Quilez, "sfrand": https://iquilezles.org/articles/sfrand/
 		// Fast, branchless and, now, portable.
-		template <std::floating_point F>
+		template <std::floating_point F = float>
 		constexpr F normalized() noexcept{
 			static_assert(std::numeric_limits<F>::is_iec559, "normalized() requires IEEE 754 (IEC 559) floating point types.");
 			using UInt = std::conditional_t<sizeof(F) == 4, uint32_t, uint64_t>; // Pick wide enough unsigned int type for F
@@ -222,7 +222,7 @@ namespace rnd {
 		}
 
 		// real in [-1.0,1.0) using the IQ float hack.
-		template <std::floating_point F>
+		template <std::floating_point F = float>
 		constexpr F signed_norm() noexcept{
 			return F(2) * normalized<F>() - F(1); // scale to [0.0, 2.0), then shift to [-1.0, 1.0)
 		}
@@ -233,7 +233,7 @@ namespace rnd {
 		}
 
 		// boolean with probability
-		template <std::floating_point F>
+		template <std::floating_point F = float>
 		constexpr bool coin_flip(F probability) noexcept{
 			return normalized<F>() < probability;
 		}
@@ -266,7 +266,7 @@ namespace rnd {
 			return *iterator(std::forward<R>(collection));
 		}
 
-		template <std::floating_point F>
+		template <std::floating_point F = float>
 		constexpr F gaussian(F mean, F stddev) noexcept{
 			// Based on the Central Limit Theorem; https://en.wikipedia.org/wiki/Central_limit_theorem
 			// the Irwin–Hall distribution (sum of 12 U(0,1) has mean = 6, variance = 1).

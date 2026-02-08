@@ -62,7 +62,7 @@ public:
 		state = oldstate * MULT + inc;
 		const u32 xorshifted = static_cast<u32>(((oldstate >> 18u) ^ oldstate) >> 27u);
 		const u32 rot = static_cast<u32>(oldstate >> 59u);
-		return std::rotr(xorshifted, rot);
+		return std::rotr(xorshifted, static_cast<int>(rot));
 	}
 	constexpr result_type operator()() noexcept{
 		return next();
