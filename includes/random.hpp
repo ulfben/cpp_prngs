@@ -1,18 +1,14 @@
 #pragma once
-#include <algorithm>
+#include "concepts.hpp" //for RandomBitEngine concept
+#include "detail.hpp"   //for constexpr and portable 128-bit multiplication
 #include <bit> // for std::bit_cast
 #include <cassert>
-#include <cmath>
 #include <concepts>
 #include <cstdint>
 #include <iterator>
+#include <limits>
 #include <ranges>
 #include <type_traits>
-#ifdef _MSC_VER
-#include <intrin.h>    // for _umul128, 64x64 multiplication
-#endif
-#include "concepts.hpp" //for RandomBitEngine concept
-#include "detail.hpp"   //for constexpr and portable 128-bit multiplication
 
 // This is an RNG interface that wraps around any engine that meets the RandomBitEngine concept.
 // It provides useful functions for generating values, including integers, floating-point numbers, and colors
@@ -100,7 +96,7 @@ namespace rnd {
 
 		// returns a decorrelated, forked engine; advances this engine's state 2 steps.
 		// use for parallel or independent streams use (think: task/thread-local randomness)
-		// consumes two outputs from the current engine to ensure the new engine's state is well-separated from the current one			
+		// consumes enough outputs to fill seed_type twice (2 draws for 64-bit engines, 4 draws for 32-bit engines when seed_type is 64-bit).
 		constexpr Random<E> split() noexcept{
 			using S = seed_type;
 			constexpr S tag = static_cast<S>(0x53504C49542D3031ULL); //the tag ensures split() uses a distinct seed domain						

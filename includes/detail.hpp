@@ -1,4 +1,8 @@
 #pragma once
+#include <cstdint>
+#ifdef _MSC_VER
+#include <intrin.h>    // for _umul128, 64x64 multiplication
+#endif
 // detail.hpp: private helpers to keep Random<E> constexpr and portable.		
 // Provides a constexpr 128-bit multiply and shift for platforms without native __uint128_t support, such as MSVC.
 // including a fully constexpr fallback on MSVC, where _umul128 is not constexpr

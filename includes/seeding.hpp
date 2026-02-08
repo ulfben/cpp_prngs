@@ -1,9 +1,11 @@
 #pragma once
+#include <bit>
 #include <chrono> 
-#include <cstddef>
+#include <cstdarg>
 #include <cstdint>
 #include <ctime> //for std::clock
 #include <memory> //for unique_ptr
+#include <new>
 #include <random>
 #include <string_view>
 #include <thread>
