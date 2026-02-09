@@ -29,11 +29,23 @@ public:
 	constexpr SmallFast32() noexcept
 		: SmallFast32(0xBADC0FFEu){}
 
+	//64-bit constructor for convenience and better seeding quality.
+	//but for backwards compatibility with the original implementation, a 32-bit constructor is provided too.
 	explicit constexpr SmallFast32(seed_type seed) noexcept
 		: a(0xf1ea5eedu)
 		, b(static_cast<u32>(seed))
 		, c(static_cast<u32>(seed >> 32))
 		, d(static_cast<u32>(seed ^ (seed >> 32))){
+		discard(20); //warmup
+	}
+
+	// Overload for 32-bit seeds, only to be able to validate against the original implementation
+	// The 64-bit seed constructor is the primary one and should be preferred for better seeding quality.
+	explicit constexpr SmallFast32(u32 seed) noexcept
+		: a(0xf1ea5eedu)
+		, b(seed)
+		, c(seed)
+		, d(seed){
 		discard(20); //warmup
 	}
 
@@ -106,6 +118,6 @@ static constexpr auto JSF_REFERENCE = []{
 	return out;
 	}();
 
-static_assert(prng_outputs(SmallFast32(123)) == JSF_REFERENCE, "SmallFast32 output does not match JSF reference");
+static_assert(prng_outputs(SmallFast32(123u)) == JSF_REFERENCE, "SmallFast32 output does not match JSF reference");
 
 #endif //VALIDATE_PRNGS
