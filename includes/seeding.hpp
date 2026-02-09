@@ -63,6 +63,15 @@ namespace seed {
 		return x;
 	}
 
+	// Absorb one entropy value into the running accumulator.
+	// The value is combined and then re-mixed so that even small
+	// or repeated inputs still significantly change the result.
+	[[nodiscard]] constexpr u64 absorb(u64 state, u64 v) noexcept{
+		state ^= v;
+		state += 0x9E3779B97F4A7C15ULL;
+		return xnasam(state, 0x4D49582D3031ULL); // "MIX-01"
+	}
+
 	constexpr u64 from_text(std::string_view str) noexcept{
 		// FNV1a for string hashing        
 		u64 hash = 14695981039346656037ULL;
@@ -131,13 +140,13 @@ namespace seed {
 		return xnasam(value);
 	}
 
-	// Stack address
+	// From stack / heap / static address
 	// Properties:
 	// - Varies between runs due to ASLR (Address Space Layout Randomization)
 	// - May be predictable if ASLR is disabled
 	// - Usually aligned to specific boundaries
 	// - Cheap to obtain
-	// - Potentially useful as supplementary entropy source
+	// - Potentially useful as supplementary entropy sources
 	inline u64 from_stack() noexcept{
 		const u64 dummy = 0;
 		return xnasam(reinterpret_cast<std::uintptr_t>(&dummy));
@@ -145,14 +154,15 @@ namespace seed {
 
 	inline u64 from_heap() noexcept{
 		std::unique_ptr<u64> dummy{new (std::nothrow) u64()};
-		if(!dummy){ return from_stack(); } // Fallback to stack if allocation fails
+		if(!dummy){ // Fallback to stack + non-zero constant.
+			return absorb(1099511628211ULL, from_stack());// We 'absorb' so from_stack() and from_heap() never return identical seeds
+		}  	
 		return xnasam(reinterpret_cast<std::uintptr_t>(dummy.get()));
 	}
 
 	inline u64 from_global() noexcept{
-		// static = stored in global memory, but scoped locally to the function
-		// alignas(8) ensures 3 low address bits are zero (more entropy in high bits)
-		alignas(8) static const u64 dummy = 0;
+		// static = stored in global memory, but scoped locally to the function		
+		static const u64 dummy = 0;
 		return xnasam(reinterpret_cast<std::uintptr_t>(&dummy));
 	}
 
@@ -166,15 +176,6 @@ namespace seed {
 		std::random_device rd;
 		const auto entropy = (static_cast<u64>(rd()) << 32) | rd();
 		return xnasam(entropy);
-	}
-
-	// Absorb one entropy value into the running accumulator.
-	// The value is combined and then re-mixed so that even small
-	// or repeated inputs still significantly change the result.
-	[[nodiscard]] constexpr u64 absorb(u64 state, u64 v) noexcept{
-		state ^= v;
-		state += 0x9E3779B97F4A7C15ULL;
-		return xnasam(state, 0x4D49582D3031ULL); // "MIX-01"
 	}
 
 	// Aggressively mixes all available entropy sources in "paranoia mode"
@@ -219,19 +220,19 @@ using rnd::Random;
 using seed::to_32; // Convenience alias for converting a 64-bit seed to 32 bits (for smaller engines).
 
 // Compile-time seeding:
-constexpr auto seed1 = seed::from_text("my_game_seed");
-constexpr auto seed2 = seed::from_source();           // Different for each compilation unit (source file)
-constexpr auto seed3 = SEED_UNIQUE_FROM_SOURCE;		  // Different for each macro expansion, even within the same source file. Only available if __COUNTER__ is supported
+constexpr auto seed1 = seed::from_text("my_game_seed"); //Deterministic seed from a string literal.
+constexpr auto seed2 = seed::from_source();				// Different for each compilation unit (source file)
+constexpr auto seed3 = SEED_UNIQUE_FROM_SOURCE();		// Different for each macro expansion, even within the same source file
 
 // Runtime seeding:
-Random<SmallFast32> rng1(to_32(seed::from_time()));   // Wall clock time, folded down to 32 bits for SmallFast32
+Random<SmallFast32> rng1(seed::from_time());		  // High resolution clock
 Random<SmallFast64> rng2(seed::from_system_entropy());// Uses std::random_device (hardware/system entropy)
 
 // Pseudo-entropy sources:
 Random<RomuDuoJr> rng3(seed::from_thread());          // Unique per thread
-Random<PCG32>     rng4(to_32(seed::from_stack()));    // Varies per run of the application, if ASLR is active
-Random<PCG32>     rng5(to_32(seed::from_cpu_time())); // Varies with CPU time consumed by the process; can reflect workload or scheduling
+Random<PCG32>     rng4(seed::from_stack());			  // Varies per run of the application, if ASLR is active
+Random<PCG32>     rng5(seed::from_cpu_time());		  // Varies with CPU time consumed by the process; can reflect workload or scheduling
 
 // Maximum entropy:
-Random<Xoshiro256SS> rng6(seed::from_all());          // Combines all sources (time, thread, stack, entropy, etc.)
+Random<Xoshiro256SS> rng6(seed::from_all());          // Combines all sources (time, thread, stack, heap, compile time, source data, hw entropy, etc.)
 */
