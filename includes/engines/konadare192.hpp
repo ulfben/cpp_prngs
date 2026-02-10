@@ -2,7 +2,7 @@
 #include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
-#include <numeric> //for std::rotr and std::rotl
+#include <bit> //for std::rotr and std::rotl
 
 /*
  * konadare192.hpp - a minimal header-only C++26 port of Pelle Evensen's "konadare192px++" PRNG,

@@ -2,7 +2,7 @@
 #include "../concepts.hpp" //for RandomBitEngine
 #include <cstdint>
 #include <limits>
-#include <numeric> //for std::rotl
+#include <bit> //for std::rotl
 /*
   RomuDuoJr - Modern C++ Port
 
@@ -20,38 +20,33 @@
 */
 class RomuDuoJr final{
    using u64 = std::uint64_t;
-   u64 x;
-   u64 y;
+   using state_type = u64;
+   state_type x;
+   state_type y;
 
-   // NASAM-style mixing (Pelle Evensen): diffuses entropy across word 
-   // https://mostlymangling.blogspot.com/2020/01/nasam-not-another-strange-acronym-mixer.html    
-   static constexpr u64 mix(u64 y) noexcept{
-      return y ^ (y >> 23) ^ (y >> 51);
-   }
    struct Direct{}; //tag for from_state()
    //private constructor to allow factory function from_state() to bypass the seeding routines.
-   constexpr RomuDuoJr(u64 xstate, u64 ystate, Direct) noexcept
+   constexpr RomuDuoJr(state_type xstate, state_type ystate, Direct) noexcept
       : x(xstate), y(ystate){}
 public:
    using result_type = u64;
-   using seed_type = u64;
-   using state_type = u64; //TODO: why is this public? 
+   using seed_type = u64;   
 
    constexpr RomuDuoJr() noexcept : RomuDuoJr(0xFEEDFACEFEEDFACEULL){}
 
    explicit constexpr RomuDuoJr(seed_type seed) noexcept
       : x(0x9E6C63D0676A9A99ULL), y(~seed - seed){
       // Initialize x to a fixed odd constant, y to ~seed – seed.
-      // Then do two rounds of NASAM mixing + a rotate‐multiply step on x.  
+      // Then do two rounds of NASAM-style mixing + a rotate‐multiply step on x.  
       // This is proven robust even with low-entropy seeds:
-          // - All 32-bit seeds tested, no output cycles found in first 2^24 bytes
-          // - All 16-bit seeds tested, no output cycles found in first 2^36 bytes
+          // - All 32-bit seeds tested, no output cycles found in first 2^24 outputs
+          // - All 16-bit seeds tested, no output cycles found in first 2^36 outputs
       // ergo: the initializer reliably avoids short-period or degenerate states, even when under-seeded.
       y *= x;
-      y = mix(y);
+      y = y ^ (y >> 23) ^ (y >> 51);
       y *= x;
       x *= std::rotl(y, 27);
-      y = mix(y);
+      y = y ^ (y >> 23) ^ (y >> 51);
    }
 
    constexpr void seed() noexcept{
@@ -67,8 +62,8 @@ public:
    }
 
    constexpr result_type next() noexcept{
-      const u64 old_x = x;
-      x = y * 0xD3833E804F4C574BULL;
+      const state_type old_x = x;
+      x = y * 15241094284759029579;
       y = std::rotl(y - old_x, 27);
       return old_x;
    }

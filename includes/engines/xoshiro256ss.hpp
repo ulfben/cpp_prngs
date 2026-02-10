@@ -3,7 +3,7 @@
 #include <limits>
 #include <cstdint>
 #include <span>
-#include <numeric> //std::rotl
+#include <bit> //std::rotl
 
 /*
   Xoshiro256SS - a modern C++ port of xoshiro256** 1.0.

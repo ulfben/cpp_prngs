@@ -2,7 +2,7 @@
 #include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
-#include <numeric> //std::rotl
+#include <bit> //std::rotl
 /*
   SmallFast64 PRNG - a modern C++ 64-bit three-rotate implementation of Jenkins Small Fast PRNG.
 
