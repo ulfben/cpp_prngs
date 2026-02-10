@@ -23,16 +23,23 @@ class Xoshiro256SS{
 	using u64 = std::uint64_t;
 	u64 s[4]{};
 
-	static constexpr u64 splitmix64(u64 x) noexcept{
-		u64 z = (x + 0x9e3779b97f4a7c15uLL);
-		z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9uLL;
-		z = (z ^ (z >> 27)) * 0x94d049bb133111ebuLL;
+	static constexpr u64 splitmix64(u64& x) noexcept{
+		x += 0x9E3779B97F4A7C15ULL; // golden ratio increment
+		u64 z = x;
+		z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+		z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
 		return z ^ (z >> 31);
 	}
-	   //private constructor to allow factory function from_state() to bypass the seeding routines.
-	constexpr Xoshiro256SS(std::span<const u64> state) noexcept{
-		std::ranges::copy(state, s);
+	
+	//private constructor to allow factory function from_state() to bypass the seeding routines.
+	constexpr Xoshiro256SS(std::span<const u64, 4> state) noexcept{		
+		s[0] = state[0];
+		s[1] = state[1];
+		s[2] = state[2];
+		s[3] = state[3];	
+		assert((s[0] | s[1] | s[2] | s[3]) != 0 && "xoshiro256** all-zero state is invalid");
 	}
+
 public:
 	using result_type = u64;
 	using seed_type = u64;
@@ -41,18 +48,19 @@ public:
 	constexpr Xoshiro256SS() noexcept
 		: Xoshiro256SS(0xFEEDFACECAFEBEEFuLL){}
 
-	explicit constexpr Xoshiro256SS(seed_type seed) noexcept{
-	// Seed initialization: instead of copying the same splitmix64(seed)
-	// into all 4 state words, I  chain splitmix64 calls with added constants. 
-	// Each constant is chosen to be large, odd, and distinct so that a poor 
-	// initial seed can never collapse the entire 256-bit state into something trivial.    
+	explicit constexpr Xoshiro256SS(seed_type seed) noexcept{		
 		s[0] = splitmix64(seed);
-		s[1] = splitmix64(s[0] + 0x9E3779B97F4A7C15uLL); // golden ratio
-		s[2] = splitmix64(s[1] + 0x7F4A7C15F39CCCD1ULL); // arbitrary odd
-		s[3] = splitmix64(s[2] + 0x3549B5A7B97C9A31ULL); // another odd
+		s[1] = splitmix64(seed);
+		s[2] = splitmix64(seed);
+		s[3] = splitmix64(seed);
+
+		if((s[0] | s[1] | s[2] | s[3]) == 0){
+			s[0] = 0xFEEDFACECAFEBEEFuLL; //all-zero state is invalid for xoshiro
+		}
 	}
+
 	//factory function to create a Xoshiro256SS from a state, bypassing the seeding routines.
-	static constexpr Xoshiro256SS from_state(std::span<const state_type> state) noexcept{
+	static constexpr Xoshiro256SS from_state(std::span<const state_type, 4> state) noexcept{
 		return Xoshiro256SS{state};
 	}
 	constexpr void seed() noexcept{

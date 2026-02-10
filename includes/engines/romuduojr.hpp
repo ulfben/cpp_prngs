@@ -38,7 +38,7 @@ public:
       : x(0x9E6C63D0676A9A99ULL), y(~seed - seed){
       // Initialize x to a fixed odd constant, y to ~seed – seed.
       // Then do two rounds of NASAM-style mixing + a rotate‐multiply step on x.  
-      // This is proven robust even with low-entropy seeds:
+      // Rhet Butler empirically tuned this and proved it robust even with low-entropy seeds:
           // - All 32-bit seeds tested, no output cycles found in first 2^24 outputs
           // - All 16-bit seeds tested, no output cycles found in first 2^36 outputs
       // ergo: the initializer reliably avoids short-period or degenerate states, even when under-seeded.
