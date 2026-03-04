@@ -63,7 +63,7 @@ public:
 
    constexpr result_type next() noexcept{
       const state_type old_x = x;
-      x = y * 15241094284759029579;
+      x = y * 15241094284759029579ULL;
       y = std::rotl(y - old_x, 27);
       return old_x;
    }
