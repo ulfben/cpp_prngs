@@ -6,6 +6,8 @@
 #include "./engines/small_fast32.hpp"
 #include "./engines/small_fast64.hpp"
 #include "./engines/xoshiro256ss.hpp"
+#include "./engines/quarkburst64.hpp"
+#include "./engines/quarkburst4x64.hpp"
 #include "random.hpp"
 
 // Source: https://github.com/ulfben/cpp_prngs/
@@ -28,7 +30,9 @@ using EnginesUnderTest = ::testing::Types<
     PCG32,
     SmallFast32,
     SmallFast64,
-    Xoshiro256SS
+    Xoshiro256SS,
+    QuarkBurst64,
+    QuarkBurst4x64
 >;
 
 TYPED_TEST_CASE(RandomTypedTest, EnginesUnderTest);
@@ -41,7 +45,7 @@ TYPED_TEST(RandomTypedTest, DefaultConstructedEnginesAreDeterministic){
     using Rng = typename RandomTypedTest<Engine>::Rng;
     Rng a{};
     Rng b{};
-    for(int i = 0; i < 1024; ++i){
+    for(int i = 0; i < 2048; ++i){
         auto va = a.next();
         auto vb = b.next();
         EXPECT_EQ(va, vb) << "Default constructed RNGs must produce same sequence";
@@ -63,7 +67,7 @@ TYPED_TEST(RandomTypedTest, NextProducesDifferentValuesOverTime){
 // -----------------------------------------------------------------------------
 TYPED_TEST(RandomTypedTest, NextBoundedRespectsUpperBound){
     constexpr std::uint32_t bound = 10;
-    for(int i = 0; i < 1024; ++i){
+    for(int i = 0; i < 2048; ++i){
         auto v = this->rng.next(bound);
         EXPECT_LT(v, bound);
     }
@@ -75,7 +79,7 @@ TYPED_TEST(RandomTypedTest, NextBoundedRespectsUpperBound){
 TYPED_TEST(RandomTypedTest, NextCompileTimeBoundedRespectsBound){
     constexpr std::uint32_t N = 10;
 
-    for(int i = 0; i < 1024; ++i){
+    for(int i = 0; i < 2048; ++i){
         auto v = this->rng.template next<N, std::uint32_t>();
         EXPECT_LT(v, N);
     }
@@ -93,7 +97,7 @@ TYPED_TEST(RandomTypedTest, NextRespectsMinMaxRange){
 
     EXPECT_LT(lo, hi);
 
-    for(int i = 0; i < 1024; ++i){
+    for(int i = 0; i < 2048; ++i){
         const result_type v = this->rng.next();
         EXPECT_GE(v, lo);
         EXPECT_LE(v, hi) << "next() must be in [min(), max()]";
@@ -135,7 +139,7 @@ TYPED_TEST(RandomTypedTest, BetweenProducesExclusiveRange){
     constexpr int lo = -5;
     constexpr int hi = 7;
 
-    for(int i = 0; i < 1024; ++i){
+    for(int i = 0; i < 2048; ++i){
         auto v = this->rng.between(lo, hi);
         EXPECT_GE(v, lo);
         EXPECT_LT(v, hi);
@@ -242,7 +246,7 @@ TYPED_TEST(RandomTypedTest, SameSeedProducesSameSequence){
     Rng a{seed};
     Rng b{seed};
 
-    for(int i = 0; i < 1024; ++i){
+    for(int i = 0; i < 2048; ++i){
         auto va = a.next();
         auto vb = b.next();
         EXPECT_EQ(va, vb);
@@ -346,7 +350,9 @@ using Engines64Bit = ::testing::Types<
     RomuDuoJr,
     Konadare192,
     SmallFast64,
-    Xoshiro256SS
+    Xoshiro256SS,
+    QuarkBurst64,
+    QuarkBurst4x64
 >;
 
 template<class Engine>

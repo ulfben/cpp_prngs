@@ -24,16 +24,13 @@ And so; if you're making games and need your random number generator to be:
 To use a PRNG:
 
 ```cpp
-#include "seeding.hpp" //optional: for convenient, high-entropy seeding strategies, at compile time and runtime!
-#include "small_fast64.hpp" //the engine; pick your favorite from the provided /engines
+#include "romuduojr.hpp" //the engine; pick your favorite from the provided /engines
 #include "random.hpp" //the user-friendly wrapper that provides a consistent interface and utilities across all engines
 
 using rnd::Random;
 
-Random<SmallFast64> rng{1234}; // generator with fixed seed, powered by the SmallFast64 engine.
+Random<RomuDuoJr> rng{1234}; // generator with fixed seed, powered by the romuduojr engine.
 int damage = rng.between(10, 20);   // Random int in [10, 20)
-
-Random<SmallFast64> rng2{ seed::from_all() }; // generator seeded with high-entropy value from multiple sources (time, thread, stack, system entropy, etc.)
 ````
 
 Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#randomhpp) like bounds, floats, coin flips, Gaussian samples, picking from containers, raw bits, and more.
@@ -53,6 +50,7 @@ They are also compact (16 or 32 bytes), produce high-quality randomness, and can
 |---------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
 | [`romuduojr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/romuduojr.hpp) | 64 bits | C++ port of [Mark Overton’s RomuDuoJr](https://romu-random.org/). Winner of Rhet Butler’s [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/)! |
 | [`konadare192.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/konadare192.hpp)         | 64 bits      | C++ port of [Pelle Evensen's konadare192px++](https://github.com/pellevensen/PReenactiNG). Second fastest and second smallest 64-bit PRNG in this lineup!  |
+| [`quarkburst64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/quarkburst64.hpp) | 64 bits | A C++ port of Eightomic’s quarkburst1x64, previously published as GhostScramble64. |
 | [`pcg32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/pcg32.hpp)         | 32 bits      | C++ port of [Melissa O’Neill’s minimal PCG32](https://www.pcg-random.org/download.html#minimal-c-implementation). Wikipedia: [Permuted congruential generator](https://en.wikipedia.org/wiki/Permuted_congruential_generator) |
 | [`xoshiro256ss.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xoshiro256ss.hpp)  | 64 bits      | C++ port of [David Blackman & Sebastiano Vigna's xoshiro256\*\* 1.0](https://prng.di.unimi.it/) generator. Wikipedia: [Xorshift](https://en.wikipedia.org/wiki/Xorshift). |
 | [`small_fast32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast32.hpp)  | 32 bits      | C++ port of [Bob Jenkins’ 32-bit “Small Fast”](https://burtleburtle.net/bob/rand/smallprng.html) PRNG (two-rotate). |
@@ -114,20 +112,21 @@ Each benchmark loops over one million values and compares multiple engines side 
 
 ---
 
-## [`seeding.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/seeding.hpp)
+## Seeding 
 
-**TL;DR**: `seeding.hpp` is a grab bag of portable, high-entropy seeding strategies - for tools, tests, or procedural generation, at runtime or compile time.
-
-All engines in this library are seeded from a single `uint64_t` value. They provide a hardcoded default seed, so default construction (`Random<E>()`) is always valid - but produces the *same* sequence every time.
+All engines in this library are seeded from a single `uint64_t` value. They provide a fixed default seed, so default construction (`Random<E>()`) is always valid - but produces the *same* sequence every time.
 
 To get varied sequences, you’ll want to provide a high-entropy seed. `std::random_device` is often used for this - it's typically hardware-backed and [works fine on most platforms](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/). But it can be slow, unavailable (e.g. on embedded systems, or at compile time), and is unsuitable when you need determinism.
 
-In game development determinism is often needed. Procedural systems such as level generation, loot tables, or AI behavior, all benefit from consistent seeds that allow us to reproduce the same output across runs and platforms. This is where `seeding.hpp` shines! It provides a variety of seeding techniques that work in both runtime and compile-time contexts, letting you draw entropy from sources like timestamps, thread IDs, game assets, player data, and even compilation metadata.
+In game development, determinism is often useful - for example in procedural generation, tests, or replays. In these cases, consistent seeds let you reproduce the same output across runs and platforms.
+
+An optional standalone [`seeding.hpp`](https://gist.github.com/ulfben/76518f306880bb7a014e35832c555cf6) is available separately from this repository. It is a collection of example seeding techniques for runtime and compile-time contexts, using sources such as timestamps, thread IDs, game assets, player data, and compilation metadata.
 
 ```cpp
+#include "seeding.hpp" // Download from the linked gist
+
 //Example usage:
 using rnd::Random; 
-using seed::to_32; // Convenience alias for converting a 64-bit seed to 32 bits (for smaller engines).
 
 // Compile-time seeding:
 constexpr auto seed1 = seed::from_text("my_game_seed");
@@ -138,15 +137,16 @@ constexpr auto seed3 = SEED_UNIQUE_FROM_SOURCE();     // Different for each macr
 Random<SmallFast32> rng1(seed::from_time());		  // High resolution clock
 Random<SmallFast64> rng2(seed::from_system_entropy());// Uses std::random_device (hardware/system entropy)
 
-// Pseudo-entropy sources:
+// Sources of run-to-run variation:
 Random<RomuDuoJr> rng3(seed::from_thread());          // Unique per thread
 Random<PCG32>     rng4(seed::from_stack());			  // Varies per run of the application, if ASLR is active
 Random<PCG32>     rng5(seed::from_cpu_time());		  // Varies with CPU time consumed by the process; can reflect workload or scheduling
 
-// Maximum entropy:
+// Combine all available sources:
 Random<Xoshiro256SS> rng6(seed::from_all());          // Combines all sources (time, thread, stack, heap, compile time, source data, hw entropy, etc.)
 ```
-These utilities help you ensure that your random number generators are seeded appropriately - whether you need reproducibility, speed, or maximal entropy.
+
+These utilities help you seed your random number generators appropriately - whether you need compile-time evaluation, reproducibility, run-to-run variation, or unpredictability.
 
 ## License
 
@@ -156,6 +156,7 @@ This repository is primarily licensed under the MIT License. See [LICENSE](https
 
 This project includes, or is based on, the following PRNG engines and reference implementations:
 
+- **QuarkBurst64**: Independent C++ implementation under MIT of William Stafford Parsons’ quarkburst1x64, created for [Eightomic](https://github.com/eightomic/quarkburst) and released under [BSD-3-Clause](https://github.com/eightomic/quarkburst/commit/2f754cf4e18e6ecdfec17c2bda72a1a1aa531db5). Previously published as [GhostScramble](https://web.archive.org/web/20260531035702/https://github.com/williamstaffordparsons/ghostscramble/blob/master/ghostscramble.c).
 - **RomuDuoJr**: Based on Rhet Butler’s C++ wrapper ([public domain](https://github.com/Almightygir/rhet_RNG/blob/main/xromu2jr.h)), itself inspired by Mark Overton’s [Romu family](https://romu-random.org/).
 - **SmallFast32 / SmallFast64**: Based on Bob Jenkins’ reference implementation ([public domain](https://burtleburtle.net/bob/rand/smallprng.html)).
 - **xoshiro256\*\***: Based on David Blackman & Sebastiano Vigna’s reference code ([public domain](https://prng.di.unimi.it/xoshiro256starstar.c)).

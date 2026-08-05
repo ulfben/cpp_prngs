@@ -44,7 +44,7 @@ std::numeric_limits<typename E::result_type>::is_integer &&
 
 #ifndef VALIDATE_PRNGS
 // Define VALIDATE_PRNGS to enable compile-time validation of PRNG outputs.
-#define VALIDATE_PRNGS 0
+#define VALIDATE_PRNGS 1
 #endif  
 
 #if VALIDATE_PRNGS

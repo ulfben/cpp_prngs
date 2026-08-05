@@ -56,6 +56,7 @@ public:
    constexpr void seed(seed_type seed) noexcept{
       *this = RomuDuoJr{seed};
    }
+
    //factory function to create a RomuDuoJr from a state, bypassing the seeding routines.
    static constexpr RomuDuoJr from_state(state_type xstate, state_type ystate) noexcept{
       return RomuDuoJr{xstate, ystate, Direct{}};
@@ -91,7 +92,7 @@ public:
 static_assert(RandomBitEngine<RomuDuoJr>);
 
 #if VALIDATE_PRNGS
-// Original implementation of RomuDuoJr from Mark Overton´s 2020 paperm for validation purposes 
+// Original implementation of RomuDuoJr from Mark Overton´s 2020 paper for validation purposes 
 // see: https://www.romu-random.org/code.c
 // adjusted for constexpr evaluation, but otherwise unchanged
 #define ROTL(d,lrot) ((d<<(lrot)) | (d>>(8*sizeof(d)-(lrot))))
