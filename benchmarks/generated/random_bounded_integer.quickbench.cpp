@@ -4,16 +4,30 @@
 #include <type_traits>  
 template<typename E>
 concept RandomBitEngine =
+requires {
+typename E::result_type;
+typename E::seed_type;
+} &&
 std::uniform_random_bit_generator<E> &&
+std::same_as<typename E::result_type, std::invoke_result_t<E&>> &&
 std::default_initializable<E> &&
 std::copy_constructible<E> &&
-std::constructible_from<E, typename E::result_type>&&
-std::equality_comparable<E>&&
-std::is_unsigned_v<typename E::result_type>&&
+std::constructible_from<E, typename E::seed_type> &&
+std::equality_comparable<E> &&
+std::is_nothrow_default_constructible_v<E> &&
+std::is_nothrow_copy_constructible_v<E> &&
+std::is_nothrow_constructible_v<E, typename E::seed_type> &&
+std::is_unsigned_v<typename E::result_type> &&
 std::numeric_limits<typename E::result_type>::is_integer &&
+std::is_unsigned_v<typename E::seed_type> &&
+std::numeric_limits<typename E::seed_type>::is_integer &&
 (E::min() == typename E::result_type{0}) &&
 (E::max() == std::numeric_limits<typename E::result_type>::max()) &&
-requires(E& e, typename E::result_type seed, unsigned long long n){
+requires(E& e, const E& ce, typename E::seed_type seed, unsigned long long n){
+{ e() } noexcept -> std::same_as<typename E::result_type>;
+{ E::min() } noexcept -> std::same_as<typename E::result_type>;
+{ E::max() } noexcept -> std::same_as<typename E::result_type>;
+{ ce == ce } noexcept -> std::convertible_to<bool>;
 { e.seed() } noexcept -> std::same_as<void>;
 { e.seed(seed) } noexcept -> std::same_as<void>;
 { e.discard(n) } noexcept -> std::same_as<void>;
@@ -164,11 +178,11 @@ return _e;
 constexpr E& engine() noexcept{
 return _e;
 }
-constexpr void discard(result_type n) noexcept{
+constexpr void discard(unsigned long long n) noexcept{
 _e.discard(n);
 }
 constexpr void seed() noexcept{
-_e = E{};
+_e.seed();
 }
 constexpr void seed(seed_type v) noexcept{
 _e.seed(v);
@@ -241,9 +255,6 @@ constexpr F normalized() noexcept{
 static_assert(std::numeric_limits<F>::is_iec559, "normalized() requires IEEE 754 (IEC 559) floating point types.");
 using UInt = std::conditional_t<sizeof(F) == 4, uint32_t, uint64_t>;  
 constexpr int mantissa_bits = std::numeric_limits<F>::digits - 1;  
-static_assert(mantissa_bits <= value_bits,
-"This engine cannot generate enough mantissa bits for this floating-point type. "
-"Use a 64-bit engine or request a 32-bit float.");
 constexpr UInt base = std::bit_cast<UInt>(F(1.0));  
 UInt mantissa = this->template bits<mantissa_bits, UInt>();       
 UInt as_int = base | mantissa;  
@@ -254,14 +265,14 @@ constexpr F signed_norm() noexcept{
 return F(2) * normalized<F>() - F(1);  
 }
 constexpr bool coin_flip() noexcept{
-return bool(next() & 1);
+return bits<1, unsigned>() != 0;
 }
 template <std::floating_point F = float>
 constexpr bool coin_flip(F probability) noexcept{
 return normalized<F>() < probability;
 }
 template <std::ranges::sized_range R>
-constexpr auto index(const R& collection) noexcept{
+constexpr auto index(const R& collection){
 assert(!std::ranges::empty(collection) && "Random::index(): empty collection.");
 using idx_t = std::ranges::range_size_t<R>;
 return static_cast<idx_t>(
@@ -270,7 +281,7 @@ between<idx_t>(0, static_cast<idx_t>(std::ranges::size(collection))));
 template <std::ranges::forward_range R>
 requires std::ranges::sized_range<R> &&
 (std::is_lvalue_reference_v<R&&> || std::ranges::borrowed_range<R>)
-constexpr auto iterator(R&& collection) noexcept{
+constexpr auto iterator(R&& collection){
 assert(!std::ranges::empty(collection) && "Random::iterator(): empty collection");
 auto idx = index(collection);              
 auto it = std::ranges::begin(collection);  
@@ -280,7 +291,7 @@ return it;
 template <std::ranges::forward_range R>
 requires std::ranges::sized_range<R> &&
 (std::is_lvalue_reference_v<R&&> || std::ranges::borrowed_range<R>)
-constexpr decltype(auto) element(R&& collection) noexcept{
+constexpr decltype(auto) element(R&& collection){
 return *iterator(std::forward<R>(collection));
 }
 template <std::floating_point F = float>
@@ -344,8 +355,8 @@ return x;
 public:
 using result_type = std::uint64_t;
 using seed_type = u64;
-constexpr Konadare192() : Konadare192(DEFAULT_SEED){}
-constexpr explicit Konadare192(seed_type seed_val) : a_(seed_val), b_(seed_val + 1), c_(seed_val + 2){
+constexpr Konadare192() noexcept : Konadare192(DEFAULT_SEED){}
+constexpr explicit Konadare192(seed_type seed_val) noexcept : a_(seed_val), b_(seed_val + 1), c_(seed_val + 2){
 for(int m = 0; m < 2; ++m){  
 result_type t0 = mix(a_, c_);
 result_type t1 = mix(b_, a_);
@@ -382,7 +393,7 @@ return result_type{0};
 static constexpr result_type max() noexcept{
 return std::numeric_limits<result_type>::max();
 }
-constexpr bool operator==(const Konadare192&) const = default;
+constexpr bool operator==(const Konadare192&) const noexcept = default;
 };
 static_assert(RandomBitEngine<Konadare192>);
 #include <bit>

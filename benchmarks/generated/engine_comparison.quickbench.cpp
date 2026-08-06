@@ -4,16 +4,30 @@
 #include <type_traits>  
 template<typename E>
 concept RandomBitEngine =
+requires {
+typename E::result_type;
+typename E::seed_type;
+} &&
 std::uniform_random_bit_generator<E> &&
+std::same_as<typename E::result_type, std::invoke_result_t<E&>> &&
 std::default_initializable<E> &&
 std::copy_constructible<E> &&
-std::constructible_from<E, typename E::result_type>&&
-std::equality_comparable<E>&&
-std::is_unsigned_v<typename E::result_type>&&
+std::constructible_from<E, typename E::seed_type> &&
+std::equality_comparable<E> &&
+std::is_nothrow_default_constructible_v<E> &&
+std::is_nothrow_copy_constructible_v<E> &&
+std::is_nothrow_constructible_v<E, typename E::seed_type> &&
+std::is_unsigned_v<typename E::result_type> &&
 std::numeric_limits<typename E::result_type>::is_integer &&
+std::is_unsigned_v<typename E::seed_type> &&
+std::numeric_limits<typename E::seed_type>::is_integer &&
 (E::min() == typename E::result_type{0}) &&
 (E::max() == std::numeric_limits<typename E::result_type>::max()) &&
-requires(E& e, typename E::result_type seed, unsigned long long n){
+requires(E& e, const E& ce, typename E::seed_type seed, unsigned long long n){
+{ e() } noexcept -> std::same_as<typename E::result_type>;
+{ E::min() } noexcept -> std::same_as<typename E::result_type>;
+{ E::max() } noexcept -> std::same_as<typename E::result_type>;
+{ ce == ce } noexcept -> std::convertible_to<bool>;
 { e.seed() } noexcept -> std::same_as<void>;
 { e.seed(seed) } noexcept -> std::same_as<void>;
 { e.discard(n) } noexcept -> std::same_as<void>;
@@ -43,8 +57,8 @@ return x;
 public:
 using result_type = std::uint64_t;
 using seed_type = u64;
-constexpr Konadare192() : Konadare192(DEFAULT_SEED){}
-constexpr explicit Konadare192(seed_type seed_val) : a_(seed_val), b_(seed_val + 1), c_(seed_val + 2){
+constexpr Konadare192() noexcept : Konadare192(DEFAULT_SEED){}
+constexpr explicit Konadare192(seed_type seed_val) noexcept : a_(seed_val), b_(seed_val + 1), c_(seed_val + 2){
 for(int m = 0; m < 2; ++m){  
 result_type t0 = mix(a_, c_);
 result_type t1 = mix(b_, a_);
@@ -81,7 +95,7 @@ return result_type{0};
 static constexpr result_type max() noexcept{
 return std::numeric_limits<result_type>::max();
 }
-constexpr bool operator==(const Konadare192&) const = default;
+constexpr bool operator==(const Konadare192&) const noexcept = default;
 };
 static_assert(RandomBitEngine<Konadare192>);
 #include <bit>
@@ -132,7 +146,7 @@ inc = (sequence << 1u) | 1u;
 state += seed_val;
 (void) next();
 }
-constexpr void discard(result_type delta) noexcept{
+constexpr void discard(unsigned long long delta) noexcept{
 u64 cur_mult = MULT;
 u64 cur_plus = inc;
 u64 acc_mult = 1u;
