@@ -11,8 +11,10 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <span>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 // Source: https://github.com/ulfben/cpp_prngs/
 // Demo is available on Compiler Explorer: https://compiler-explorer.com/z/9sazdcfzx
@@ -26,6 +28,16 @@ class RandomTypedTest : public ::testing::Test{
 protected:
     using Rng = rnd::Random<Engine>;
     Rng rng{}; // default-seeded
+};
+
+template<class Rng, class Range>
+concept CanGetRandomIterator = requires(Rng& rng, Range&& range){
+    rng.iterator(std::forward<Range>(range));
+};
+
+template<class Rng, class Range>
+concept CanGetRandomElement = requires(Rng& rng, Range&& range){
+    rng.element(std::forward<Range>(range));
 };
 
 using EnginesUnderTest = ::testing::Types<
@@ -436,6 +448,15 @@ TYPED_TEST(RandomTypedTest, SeedWithValueResetsToGivenSequence){
 // Collection helpers, gaussian(), and split()
 // -----------------------------------------------------------------------------
 TYPED_TEST(RandomTypedTest, CollectionHelpersReturnValidMutableAndConstElements){
+    using Rng = rnd::Random<TypeParam>;
+
+    static_assert(CanGetRandomIterator<Rng, std::vector<int>&>);
+    static_assert(CanGetRandomElement<Rng, std::vector<int>&>);
+    static_assert(!CanGetRandomIterator<Rng, std::vector<int>>);
+    static_assert(!CanGetRandomElement<Rng, std::vector<int>>);
+    static_assert(CanGetRandomIterator<Rng, std::span<int>>);
+    static_assert(CanGetRandomElement<Rng, std::span<int>>);
+
     std::array<int, 5> values{10, 20, 30, 40, 50};
     const auto& const_values = values;
 

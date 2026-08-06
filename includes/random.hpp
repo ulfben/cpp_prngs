@@ -231,7 +231,8 @@ namespace rnd {
 
 		// get an iterator to a random element. Accepts const and non-const ranges
 		template <std::ranges::forward_range R>
-			requires std::ranges::sized_range<R>
+			requires std::ranges::sized_range<R> &&
+				(std::is_lvalue_reference_v<R&&> || std::ranges::borrowed_range<R>)
 		constexpr auto iterator(R&& collection) noexcept{
 			assert(!std::ranges::empty(collection) && "Random::iterator(): empty collection");
 			auto idx = index(collection);             // index accepts const&
@@ -243,7 +244,8 @@ namespace rnd {
 		//return a reference to a random element in a collection
 		//accepts both const and non-const ranges
 		template <std::ranges::forward_range R>
-			requires std::ranges::sized_range<R>
+			requires std::ranges::sized_range<R> &&
+				(std::is_lvalue_reference_v<R&&> || std::ranges::borrowed_range<R>)
 		constexpr decltype(auto) element(R&& collection) noexcept{
 			return *iterator(std::forward<R>(collection));
 		}
