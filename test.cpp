@@ -338,6 +338,19 @@ TYPED_TEST(RandomTypedTest, CoinFlipDefaultProducesBothOutcomes){
     EXPECT_TRUE(saw_false);
 }
 
+TYPED_TEST(RandomTypedTest, CoinFlipUsesHighBit){
+    using Rng = rnd::Random<TypeParam>;
+    using result_type = typename TypeParam::result_type;
+    constexpr auto shift = std::numeric_limits<result_type>::digits - 1;
+    Rng coin_rng{123u};
+    Rng raw_rng{123u};
+
+    for(int i = 0; i < 256; ++i){
+        const bool expected = ((raw_rng.next() >> shift) & 1u) != 0;
+        EXPECT_EQ(coin_rng.coin_flip(), expected);
+    }
+}
+
 TYPED_TEST(RandomTypedTest, CoinFlipProbabilityExtremes){
     // p = 0 -> always false over a reasonable sample
     bool any_true = false;

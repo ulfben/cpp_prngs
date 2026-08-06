@@ -208,7 +208,7 @@ namespace rnd {
 
 		// boolean
 		constexpr bool coin_flip() noexcept{
-			return bool(next() & 1);
+			return bits<1, unsigned>() != 0;
 		}
 
 		// boolean with probability
