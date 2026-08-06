@@ -3,7 +3,7 @@
 
 When generating random numbers for games - where the goal is fun, speed, and reproducibility rather than cryptographic security - the C and C++ standard facilities are often an awkward fit.
 
-The classic C `srand()` / `rand()` interface is explicitly described by the C++ standard as a [low-quality, non-portable facility with implementation-defined data-race behavior](https://eel.is/c++draft/rand#c.math.rand). The standard leaves its underlying algorithm unspecified (meaning that `rand()` is allowed to return different numbers on different platforms given the same seed!), `RAND_MAX` is permitted to be [as low as 32,767](https://web.archive.org/web/20260410163728/https://www.codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/#fn1), and common attempts to convert its output into a desired range - such as `rand() % n` - introduce [modulo bias](https://web.archive.org/web/20260410163728/https://www.codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/).
+The classic C `srand()` / `rand()` interface is explicitly described by the C++ standard as a [low-quality, non-portable facility with implementation-defined data-race behavior](https://eel.is/c++draft/rand#c.math.rand). The standard leaves its underlying algorithm unspecified (meaning that `rand()` is allowed to return different numbers on different platforms given the same seed!), `RAND_MAX` is permitted to be [as low as 32,767](https://web.archive.org/web/20260410163728/https://www.codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/#fn1), and common attempts to convert its output into a desired range - such as `rand() % n` - [are slow]((https://github.com/ulfben/cpp_prngs/#performance-benchmarks)) and can introduce [modulo bias](https://web.archive.org/web/20260410163728/https://www.codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/).
 
 Although C++11 introduced `<random>`, it still presents several practical problems for game developers:
 
@@ -11,9 +11,9 @@ Although C++11 introduced `<random>`, it still presents several practical proble
 
 **Standard distributions are not cross-library reproducible.** Given the same engine state, distributions such as `std::normal_distribution` are not required to produce identical results across different standard-library implementations. This can break procedural-generation consistency between platforms. See [P2059R0: Make Pseudo-random Numbers Portable](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2059r0.pdf).
 
-**There is no compile-time support.** Standard random-number engines cannot currently be evaluated at compile time. Deterministic `constexpr <random>` facilities are still only proposed for C++29 in [P3791R1](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p3791r1.html).
+**There is no compile-time support.** Standard engines and distributions are not constexpr and cannot be evaluated at compile time. Making the deterministic <random> facilities constexpr is still only proposed for C++29 in [P3791R1](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p3791r1.html).
 
-The most widely used general-purpose engine in the C++ standard library is probably the Mersenne Twister, [`std::mt19937`](https://eel.is/c++draft/rand.predef). However, `std::mt19937` requires **624 state words - typically around 2.5 KiB of internal state**. That puts substantial pressure on CPU caches. Choosing it over modern small-state generators such as [xoshiro256**](https://prng.di.unimi.it/), [PCG](https://www.pcg-random.org/paper.html), or [Romu](https://www.romu-random.org/) incurs [a significant performance cost](https://github.com/ulfben/cpp_prngs/#performance-benchmarks).
+The most widely used general-purpose engine in the C++ standard library is probably the Mersenne Twister, [`std::mt19937`](https://eel.is/c++draft/rand.predef). It is a respectable generator, but `std::mt19937` requires **624 state words - typically around 2.5 KiB of internal state**. That can put substantial pressure on CPU caches. Choosing it over modern small-state generators such as [xoshiro256**](https://prng.di.unimi.it/), [PCG](https://www.pcg-random.org/paper.html), or [Romu](https://www.romu-random.org/) incurs [a significant performance cost](https://github.com/ulfben/cpp_prngs/#performance-benchmarks).
 
 For a deep, game-focused comparison of 47 PRNGs across nine platforms, see Rhet Butler’s excellent [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/). It highlights the performance, portability, state-size, and statistical-quality concerns that matter in real-world game development. Several of its top-performing generators - including Romu and SmallFast - are included here.
 
@@ -55,7 +55,7 @@ Want to use your own engine? It only needs to satisfy the `RandomBitEngine` conc
 ## [Engines](https://github.com/ulfben/cpp_prngs/tree/main/includes/engines)
 All the provided engines [are very fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks):
 
-They are also compact (16 or 32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (~4.29 billion elements). Such large containers are rare though and, in debug builds, the `Random<E>` code will alert you if this problem occurs.
+They are also compact (16-32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions unless you have a measured performance reason not to. The 32-bit engines work fine, but their output values are smaller than `size_t` on most systems. This means they might not handle indexing very large containers (~4.29 billion elements). Such large containers are rare though and, in debug builds, the `Random<E>` code will alert you if this problem occurs.
 
 | File Name           | Output Width | Description                                                                                                                                |
 |---------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
@@ -69,7 +69,7 @@ They are also compact (16 or 32 bytes), produce high-quality randomness, and can
 
 Each engine satisfies the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp) concept, which extends the C++20 [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) to ensure compatibility with the STL. You can use the engines directly, but `RandomBitEngine` provides only a minimal set of features: seeding, advancing, reporting `min()` and `max()`, comparison (of state) and generating random unsigned integers.
 
-The engines are kept simple so they can be swapped easily with the [`Random<E>`](https://github.com/ulfben/cpp_prngs/blob/main/random.hpp) template. `Random<E>` wraps any engine - including your own - to provide a consistent, user-friendly interface designed for game development. See the full interface below.
+The engines are kept simple so they can be swapped easily with the [`Random<E>`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) template. `Random<E>` wraps any engine - including your own - to provide a consistent, user-friendly interface designed for game development. See the full interface below.
 
 ---
 
@@ -87,8 +87,8 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 | `next(bound)` / `operator()(bound)` | Random integer in `[0, bound)`, using [Lemire’s FastRange](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) without rejection (so: minimal bias, very fast) |
 | `next<N, T>()`                      | Compile-time bounded integer in `[0, N)`, optionally returned as type `T`; optimized for power-of-2 bounds[^1]                                                      |
 | `between(lo, hi)`                   | Random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float)                                                                                |
-| `bits(n)`                           | Runtime: returns the top `n` random bits (`1 ≤ n ≤ digits(result_type)`), packed into `T` (default: `result_type`)[^1]                                              |
-| `bits<N, T>()`                      | Returns the top `N` random bits as type `T`; constraints checked at compile time[^1]                                                                  |
+| `bits(n)`							  | Runtime: returns `n` random bits in the low `n` bits of `T` (`1 ≤ n ≤ digits(T)`), drawing from the high bits of one or more engine outputs; `T` defaults to `result_type`[^1] |
+| `bits<N, T>()`					  | Returns `N` random bits in the low `N` bits of `T`, drawing from the high bits of one or more engine outputs; constraints are checked at compile time[^1] |
 | `bits_as<T>()`                      | Convenience: returns an unsigned `T` filled with high-quality random bits                                                                               |
 | `normalized<F>()`                   | Returns float `F` in `[0.0, 1.0)`, using the [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/)                                                     |
 | `signed_norm<F>()`                  | Returns float `F` in `[-1.0, 1.0)`                                                                                                                                  |
@@ -143,7 +143,7 @@ Performance depends on the compiler, standard library, build settings, CPU, and 
 
 All engines in this library are seeded from a single `uint64_t` value. They provide a fixed default seed, so default construction (`Random<E>()`) is always valid - but produces the *same* sequence every time.
 
-To get varied sequences, you’ll want to provide a high-entropy seed. `std::random_device` is often used for this - it's typically hardware-backed and [works fine on most platforms](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/). But it can be slow, unavailable (e.g. on embedded systems, or at compile time), and is unsuitable when you need determinism.
+To get varied sequences, you’ll want to provide a high-entropy seed. `std::random_device` is often used for this - it's typically backed by an operating-system entropy source and [works fine on most platforms](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/). But it can be slow, unavailable (e.g. on embedded systems, or at compile time), and is unsuitable when you need determinism.
 
 In game development, determinism is often useful - for example in procedural generation, tests, or replays. In these cases, consistent seeds let you reproduce the same output across runs and platforms.
 
