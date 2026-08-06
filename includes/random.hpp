@@ -219,31 +219,30 @@ namespace rnd {
 
 		// pick an index in [0, size)
 		template <std::ranges::sized_range R>
-		constexpr auto index(const R& collection){
-			assert(!std::ranges::empty(collection) && "Random::index(): empty collection.");
-			using idx_t = std::ranges::range_size_t<R>;
-			return static_cast<idx_t>(
-				between<idx_t>(0, static_cast<idx_t>(std::ranges::size(collection))));
+		[[nodiscard]] constexpr auto index(R&& collection) noexcept{
+			using size_type = std::ranges::range_size_t<R>;
+			const size_type size = std::ranges::size(collection);
+			assert(size != 0 && "Random::index(): empty collection.");
+			assert(std::in_range<result_type>(size) &&
+				"Random::index(): collection is too large for this engine.");
+			return static_cast<size_type>(next(static_cast<result_type>(size)));
 		}
 
 		// get an iterator to a random element. Accepts const and non-const ranges
 		template <std::ranges::forward_range R>
 			requires std::ranges::sized_range<R> &&
-				(std::is_lvalue_reference_v<R&&> || std::ranges::borrowed_range<R>)
-		constexpr auto iterator(R&& collection){
-			assert(!std::ranges::empty(collection) && "Random::iterator(): empty collection");
-			auto idx = index(collection);             // index accepts const&
-			auto it = std::ranges::begin(collection); // picks begin or cbegin for us
-			std::advance(it, idx);
-			return it;
+				std::ranges::borrowed_range<R>
+		[[nodiscard]] constexpr auto iterator(R&& collection) noexcept{
+			const auto offset = static_cast<std::ranges::range_difference_t<R>>(index(collection));
+			return std::ranges::next(std::ranges::begin(collection), offset);
 		}
 
 		//return a reference to a random element in a collection
 		//accepts both const and non-const ranges
 		template <std::ranges::forward_range R>
 			requires std::ranges::sized_range<R> &&
-				(std::is_lvalue_reference_v<R&&> || std::ranges::borrowed_range<R>)
-		constexpr decltype(auto) element(R&& collection){
+				std::ranges::borrowed_range<R>
+		[[nodiscard]] constexpr decltype(auto) element(R&& collection) noexcept{
 			return *iterator(std::forward<R>(collection));
 		}
 

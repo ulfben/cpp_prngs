@@ -6,23 +6,6 @@
 
 // Concept: RandomBitEngine
 //
-// This concept defines the "engine contract" used throughout the library.
-//
-// Baseline:
-// - E models std::uniform_random_bit_generator, so it plugs into <random>
-//   utilities (std::shuffle, std::uniform_int_distribution, etc).
-// - E supports the standard engine operations we rely on: default construction,
-//   seeding, copying, equality, and discard().
-//
-// Additional library promise (important for bounded generation and bit-mixing):
-// - result_type is an *unsigned* integer type
-// - min() == 0
-// - max() == numeric_limits<result_type>::max()
-//
-
-
-// Concept: RandomBitEngine
-//
 // Defines the engine contract required by rnd::Random.
 //
 // An engine must:
