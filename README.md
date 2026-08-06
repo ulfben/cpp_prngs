@@ -10,7 +10,7 @@ And so; if you're making games and need your random number generator to be:
 
 - small (16 or 32 bytes) and [*fast*](https://github.com/ulfben/cpp_prngs#performance-benchmarks)
 - deterministic across platforms (e.g., *portable!*)
-- [easy to seed](https://github.com/ulfben/cpp_prngs#seedinghpp)
+- [easy to seed](https://github.com/ulfben/cpp_prngs#seeding)
 - [feature-rich](https://github.com/ulfben/cpp_prngs#randomhpp) (ints, floats, coin flip, ranges, pick-from-collection, etc.)
 - executable at compile time
 - [compatible](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) with all of your favorite STL algorithms and distributions (`std::shuffle`, `std::sample`, `std::*_distribution`, etc.)
@@ -35,7 +35,7 @@ int damage = rng.between(10, 20);   // Random int in [10, 20)
 
 Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#randomhpp) like bounds, floats, coin flips, Gaussian samples, picking from containers, raw bits, and more.
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/67ffKPv3G)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/1jvr7effd)
 
 Want to use your own engine? It only needs to satisfy the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp)).
 

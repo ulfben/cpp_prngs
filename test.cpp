@@ -16,7 +16,7 @@
 #include <utility>
 
 // Source: https://github.com/ulfben/cpp_prngs/
-// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/nzK9joeYE
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/1jvr7effd
 // Benchmarks:
    // Quick Bench for generating raw random values: https://quick-bench.com/q/vWdKKNz7kEyf6kQSNnUEFOX_4DI
    // Quick Bench for generating normalized floats: https://quick-bench.com/q/GARc3WSfZu4sdVeCAMSWWPMQwSE
