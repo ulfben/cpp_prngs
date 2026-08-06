@@ -192,6 +192,46 @@ TYPED_TEST(RandomTypedTest, BetweenProducesExclusiveRange){
     }
 }
 
+TEST(RandomBoundaryTest, BetweenHandlesWideSignedIntRanges){
+    rnd::Random<SmallFast32> rng{};
+    constexpr auto min = std::numeric_limits<std::int32_t>::min();
+    constexpr auto max = std::numeric_limits<std::int32_t>::max();
+
+    for(int i = 0; i < 1024; ++i){
+        const auto wide = rng.between(min, max);
+        EXPECT_GE(wide, min);
+        EXPECT_LT(wide, max);
+
+        const auto near_min = rng.between(min, min + 100);
+        EXPECT_GE(near_min, min);
+        EXPECT_LT(near_min, min + 100);
+
+        const auto near_max = rng.between(max - 100, max);
+        EXPECT_GE(near_max, max - 100);
+        EXPECT_LT(near_max, max);
+    }
+}
+
+TEST(RandomBoundaryTest, BetweenHandlesWideSignedInt64Ranges){
+    rnd::Random<SmallFast64> rng{};
+    constexpr auto min = std::numeric_limits<std::int64_t>::min();
+    constexpr auto max = std::numeric_limits<std::int64_t>::max();
+
+    for(int i = 0; i < 1024; ++i){
+        const auto wide = rng.between(min, max);
+        EXPECT_GE(wide, min);
+        EXPECT_LT(wide, max);
+
+        const auto near_min = rng.between(min, min + 100);
+        EXPECT_GE(near_min, min);
+        EXPECT_LT(near_min, min + 100);
+
+        const auto near_max = rng.between(max - 100, max);
+        EXPECT_GE(near_max, max - 100);
+        EXPECT_LT(near_max, max);
+    }
+}
+
 TYPED_TEST(RandomTypedTest, BetweenFloatingPointProducesExclusiveRange){
     for(int i = 0; i < 2048; ++i){
         const float v = this->rng.between(-2.5f, 4.25f);
