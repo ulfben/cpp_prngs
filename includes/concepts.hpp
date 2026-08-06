@@ -29,13 +29,16 @@ concept RandomBitEngine =
 std::uniform_random_bit_generator<E> &&
 std::default_initializable<E> &&
 std::copy_constructible<E> &&
-std::constructible_from<E, typename E::result_type>&&
+requires { typename E::seed_type; } &&
+std::constructible_from<E, typename E::seed_type>&&
 std::equality_comparable<E>&&
 std::is_unsigned_v<typename E::result_type>&&
 std::numeric_limits<typename E::result_type>::is_integer &&
+std::is_unsigned_v<typename E::seed_type>&&
+std::numeric_limits<typename E::seed_type>::is_integer &&
 (E::min() == typename E::result_type{0}) &&
 (E::max() == std::numeric_limits<typename E::result_type>::max()) &&
-    requires(E& e, typename E::result_type seed, unsigned long long n){
+    requires(E& e, typename E::seed_type seed, unsigned long long n){
         { e.seed() } noexcept -> std::same_as<void>;
         { e.seed(seed) } noexcept -> std::same_as<void>;
         { e.discard(n) } noexcept -> std::same_as<void>;

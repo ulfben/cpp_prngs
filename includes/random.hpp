@@ -89,7 +89,7 @@ namespace rnd {
 		}
 
 		constexpr void seed() noexcept{
-			_e = E{};
+			_e.seed();
 		}
 
 		constexpr void seed(seed_type v) noexcept{

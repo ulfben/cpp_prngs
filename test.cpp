@@ -40,6 +40,51 @@ concept CanGetRandomElement = requires(Rng& rng, Range&& range){
     rng.element(std::forward<Range>(range));
 };
 
+class NonAssignableSeedEngine{
+public:
+    using result_type = std::uint32_t;
+    using seed_type = std::uint64_t;
+
+    constexpr NonAssignableSeedEngine() noexcept = default;
+    explicit constexpr NonAssignableSeedEngine(seed_type seed) noexcept
+        : state_(static_cast<result_type>(seed)){}
+    constexpr NonAssignableSeedEngine(const NonAssignableSeedEngine&) noexcept = default;
+    constexpr NonAssignableSeedEngine& operator=(const NonAssignableSeedEngine&) = delete;
+
+    static constexpr result_type min() noexcept{ return 0; }
+    static constexpr result_type max() noexcept{ return std::numeric_limits<result_type>::max(); }
+
+    constexpr result_type operator()() noexcept{ return state_++; }
+    constexpr void seed() noexcept{ state_ = default_state; }
+    constexpr void seed(seed_type seed) noexcept{ state_ = static_cast<result_type>(seed); }
+    constexpr void discard(unsigned long long n) noexcept{ state_ += static_cast<result_type>(n); }
+    constexpr bool operator==(const NonAssignableSeedEngine&) const noexcept = default;
+
+private:
+    static constexpr result_type default_state = 0x12345678u;
+    result_type state_ = default_state;
+};
+
+class MissingSeedTypeEngine{
+public:
+    using result_type = std::uint32_t;
+
+    constexpr MissingSeedTypeEngine() noexcept = default;
+    explicit constexpr MissingSeedTypeEngine(result_type) noexcept{}
+    static constexpr result_type min() noexcept{ return 0; }
+    static constexpr result_type max() noexcept{ return std::numeric_limits<result_type>::max(); }
+    constexpr result_type operator()() noexcept{ return 0; }
+    constexpr void seed() noexcept{}
+    constexpr void seed(result_type) noexcept{}
+    constexpr void discard(unsigned long long) noexcept{}
+    constexpr bool operator==(const MissingSeedTypeEngine&) const noexcept = default;
+};
+
+static_assert(RandomBitEngine<NonAssignableSeedEngine>);
+static_assert(!RandomBitEngine<MissingSeedTypeEngine>);
+static_assert(!std::assignable_from<NonAssignableSeedEngine&, NonAssignableSeedEngine>);
+static_assert(!std::is_same_v<PCG32::result_type, PCG32::seed_type>);
+
 using EnginesUnderTest = ::testing::Types<
     RomuDuoJr,
     Konadare192,
@@ -408,6 +453,15 @@ TYPED_TEST(RandomTypedTest, SeedWithoutValueRestoresDefaultState){
     for(int i = 0; i < 64; ++i){
         EXPECT_EQ(rng.next(), default_rng.next());
     }
+}
+
+TEST(RandomSeedTest, SeedWithoutValueSupportsNonAssignableEngines){
+    rnd::Random<NonAssignableSeedEngine> rng{std::uint64_t{42}};
+    rng.next();
+    rng.seed();
+
+    rnd::Random<NonAssignableSeedEngine> default_rng{};
+    EXPECT_EQ(rng.next(), default_rng.next());
 }
 
 // -----------------------------------------------------------------------------
