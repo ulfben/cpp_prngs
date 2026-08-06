@@ -1,4 +1,3 @@
-#pragma once
 #include "gtest/gtest.h"
 #include "./engines/romuduojr.hpp"
 #include "./engines/konadare192.hpp"
@@ -9,6 +8,12 @@
 #include "./engines/quarkburst64.hpp"
 #include "./engines/quarkburst4x64.hpp"
 #include "random.hpp"
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <type_traits>
+#include <utility>
 
 // Source: https://github.com/ulfben/cpp_prngs/
 // Demo is available on Compiler Explorer: https://compiler-explorer.com/z/nzK9joeYE
@@ -73,6 +78,21 @@ TYPED_TEST(RandomTypedTest, NextBoundedRespectsUpperBound){
     }
 }
 
+TYPED_TEST(RandomTypedTest, BoundedOperatorsAreEquivalentAndHandleBoundaryBounds){
+    using Rng = rnd::Random<TypeParam>;
+    using result_type = typename TypeParam::result_type;
+
+    for(result_type bound : {result_type{1}, result_type{2}, result_type{16}, TypeParam::max()}){
+        Rng next_rng{123u};
+        Rng call_rng{123u};
+        for(int i = 0; i < 64; ++i){
+            const auto via_next = next_rng.next(bound);
+            EXPECT_EQ(via_next, call_rng(bound));
+            EXPECT_LT(via_next, bound);
+        }
+    }
+}
+
 // -----------------------------------------------------------------------------
 // next<N, T>() returns values in [0, N)
 // -----------------------------------------------------------------------------
@@ -82,6 +102,13 @@ TYPED_TEST(RandomTypedTest, NextCompileTimeBoundedRespectsBound){
     for(int i = 0; i < 2048; ++i){
         auto v = this->rng.template next<N, std::uint32_t>();
         EXPECT_LT(v, N);
+    }
+}
+
+TYPED_TEST(RandomTypedTest, CompileTimeBoundedHandlesOneAndPowerOfTwo){
+    for(int i = 0; i < 64; ++i){
+        EXPECT_EQ((this->rng.template next<1, std::uint8_t>()), 0u);
+        EXPECT_LT((this->rng.template next<16, std::uint8_t>()), 16u);
     }
 }
 
@@ -101,6 +128,15 @@ TYPED_TEST(RandomTypedTest, NextRespectsMinMaxRange){
         const result_type v = this->rng.next();
         EXPECT_GE(v, lo);
         EXPECT_LE(v, hi) << "next() must be in [min(), max()]";
+    }
+}
+
+TYPED_TEST(RandomTypedTest, CallOperatorMatchesNext){
+    using Rng = rnd::Random<TypeParam>;
+    Rng via_next{123u};
+    Rng via_call{123u};
+    for(int i = 0; i < 64; ++i){
+        EXPECT_EQ(via_next.next(), via_call());
     }
 }
 
@@ -146,12 +182,21 @@ TYPED_TEST(RandomTypedTest, BetweenProducesExclusiveRange){
     }
 }
 
+TYPED_TEST(RandomTypedTest, BetweenFloatingPointProducesExclusiveRange){
+    for(int i = 0; i < 2048; ++i){
+        const float v = this->rng.between(-2.5f, 4.25f);
+        EXPECT_TRUE(std::isfinite(v));
+        EXPECT_GE(v, -2.5f);
+        EXPECT_LT(v, 4.25f);
+    }
+}
+
 // -----------------------------------------------------------------------------
 // normalized<F>() in [0, 1), signed_norm<F>() in [-1, 1)
 // -----------------------------------------------------------------------------
 TYPED_TEST(RandomTypedTest, NormalizedProducesFloatInUnitInterval){
     for(int i = 0; i < 2048; ++i){
-        float f = this->rng.normalized<float>();
+        float f = this->rng.template normalized<float>();
         EXPECT_TRUE(std::isfinite(f));
         EXPECT_GE(f, 0.0f);
         EXPECT_LT(f, 1.0f);
@@ -160,7 +205,7 @@ TYPED_TEST(RandomTypedTest, NormalizedProducesFloatInUnitInterval){
 
 TYPED_TEST(RandomTypedTest, SignedNormProducesFloatInSignedUnitInterval){
     for(int i = 0; i < 2048; ++i){
-        float f = this->rng.signed_norm<float>();
+        float f = this->rng.template signed_norm<float>();
         EXPECT_TRUE(std::isfinite(f));
         EXPECT_GE(f, -1.0f);
         EXPECT_LT(f, 1.0f);
@@ -232,6 +277,18 @@ TYPED_TEST(RandomTypedTest, EngineAccessorAndEngineConstructorRoundTrip){
     }
 }
 
+TYPED_TEST(RandomTypedTest, EngineAccessorsPreserveConstnessAndExposeState){
+    using Rng = rnd::Random<TypeParam>;
+    static_assert(std::is_same_v<decltype(std::declval<Rng&>().engine()), TypeParam&>);
+    static_assert(std::is_same_v<decltype(std::declval<const Rng&>().engine()), const TypeParam&>);
+
+    Rng wrapped{123u};
+    Rng expected{123u};
+    wrapped.engine()();
+    expected.next();
+    EXPECT_EQ(wrapped, expected);
+}
+
 
 // -----------------------------------------------------------------------------
 // Reproducibility with explicit seed
@@ -291,6 +348,18 @@ TYPED_TEST(RandomTypedTest, DiscardSkipsValues){
     EXPECT_EQ(a.next(), b.next());
 }
 
+TYPED_TEST(RandomTypedTest, SeedWithoutValueRestoresDefaultState){
+    using Rng = rnd::Random<TypeParam>;
+    Rng rng{123u};
+    for(int i = 0; i < 17; ++i) rng.next();
+    rng.seed();
+
+    Rng default_rng{};
+    for(int i = 0; i < 64; ++i){
+        EXPECT_EQ(rng.next(), default_rng.next());
+    }
+}
+
 // -----------------------------------------------------------------------------
 // bits(n) and bits<N, T>() only set the requested bits
 // -----------------------------------------------------------------------------
@@ -312,6 +381,32 @@ TYPED_TEST(RandomTypedTest, BitsCompileTimeReturnsOnlyRequestedBits){
     // 8 bits fit in uint16_t, and 8 <= digits(result_type) for all tested engines
     auto v = this->rng.template bits<8, std::uint16_t>();
     EXPECT_LE(v, std::uint16_t{0xFF});
+}
+
+TYPED_TEST(RandomTypedTest, BitsUseHighBitsAndRuntimeMatchesCompileTime){
+    using Rng = rnd::Random<TypeParam>;
+    using result_type = typename TypeParam::result_type;
+    constexpr unsigned width = std::numeric_limits<result_type>::digits;
+
+    Rng raw_rng{123u};
+    Rng runtime_rng{123u};
+    Rng compile_rng{123u};
+    const result_type expected = raw_rng.next() >> (width - 8);
+    EXPECT_EQ(runtime_rng.template bits<result_type>(8), expected);
+    EXPECT_EQ((compile_rng.template bits<8, result_type>()), expected);
+}
+
+TYPED_TEST(RandomTypedTest, BitsCanFillATypeWiderThanEngineOutput){
+    using Rng = rnd::Random<TypeParam>;
+    Rng bits_rng{123u};
+    Rng expected_rng{123u};
+
+    std::uint64_t expected = expected_rng.next();
+    if constexpr(std::numeric_limits<typename TypeParam::result_type>::digits == 32){
+        expected |= std::uint64_t{expected_rng.next()} << 32;
+    }
+    EXPECT_EQ(bits_rng.template bits_as<std::uint64_t>(), expected);
+    EXPECT_EQ(bits_rng, expected_rng) << "bits_as must consume exactly enough engine outputs";
 }
 
 TYPED_TEST(RandomTypedTest, BitsAsUsesAllDigitsOfTargetType){
@@ -336,6 +431,72 @@ TYPED_TEST(RandomTypedTest, SeedWithValueResetsToGivenSequence){
     for(int i = 0; i < 16; ++i){
         EXPECT_EQ(a.next(), b.next());
     }
+}
+
+
+// -----------------------------------------------------------------------------
+// Collection helpers, gaussian(), and split()
+// -----------------------------------------------------------------------------
+TYPED_TEST(RandomTypedTest, CollectionHelpersReturnValidMutableAndConstElements){
+    std::array<int, 5> values{10, 20, 30, 40, 50};
+    const auto& const_values = values;
+
+    static_assert(std::is_same_v<decltype(this->rng.element(values)), int&>);
+    static_assert(std::is_same_v<decltype(this->rng.element(const_values)), const int&>);
+
+    for(int i = 0; i < 128; ++i){
+        const auto idx = this->rng.index(values);
+        EXPECT_LT(idx, values.size());
+
+        const auto it = this->rng.iterator(values);
+        EXPECT_GE(std::distance(values.begin(), it), 0);
+        EXPECT_LT(std::distance(values.begin(), it), static_cast<std::ptrdiff_t>(values.size()));
+
+        int& element = this->rng.element(values);
+        EXPECT_GE(&element, values.data());
+        EXPECT_LT(&element, values.data() + values.size());
+    }
+}
+
+TYPED_TEST(RandomTypedTest, GaussianWithZeroDeviationReturnsMean){
+    for(int i = 0; i < 32; ++i){
+        EXPECT_EQ(this->rng.gaussian(12.5f, 0.0f), 12.5f);
+    }
+}
+
+TYPED_TEST(RandomTypedTest, SplitIsDeterministic){
+    using Engine = TypeParam;
+    using Rng = rnd::Random<Engine>;
+    
+    Rng a{123u};
+    Rng b{123u};
+
+    EXPECT_EQ(a.split(), b.split());
+    EXPECT_EQ(a, b);
+}
+
+TYPED_TEST(RandomTypedTest, ConsecutiveSplitsProduceDifferentChildren){
+    using Engine = TypeParam;
+    using Rng = rnd::Random<Engine>;
+    
+    Rng parent{123u};
+
+    auto first = parent.split();
+    auto second = parent.split();
+
+    EXPECT_FALSE(first == second);
+}
+
+TYPED_TEST(RandomTypedTest, SplitAdvancesParent){
+    using Engine = TypeParam;
+    using Rng = rnd::Random<Engine>;
+    
+    Rng parent{123u};
+    Rng original = parent;
+
+    [[maybe_unused]] auto child = parent.split();
+
+    EXPECT_FALSE(parent == original);
 }
 
 // -----------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 #pragma once
 #include "concepts.hpp" //for RandomBitEngine concept
 #include "detail.hpp"   //for constexpr and portable 128-bit multiplication
+#include <algorithm>
 #include <bit> // for std::bit_cast
 #include <cassert>
 #include <concepts>
@@ -9,6 +10,7 @@
 #include <limits>
 #include <ranges>
 #include <type_traits>
+#include <utility>
 
 // This is an RNG interface that wraps around any engine that meets the RandomBitEngine concept.
 // It provides useful functions for generating values, including integers, floating-point numbers, and colors
@@ -93,29 +95,13 @@ namespace rnd {
 		constexpr void seed(seed_type v) noexcept{
 			_e.seed(v);
 		}
-
-		// returns a decorrelated, forked engine; advances this engine's state 2 steps.
-		// use for parallel or independent streams use (think: task/thread-local randomness)
-		// consumes enough outputs to fill seed_type twice (2 draws for 64-bit engines, 4 draws for 32-bit engines when seed_type is 64-bit).
-		constexpr Random<E> split() noexcept{
-			using S = seed_type;
-			constexpr S tag = static_cast<S>(0x53504C49542D3031ULL); //the tag ensures split() uses a distinct seed domain						
-			S a = bits_as<S>(); 
-			S b = bits_as<S>();						
-			S seed = (a ^ std::rotl(b, std::min<int>(32, std::numeric_limits<S>::digits - 1))) ^ tag; // Mix two consecutive pulls + domain-separating tag			
-			
-			// xnasam avalanche, inlined. See: seeding.hpp for details.
-			//TODO: this is a 64-bit mixer. Delegate to something more appropriate on smaller engines!
-			seed ^= 0x9E3779B97F4A7C15ULL;
-			seed ^= std::rotr(seed, 25) ^ std::rotr(seed, 47);
-			seed *= 0x9E6C63D0676A9A99ULL;
-			seed ^= (seed >> 23) ^ (seed >> 51);
-			seed *= 0x9E6D62D06F6A9A9BULL;
-			seed ^= (seed >> 23) ^ (seed >> 51);
-
-			return Random<E>{ seed };
+	
+		// Returns a child generator derived from the parent.		
+		// Suitable for deriving task- or thread-local random streams when strict
+		// non-overlap is not required. 
+		[[nodiscard]] constexpr Random split() noexcept{
+			return Random{bits_as<seed_type>()}; //consume enough engine outputs to fill one seed_type value.		
 		}
-
 
 		static constexpr auto min() noexcept{
 			return 0; 
@@ -258,7 +244,7 @@ namespace rnd {
 		//accepts both const and non-const ranges
 		template <std::ranges::forward_range R>
 			requires std::ranges::sized_range<R>
-		constexpr auto element(R&& collection) noexcept{
+		constexpr decltype(auto) element(R&& collection) noexcept{
 			return *iterator(std::forward<R>(collection));
 		}
 
