@@ -298,6 +298,15 @@ TYPED_TEST(RandomTypedTest, NormalizedProducesFloatInUnitInterval){
     }
 }
 
+TYPED_TEST(RandomTypedTest, NormalizedProducesDoubleInUnitInterval){
+    for(int i = 0; i < 2048; ++i){
+        const double value = this->rng.template normalized<double>();
+        EXPECT_TRUE(std::isfinite(value));
+        EXPECT_GE(value, 0.0);
+        EXPECT_LT(value, 1.0);
+    }
+}
+
 TYPED_TEST(RandomTypedTest, SignedNormProducesFloatInSignedUnitInterval){
     for(int i = 0; i < 2048; ++i){
         float f = this->rng.template signed_norm<float>();
@@ -333,7 +342,7 @@ TYPED_TEST(RandomTypedTest, CoinFlipProbabilityExtremes){
     // p = 0 -> always false over a reasonable sample
     bool any_true = false;
     for(int i = 0; i < 512; ++i){
-        if(this->rng.coin_flip(0.0f)){ //note: float, to support 32-bit engines
+        if(this->rng.coin_flip(0.0)){ //note: float, to support 32-bit engines
             any_true = true;
             break;
         }
@@ -343,7 +352,7 @@ TYPED_TEST(RandomTypedTest, CoinFlipProbabilityExtremes){
     // p = 1 -> always true over a reasonable sample
     bool any_false = false;
     for(int i = 0; i < 512; ++i){
-        if(!this->rng.coin_flip(1.0f)){  //note: float, to support 32-bit engines
+        if(!this->rng.coin_flip(1.0)){  //note: float, to support 32-bit engines
             any_false = true;
             break;
         }

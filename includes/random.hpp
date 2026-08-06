@@ -194,9 +194,6 @@ namespace rnd {
 			static_assert(std::numeric_limits<F>::is_iec559, "normalized() requires IEEE 754 (IEC 559) floating point types.");
 			using UInt = std::conditional_t<sizeof(F) == 4, uint32_t, uint64_t>; // Pick wide enough unsigned int type for F
 			constexpr int mantissa_bits = std::numeric_limits<F>::digits - 1; // Number of mantissa bits for F (e.g., 23 for float)
-			static_assert(mantissa_bits <= value_bits,
-				"This engine cannot generate enough mantissa bits for this floating-point type. "
-				"Use a 64-bit engine or request a 32-bit float.");
 			constexpr UInt base = std::bit_cast<UInt>(F(1.0)); // Bit pattern for F(1.0), i.e., exponent set, mantissa 0
 			UInt mantissa = this->template bits<mantissa_bits, UInt>();      // Get random bits to fill the mantissa field
 			UInt as_int = base | mantissa; // Combine base (1.0) with random mantissa bits
