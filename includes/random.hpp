@@ -103,11 +103,11 @@ namespace rnd {
 			return Random{bits_as<seed_type>()}; //consume enough engine outputs to fill one seed_type value.		
 		}
 
-		static constexpr auto min() noexcept{
+		static constexpr result_type  min() noexcept{
 			return 0; 
 		}
 
-		static constexpr auto max() noexcept{
+		static constexpr result_type  max() noexcept{
 			return E::max();
 		}
 
