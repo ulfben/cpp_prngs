@@ -84,7 +84,7 @@ namespace rnd {
 
 		//advance the random engine n steps.
 		//some engines (like PCG32) can do this faster than linear time
-		constexpr void discard(result_type n) noexcept{
+		constexpr void discard(unsigned long long n) noexcept{
 			_e.discard(n);
 		}
 

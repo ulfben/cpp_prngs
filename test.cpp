@@ -443,6 +443,15 @@ TYPED_TEST(RandomTypedTest, DiscardSkipsValues){
     EXPECT_EQ(a.next(), b.next());
 }
 
+TEST(RandomDiscardTest, AdvancesPcg32BeyondItsResultTypeWidth){
+    rnd::Random<PCG32> advanced{std::uint64_t{123}};
+    const rnd::Random<PCG32> original = advanced;
+
+    advanced.discard(1ull << 32);
+
+    EXPECT_FALSE(advanced == original);
+}
+
 TYPED_TEST(RandomTypedTest, SeedWithoutValueRestoresDefaultState){
     using Rng = rnd::Random<TypeParam>;
     Rng rng{123u};

@@ -81,7 +81,7 @@ public:
 		(void) next();
 	}
 
-	constexpr void discard(result_type delta) noexcept{
+	constexpr void discard(unsigned long long delta) noexcept{
 		//Based on Brown, "Random Number Generation with Arbitrary Stride,"
 		// Transactions of the American Nuclear Society (Nov. 1994)       
 		u64 cur_mult = MULT;
