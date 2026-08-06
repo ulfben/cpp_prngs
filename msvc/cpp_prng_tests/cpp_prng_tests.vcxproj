@@ -144,7 +144,6 @@
   <ItemGroup>
     <ClInclude Include="..\..\includes\concepts.hpp" />
     <ClInclude Include="..\..\includes\random.hpp" />
-    <ClInclude Include="..\..\includes\seeding.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
