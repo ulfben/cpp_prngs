@@ -268,7 +268,8 @@ return static_cast<idx_t>(
 between<idx_t>(0, static_cast<idx_t>(std::ranges::size(collection))));
 }
 template <std::ranges::forward_range R>
-requires std::ranges::sized_range<R>
+requires std::ranges::sized_range<R> &&
+(std::is_lvalue_reference_v<R&&> || std::ranges::borrowed_range<R>)
 constexpr auto iterator(R&& collection) noexcept{
 assert(!std::ranges::empty(collection) && "Random::iterator(): empty collection");
 auto idx = index(collection);              
@@ -277,7 +278,8 @@ std::advance(it, idx);
 return it;
 }
 template <std::ranges::forward_range R>
-requires std::ranges::sized_range<R>
+requires std::ranges::sized_range<R> &&
+(std::is_lvalue_reference_v<R&&> || std::ranges::borrowed_range<R>)
 constexpr decltype(auto) element(R&& collection) noexcept{
 return *iterator(std::forward<R>(collection));
 }
