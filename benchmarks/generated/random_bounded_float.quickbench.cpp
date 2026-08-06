@@ -231,7 +231,7 @@ assert(bound <= E::max() &&
 "between(lo, hi): range too large for this engine. Consider a 64-bit engine "
 "(xoshiro256ss, SmallFast64) or ensure hi–lo <= max()");
 auto safe_bound = static_cast<result_type>(bound);
-return lo + static_cast<I>(next(safe_bound));
+return static_cast<I>(U(lo) + static_cast<U>(next(safe_bound)));
 }
 template <std::floating_point F = float> constexpr F between(F lo, F hi) noexcept{
 return lo + (hi - lo) * normalized<F>();
