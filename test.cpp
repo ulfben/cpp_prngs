@@ -6,7 +6,6 @@
 #include "./engines/small_fast64.hpp"
 #include "./engines/xoshiro256ss.hpp"
 #include "./engines/quarkburst64.hpp"
-#include "./engines/quarkburst4x64.hpp"
 #include "random.hpp"
 #include <array>
 #include <cmath>
@@ -16,11 +15,11 @@
 #include <utility>
 
 // Source: https://github.com/ulfben/cpp_prngs/
-// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/1jvr7effd
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/9sazdcfzx
 // Benchmarks:
-   // Quick Bench for generating raw random values: https://quick-bench.com/q/vWdKKNz7kEyf6kQSNnUEFOX_4DI
-   // Quick Bench for generating normalized floats: https://quick-bench.com/q/GARc3WSfZu4sdVeCAMSWWPMQwSE
-   // Quick Bench for generating bounded values: https://quick-bench.com/q/WHEcW9iSV7I8qB_4eb1KWOvNZU0
+   // Quick Bench for generating raw random values: https://quick-bench.com/q/L2igH6P-IVdiwrTdVpuEzkzoH5Q
+   // Quick Bench for generating bounded floats:    https://quick-bench.com/q/GP9Zfw7YOaXteDOztQ_P2kYnmoY
+   // Quick Bench for generating bounded integers:  https://quick-bench.com/q/6hjHn7fpVdaEmp37BcsXyW4A3K4
 
 template<class Engine>
 class RandomTypedTest : public ::testing::Test{
@@ -36,8 +35,7 @@ using EnginesUnderTest = ::testing::Types<
     SmallFast32,
     SmallFast64,
     Xoshiro256SS,
-    QuarkBurst64,
-    QuarkBurst4x64
+    QuarkBurst64    
 >;
 
 TYPED_TEST_CASE(RandomTypedTest, EnginesUnderTest);
@@ -512,8 +510,7 @@ using Engines64Bit = ::testing::Types<
     Konadare192,
     SmallFast64,
     Xoshiro256SS,
-    QuarkBurst64,
-    QuarkBurst4x64
+    QuarkBurst64    
 >;
 
 template<class Engine>

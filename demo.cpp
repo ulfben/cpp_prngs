@@ -22,7 +22,6 @@
 // - Konadare192
 // - PCG32
 // - QuarkBurst64
-// - QuarkBurst4x64
 // - RomuDuoJr
 // - SmallFast32
 // - SmallFast64
@@ -34,8 +33,12 @@
 // The library operations are constexpr where their inputs and underlying
 // engine permit constant evaluation.
 //
-// Try it on compiler explorer: https://compiler-explorer.com/z/qaGMM4fPT
-// Benchmarks: see https://github.com/ulfben/cpp_prngs#performance-benchmarks
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/9sazdcfzx
+// Benchmarks:
+   // Quick Bench for generating raw random values: https://quick-bench.com/q/L2igH6P-IVdiwrTdVpuEzkzoH5Q
+   // Quick Bench for generating bounded floats:    https://quick-bench.com/q/GP9Zfw7YOaXteDOztQ_P2kYnmoY
+   // Quick Bench for generating bounded integers:  https://quick-bench.com/q/6hjHn7fpVdaEmp37BcsXyW4A3K4
+// See also: https://github.com/ulfben/cpp_prngs#performance-benchmarks
 
 int main(){
    using namespace rnd;       

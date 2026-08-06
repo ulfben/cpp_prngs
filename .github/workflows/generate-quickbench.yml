@@ -1,0 +1,44 @@
+name: Generate Quick Bench source
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "includes/**"
+      - "benchmarks/*.cpp"
+      - "benchmarks/generate-quickbench.ps1"
+      - ".github/workflows/generate-quickbench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Generate standalone Quick Bench source
+        shell: pwsh
+        run: ./benchmarks/generate-quickbench.ps1
+
+      - name: Commit generated source when changed
+        shell: pwsh
+        run: |
+          $generated = "benchmarks/generated"
+          $changes = git status --porcelain -- $generated
+
+          if (-not $changes) {
+              Write-Host "Generated source is already current."
+              exit 0
+          }
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- $generated
+          git commit -m "Regenerate Quick Bench source"
+          git push

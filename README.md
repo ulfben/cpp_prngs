@@ -35,7 +35,7 @@ int damage = rng.between(10, 20);   // Random int in [10, 20)
 
 Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#randomhpp) like bounds, floats, coin flips, Gaussian samples, picking from containers, raw bits, and more.
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/1jvr7effd)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/9sazdcfzx)
 
 Want to use your own engine? It only needs to satisfy the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp)).
 
@@ -98,17 +98,33 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 
 ---
 
-### Performance Benchmarks
+## Performance Benchmarks
 
-![quickbench_cpp_prngs](https://github.com/user-attachments/assets/5a22df16-cf7f-4220-b8cd-65052448c00f)
+The [benchmark suite](benchmarks/) uses [Quick Bench](https://quick-bench.com/) to measure three representative workloads:
 
-These benchmarks use [QuickBench](https://quick-bench.com/) to let you compare performance across different use cases:
+- [Raw engine throughput](https://quick-bench.com/q/L2igH6P-IVdiwrTdVpuEzkzoH5Q) using `next()`.
+- [Bounded integer generation](https://quick-bench.com/q/6hjHn7fpVdaEmp37BcsXyW4A3K4) using `Random<E>::next(bound)`.
+- [Bounded floating-point generation](https://quick-bench.com/q/GP9Zfw7YOaXteDOztQ_P2kYnmoY) using `Random<E>::between(lo, hi)`.
 
-- [`next()` – raw unsigned output](https://quick-bench.com/q/vWdKKNz7kEyf6kQSNnUEFOX_4DI): baseline performance
-- [`next(bound)` – bounded integer using Lemire’s method](https://quick-bench.com/q/WHEcW9iSV7I8qB_4eb1KWOvNZU0): efficient rejection-free range generation
-- [`normalized<float>()` – floating-point in \[0.0, 1.0)](https://quick-bench.com/q/GARc3WSfZu4sdVeCAMSWWPMQwSE): branchless float generation (IQ trick)
+The bounded benchmarks exercise the public `Random<E>` interface and compare it with equivalent C and C++ standard-library approaches. Lower bars are faster.
 
-Each benchmark loops over one million values and compares multiple engines side by side, including the std library and cstdlib alternatives.
+### Engine throughput
+
+![Engine throughput benchmark](benchmarks/results/engine-comparison-2026-08.png)
+
+All of the included engines substantially outperform the standard-library generators in this benchmark.
+
+### Bounded integers
+
+![Bounded integer benchmark](benchmarks/results/random-bounded-integer-2026-08.png)
+
+### Bounded floating-point values
+
+![Bounded floating-point benchmark](benchmarks/results/random-bounded-float-2026-08.png)
+
+The bounded benchmarks show that the convenience provided by `Random<E>` does not come at the expense of performance. QuarkBurst64, RomuDuoJr, and Konadare192 are currently the fastest engines in these comparisons.
+
+Performance depends on the compiler, standard library, build settings, CPU, and workload. Always benchmark on your own target hardware before choosing an engine.
 
 ---
 
