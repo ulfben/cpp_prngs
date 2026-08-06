@@ -58,8 +58,8 @@ public:
 	using result_type = std::uint64_t;
 	using seed_type = u64;
 
-	constexpr Konadare192() : Konadare192(DEFAULT_SEED){}
-	constexpr explicit Konadare192(seed_type seed_val) : a_(seed_val), b_(seed_val + 1), c_(seed_val + 2){
+	constexpr Konadare192() noexcept : Konadare192(DEFAULT_SEED){}
+	constexpr explicit Konadare192(seed_type seed_val) noexcept : a_(seed_val), b_(seed_val + 1), c_(seed_val + 2){
 		for(int m = 0; m < 2; ++m){ //two rounds of mixing to warm up the state
 			result_type t0 = mix(a_, c_);
 			result_type t1 = mix(b_, a_);
@@ -101,6 +101,6 @@ public:
 	static constexpr result_type max() noexcept{
 		return std::numeric_limits<result_type>::max();
 	}
-	constexpr bool operator==(const Konadare192&) const = default;
+	constexpr bool operator==(const Konadare192&) const noexcept = default;
 };
 static_assert(RandomBitEngine<Konadare192>);

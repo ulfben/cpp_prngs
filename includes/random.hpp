@@ -219,7 +219,7 @@ namespace rnd {
 
 		// pick an index in [0, size)
 		template <std::ranges::sized_range R>
-		constexpr auto index(const R& collection) noexcept{
+		constexpr auto index(const R& collection){
 			assert(!std::ranges::empty(collection) && "Random::index(): empty collection.");
 			using idx_t = std::ranges::range_size_t<R>;
 			return static_cast<idx_t>(
@@ -230,7 +230,7 @@ namespace rnd {
 		template <std::ranges::forward_range R>
 			requires std::ranges::sized_range<R> &&
 				(std::is_lvalue_reference_v<R&&> || std::ranges::borrowed_range<R>)
-		constexpr auto iterator(R&& collection) noexcept{
+		constexpr auto iterator(R&& collection){
 			assert(!std::ranges::empty(collection) && "Random::iterator(): empty collection");
 			auto idx = index(collection);             // index accepts const&
 			auto it = std::ranges::begin(collection); // picks begin or cbegin for us
@@ -243,7 +243,7 @@ namespace rnd {
 		template <std::ranges::forward_range R>
 			requires std::ranges::sized_range<R> &&
 				(std::is_lvalue_reference_v<R&&> || std::ranges::borrowed_range<R>)
-		constexpr decltype(auto) element(R&& collection) noexcept{
+		constexpr decltype(auto) element(R&& collection){
 			return *iterator(std::forward<R>(collection));
 		}
 
