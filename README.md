@@ -1,21 +1,32 @@
+
 # cpp_prngs
 
-When talking about random number generation - for making games fun, not for making SSH keys - the C and C++ standard libraries come up short in many ways. The classic C `srand()/rand()` [is biased, not thread-safe, not portable, and offers limited range](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/#fnref1). The C++ `<random>` library is [inconvenient](https://youtu.be/zUVQhcu32rg?si=G3LHsYagEHhH9UYS&t=234), [easy to misuse](https://www.pcg-random.org/posts/cpp-seeding-surprises.html), provides [poor guarantees](https://codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/), and is not available at compile time.
+When generating random numbers for games - where the goal is fun, speed, and reproducibility rather than cryptographic security - the C and C++ standard facilities are often an awkward fit.
 
-The best pseudo-random number generator (PRNG) offered by the C++ standard library is likely the Mersenne Twister. But choosing `std::mt19937` over more efficient alternatives like [Xorshift](https://en.wikipedia.org/wiki/Xorshift) or a [PCG](https://en.wikipedia.org/wiki/Permuted_congruential_generator) variant sacrifices [a significant amount of performance](https://github.com/ulfben/cpp_prngs/#performance-benchmarks) in *addition* to the problems listed above.
+The classic C `srand()` / `rand()` interface is explicitly described by the C++ standard as a [low-quality, non-portable facility with implementation-defined data-race behavior](https://eel.is/c++draft/rand#c.math.rand). The standard leaves its underlying algorithm unspecified (meaning that `rand()` is allowed to return different numbers on different platforms given the same seed!), `RAND_MAX` is permitted to be [as low as 32,767](https://web.archive.org/web/20260410163728/https://www.codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/#fn1), and common attempts to convert its output into a desired range - such as `rand() % n`—introduce [modulo bias](https://web.archive.org/web/20260410163728/https://www.codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/).
 
-For a deep, game-focused comparison of 47 PRNGs across 9 platforms, see Rhet Butler’s excellent [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/), which highlights the performance, portability, and statistical quality concerns that matter most in real-world game development. Several of the top-performing generators featured there - including Romu and SmallFast - are included here.
+Although C++11 introduced `<random>`, it still presents several practical problems for game developers:
 
-And so; if you're making games and need your random number generator to be:
+**Seeding is cumbersome.** Correctly supplying engines with suitable seed material is notoriously [easy to get wrong](https://www.pcg-random.org/posts/cpp-seeding-surprises.html), and so inconvenient that it has motivated multiple C++ committee proposals, including [P0205R1](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0205r1.html) and [P0347R1](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0347r1.html).
 
-- small (16 or 32 bytes) and [*fast*](https://github.com/ulfben/cpp_prngs#performance-benchmarks)
+**Standard distributions are not cross-library reproducible.** Given the same engine state, distributions such as `std::normal_distribution` are not required to produce identical results across different standard-library implementations. This can break procedural-generation consistency between platforms. See [P2059R0: Make Pseudo-random Numbers Portable](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2059r0.pdf).
+
+**There is no compile-time support.** Standard random-number engines cannot currently be evaluated at compile time. Deterministic `constexpr <random>` facilities are still only proposed for C++29 in [P3791R1](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p3791r1.html).
+
+The most widely used general-purpose engine in the C++ standard library is probably the Mersenne Twister, [`std::mt19937`](https://eel.is/c++draft/rand.predef). However, `std::mt19937` requires **624 state words - typically around 2.5 KiB of internal state**. That puts substantial pressure on CPU caches. Choosing it over modern small-state generators such as [xoshiro256**](https://prng.di.unimi.it/), [PCG](https://www.pcg-random.org/paper.html), or [Romu](https://www.romu-random.org/) incurs [a significant performance cost](https://github.com/ulfben/cpp_prngs/#performance-benchmarks).
+
+For a deep, game-focused comparison of 47 PRNGs across nine platforms, see Rhet Butler’s excellent [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/). It highlights the performance, portability, state-size, and statistical-quality concerns that matter in real-world game development. Several of its top-performing generators - including Romu and SmallFast - are included here.
+
+So, if you are making games and need a random-number generator that is:
+
+- small (**16–32 bytes**) and [fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks)
 - deterministic across platforms (e.g., *portable!*)
 - [easy to seed](https://github.com/ulfben/cpp_prngs#seeding)
-- [feature-rich](https://github.com/ulfben/cpp_prngs#randomhpp) (ints, floats, coin flip, ranges, pick-from-collection, etc.)
-- executable at compile time
-- [compatible](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) with all of your favorite STL algorithms and distributions (`std::shuffle`, `std::sample`, `std::*_distribution`, etc.)
+- [feature-rich](https://github.com/ulfben/cpp_prngs#randomhpp), with integers, floats, coin flips, Gaussian samples, raw bits, and random range selection
+- executable at compile time with `constexpr` and
+- [compatible](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) with STL algorithms and distributions such as `std::shuffle`, `std::sample`, and `std::*_distribution`
 
-... go ahead and copy-paste any of these engines and the `random.hpp` interface, and go forth and prosper. Let me know if you find bugs or add any cool new features!
+…go ahead and copy any of these engines together with the `random.hpp` interface, and go forth and prosper. Let me know if you find bugs or add any cool new features!
 
 ---
 
