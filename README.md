@@ -42,9 +42,44 @@ using rnd::Random;
 
 Random<RomuDuoJr> rng{1234}; // generator with fixed seed, powered by the romuduojr engine.
 int damage = rng.between(10, 20);   // Random int in [10, 20)
-````
+```
 
 Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#randomhpp) like bounds, floats, coin flips, Gaussian samples, picking from containers, raw bits, and more.
+
+### Weighted draws
+
+Pass a range of weights to `weighted_index()` when the weights themselves form the lookup table. Each returned index corresponds to the weight at that index:
+
+```cpp
+#include <array>
+
+constexpr std::array weights{50, 30, 15, 5};
+const std::size_t tier = rng.weighted_index(weights);
+// tier 0 is selected with weight 50, tier 1 with weight 30, and so on.
+```
+
+When weights are stored in a collection of objects, pass a projection to `weighted_element()` or `weighted_iterator()`. A pointer to the weight member is often all the projection you need:
+
+```cpp
+#include <array>
+#include <string_view>
+
+struct LootDrop{
+    std::string_view name;
+    unsigned weight;
+};
+
+constexpr std::array loot_table{
+    LootDrop{"potion", 50},
+    LootDrop{"gold", 30},
+    LootDrop{"magic sword", 15},
+    LootDrop{"dragon egg", 5}
+};
+
+const LootDrop& drop = rng.weighted_element(loot_table, &LootDrop::weight);
+```
+
+Weights must be positive. A weight of zero excludes that index or element from selection.
 
 [Try it on Compiler Explorer!](https://compiler-explorer.com/z/9sazdcfzx)
 
@@ -97,12 +132,21 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 | `index(range)`                      | Returns a random index into any sized range                                                                                                                         |
 | `iterator(range)`                   | Returns an iterator to a random element                                                                                                                             |
 | `element(range)`                    | Returns a reference to a random element                                                                                                                             |
+| `weighted_index(weights)`           | Returns an index selected proportionally to non-negative integral weights; zero-weight indices are excluded                                                        |
+| `weighted_iterator(range, projection)` | Returns an iterator selected proportionally to the non-negative integral weight returned by `projection(element)`                                               |
+| `weighted_element(range, projection)` | Returns a reference selected proportionally to the non-negative integral weight returned by `projection(element)`                                                |
 | `gaussian(mean, stddev)`            | Approximate normal sample via the Irwin–Hall sum-of-12 method                                                                                                       |
 | `discard(n)`                        | Advances the underlying engine by `n` steps                                                                                                                         |
 | `seed()`                            | Reseeds the engine back to its default state                                                                                                                        |
 | `seed(v)`                           | Reseeds the engine with value `v`                                                                                                                                   |
 | `split()`                           | Produces a decorrelated, forked engine (useful for parallel streams)                                                                                                |
 | `engine()` / `engine() const`       | Access the underlying engine instance (for manual serialization, debugging, etc.)                                                                                   |
+
+The weighted helpers require a sized forward range. Weights must be non-negative
+integral values, at least one must be positive, and their sum must fit in the
+engine's `result_type`. A projection is evaluated during both passes, so it must
+return stable weights. As with `iterator()` and `element()`, the iterator- and
+element-returning weighted overloads reject non-borrowed temporary ranges.
 
 
 [^1]: Although `bits(n)` and `bits<N>()` *can* be used for power-of-two integer ranges, this is not their intended purpose. Prefer `next<N,T>()` instead. It chooses the same fast, unbiased bit-shift specialization, but makes your code clearer and safer.

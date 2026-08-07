@@ -6,6 +6,7 @@
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/engines/romuduojr.hpp> // RomuDuoJr engine 
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/random.hpp> // the Random interface, which wraps any engine to provide a rich set of random generation features
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -74,6 +75,27 @@ int main(){
    std::println("  element(str): {}", random.element(str));                             // random element from a sized forward range
    std::size_t i = random.index(str);                                                   // random index in [0, size)
    std::println("  index(str): {} ({})", i, str[i]);                                  
+
+   // weighted_index() takes the weights directly, so it does not need a projection.
+   constexpr std::array loot_tiers{"common", "uncommon", "rare", "legendary"};
+   constexpr std::array<unsigned, 4> tier_weights{50, 30, 15, 5};
+   const std::size_t tier = random.weighted_index(tier_weights);
+   std::println("  weighted_index: {} (weight {})", loot_tiers[tier], tier_weights[tier]);
+
+   struct LootDrop{
+      std::string_view name;
+      unsigned weight;
+   };
+   constexpr std::array loot_table{
+      LootDrop{"potion", 50},
+      LootDrop{"gold", 30},
+      LootDrop{"magic sword", 15},
+      LootDrop{"dragon egg", 5}
+   };
+
+   // For a collection of objects, the projection maps each object to its weight.
+   const LootDrop& drop = random.weighted_element(loot_table, &LootDrop::weight);
+   std::println("  weighted_element: {} (weight {})", drop.name, drop.weight);
 
    //Random<E> satisfies UniformRandomBitGenerator so we can use 
    //it with all std algorithms, for example, std::shuffle:

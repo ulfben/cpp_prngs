@@ -40,6 +40,38 @@ concept CanGetRandomElement = requires(Rng& rng, Range&& range){
     rng.element(std::forward<Range>(range));
 };
 
+template<class Rng, class Range>
+concept CanGetWeightedIndex = requires(Rng& rng, Range&& range){
+    rng.weighted_index(std::forward<Range>(range));
+};
+
+template<class Rng, class Range, class Projection>
+concept CanGetWeightedIterator = requires(Rng& rng, Range&& range, Projection projection){
+    rng.weighted_iterator(std::forward<Range>(range), projection);
+};
+
+template<class Rng, class Range, class Projection>
+concept CanGetWeightedElement = requires(Rng& rng, Range&& range, Projection projection){
+    rng.weighted_element(std::forward<Range>(range), projection);
+};
+
+struct WeightedValue{
+    int value;
+    std::uint16_t weight;
+};
+
+struct FloatingWeightProjection{
+    constexpr float operator()(const WeightedValue& item) const noexcept{
+        return static_cast<float>(item.weight);
+    }
+};
+
+struct BooleanWeightProjection{
+    constexpr bool operator()(const WeightedValue& item) const noexcept{
+        return item.weight != 0;
+    }
+};
+
 class NonAssignableSeedEngine{
 public:
     using result_type = std::uint32_t;
@@ -84,6 +116,23 @@ static_assert(RandomBitEngine<NonAssignableSeedEngine>);
 static_assert(!RandomBitEngine<MissingSeedTypeEngine>);
 static_assert(!std::assignable_from<NonAssignableSeedEngine&, NonAssignableSeedEngine>);
 static_assert(!std::is_same_v<PCG32::result_type, PCG32::seed_type>);
+
+consteval bool weightedHelpersAreConstexpr(){
+    rnd::Random<PCG32> rng{123u};
+    std::array<unsigned, 3> weights{0, 7, 0};
+    std::array<bool, 3> boolean_weights{false, true, false};
+    std::array<WeightedValue, 3> values{{
+        {10, 0},
+        {20, 7},
+        {30, 0}
+    }};
+
+    return rng.weighted_index(weights) == 1 &&
+        rng.weighted_index(boolean_weights) == 1 &&
+        rng.weighted_element(values, &WeightedValue::weight).value == 20;
+}
+
+static_assert(weightedHelpersAreConstexpr());
 
 using EnginesUnderTest = ::testing::Types<
     RomuDuoJr,
@@ -599,6 +648,97 @@ TYPED_TEST(RandomTypedTest, CollectionHelpersReturnValidMutableAndConstElements)
         int& element = this->rng.element(values);
         EXPECT_GE(&element, values.data());
         EXPECT_LT(&element, values.data() + values.size());
+    }
+}
+
+TYPED_TEST(RandomTypedTest, WeightedHelpersHaveSafeRangeAndWeightConstraints){
+    using Rng = rnd::Random<TypeParam>;
+
+    static_assert(CanGetWeightedIndex<Rng, std::array<int, 3>&>);
+    static_assert(CanGetWeightedIndex<Rng, std::array<std::uint8_t, 3>>);
+    static_assert(!CanGetWeightedIndex<Rng, std::array<float, 3>&>);
+    static_assert(CanGetWeightedIndex<Rng, std::array<bool, 3>&>);
+
+    static_assert(CanGetWeightedIterator<
+        Rng, std::vector<WeightedValue>&, decltype(&WeightedValue::weight)>);
+    static_assert(CanGetWeightedElement<
+        Rng, std::span<WeightedValue>, decltype(&WeightedValue::weight)>);
+    static_assert(!CanGetWeightedIterator<
+        Rng, std::vector<WeightedValue>, decltype(&WeightedValue::weight)>);
+    static_assert(!CanGetWeightedElement<
+        Rng, std::vector<WeightedValue>, decltype(&WeightedValue::weight)>);
+    static_assert(!CanGetWeightedIterator<
+        Rng, std::array<WeightedValue, 3>&, FloatingWeightProjection>);
+    static_assert(CanGetWeightedElement<
+        Rng, std::array<WeightedValue, 3>&, BooleanWeightProjection>);
+
+    std::array<WeightedValue, 3> values{{
+        {10, 0},
+        {20, 1},
+        {30, 0}
+    }};
+    const auto& const_values = values;
+
+    static_assert(std::is_same_v<decltype(this->rng.weighted_element(
+        values, &WeightedValue::weight)), WeightedValue&>);
+    static_assert(std::is_same_v<decltype(this->rng.weighted_element(
+        const_values, &WeightedValue::weight)), const WeightedValue&>);
+
+    EXPECT_EQ(this->rng.weighted_iterator(values, &WeightedValue::weight), values.begin() + 1);
+    WeightedValue& selected = this->rng.weighted_element(values, &WeightedValue::weight);
+    EXPECT_EQ(&selected, &values[1]);
+}
+
+TYPED_TEST(RandomTypedTest, WeightedIndexMatchesTheUnderlyingBoundedDraw){
+    using Rng = rnd::Random<TypeParam>;
+    using result_type = typename TypeParam::result_type;
+
+    Rng weighted_rng{123u};
+    Rng target_rng{123u};
+    const std::array<std::uint16_t, 4> weights{0, 2, 5, 3};
+
+    for(int i = 0; i < 256; ++i){
+        const result_type target = target_rng.next(result_type{10});
+        const std::size_t expected = target < 2 ? 1 : target < 7 ? 2 : 3;
+        EXPECT_EQ(weighted_rng.weighted_index(weights), expected);
+    }
+}
+
+TYPED_TEST(RandomTypedTest, WeightedIteratorMatchesTheUnderlyingBoundedDraw){
+    using Rng = rnd::Random<TypeParam>;
+    using result_type = typename TypeParam::result_type;
+
+    Rng weighted_rng{456u};
+    Rng target_rng{456u};
+    std::array<WeightedValue, 4> values{{
+        {10, 0},
+        {20, 2},
+        {30, 5},
+        {40, 3}
+    }};
+
+    for(int i = 0; i < 256; ++i){
+        const result_type target = target_rng.next(result_type{10});
+        const std::size_t expected = target < 2 ? 1 : target < 7 ? 2 : 3;
+        EXPECT_EQ(
+            weighted_rng.weighted_iterator(values, &WeightedValue::weight),
+            values.begin() + static_cast<std::ptrdiff_t>(expected)
+        );
+    }
+}
+
+TYPED_TEST(RandomTypedTest, WeightedIndexAccumulatesNarrowWeightsInEngineType){
+    using Rng = rnd::Random<TypeParam>;
+    using result_type = typename TypeParam::result_type;
+
+    Rng weighted_rng{789u};
+    Rng target_rng{789u};
+    const std::array<std::uint8_t, 2> weights{200, 100};
+
+    for(int i = 0; i < 64; ++i){
+        const result_type target = target_rng.next(result_type{300});
+        const std::size_t expected = target < 200 ? 0 : 1;
+        EXPECT_EQ(weighted_rng.weighted_index(weights), expected);
     }
 }
 
