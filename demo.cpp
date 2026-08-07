@@ -34,7 +34,7 @@
 // The library operations are constexpr where their inputs and underlying
 // engine permit constant evaluation.
 //
-// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/9sazdcfzx
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/YTbGcreEe
 // Benchmarks:
    // Quick Bench for generating raw random values: https://quick-bench.com/q/L2igH6P-IVdiwrTdVpuEzkzoH5Q
    // Quick Bench for generating bounded floats:    https://quick-bench.com/q/GP9Zfw7YOaXteDOztQ_P2kYnmoY

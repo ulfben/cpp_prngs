@@ -17,7 +17,7 @@
 #include <vector>
 
 // Source: https://github.com/ulfben/cpp_prngs/
-// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/9sazdcfzx
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/YTbGcreEe
 // Benchmarks:
    // Quick Bench for generating raw random values: https://quick-bench.com/q/L2igH6P-IVdiwrTdVpuEzkzoH5Q
    // Quick Bench for generating bounded floats:    https://quick-bench.com/q/GP9Zfw7YOaXteDOztQ_P2kYnmoY

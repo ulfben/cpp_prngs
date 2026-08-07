@@ -28,6 +28,8 @@ So, if you are making games and need a random-number generator that is:
 
 …go ahead and copy any of these engines together with the `random.hpp` interface, and go forth and prosper. Let me know if you find bugs or add any cool new features!
 
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/YTbGcreEe)
+
 ---
 
 ## Getting Started
@@ -81,7 +83,7 @@ const LootDrop& drop = rng.weighted_element(loot_table, &LootDrop::weight);
 
 Weights must be positive. A weight of zero excludes that index or element from selection.
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/9sazdcfzx)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/YTbGcreEe)
 
 Want to use your own engine? It only needs to satisfy the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp)).
 
@@ -133,8 +135,8 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 | `iterator(range)`                   | Returns an iterator to a random element                                                                                                                             |
 | `element(range)`                    | Returns a reference to a random element                                                                                                                             |
 | `weighted_index(weights)`           | Returns an index selected proportionally to non-negative integral weights; zero-weight indices are excluded                                                        |
-| `weighted_iterator(range, projection)` | Returns an iterator selected proportionally to the non-negative integral weight returned by `projection(element)`                                               |
-| `weighted_element(range, projection)` | Returns a reference selected proportionally to the non-negative integral weight returned by `projection(element)`                                                |
+| `weighted_iterator(range, projection)` | Returns an iterator selected proportionally to weights returned by `projection(element)`                                               |
+| `weighted_element(range, projection)` | Returns a reference selected proportionally to weights returned by `projection(element)`                                                |
 | `gaussian(mean, stddev)`            | Approximate normal sample via the Irwin–Hall sum-of-12 method                                                                                                       |
 | `discard(n)`                        | Advances the underlying engine by `n` steps                                                                                                                         |
 | `seed()`                            | Reseeds the engine back to its default state                                                                                                                        |
@@ -165,17 +167,24 @@ The bounded benchmarks exercise the public `Random<E>` interface and compare it 
 
 ### Engine throughput
 
+Generating raw random numbers using `next()`:
+
 ![Engine throughput benchmark](benchmarks/results/engine-comparison-2026-08.png)
 
 All of the included engines substantially outperform the standard-library generators in this benchmark.
 
 ### Bounded integers
 
+Generating random integers in `[0, bound)` using `Random<E>::next(bound)`:
+
 ![Bounded integer benchmark](benchmarks/results/random-bounded-integer-2026-08.png)
 
 ### Bounded floating-point values
 
+Generating random floats in `[lo, hi)` using `Random<E>::between(lo, hi)`:
+
 ![Bounded floating-point benchmark](benchmarks/results/random-bounded-float-2026-08.png)
+
 
 The bounded benchmarks show that the convenience provided by `Random<E>` does not come at the expense of performance. QuarkBurst64, RomuDuoJr, and Konadare192 are currently the fastest engines in these comparisons.
 
