@@ -257,7 +257,7 @@ return normalized<F>() < probability;
 }
 template <supported_float F = float>
 constexpr F gaussian(F mean, F stddev) noexcept{
-assert(stddev > F{0} && "gaussian(mean, stddev): standard deviation must be non-negative");
+assert(stddev >= F{0} && "gaussian(mean, stddev): standard deviation must be non-negative");
 F sum{};
 for(auto i = 0; i < 12; ++i){
 sum += normalized<F>();
