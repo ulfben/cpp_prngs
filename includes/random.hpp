@@ -6,7 +6,6 @@
 #include <cassert>
 #include <concepts>
 #include <cstdint>
-#include <functional>
 #include <iterator>
 #include <limits>
 #include <ranges>
@@ -59,22 +58,15 @@ namespace rnd {
 			return acc & mask_low<T>(n);
 		}
 
-		template <std::integral Weight>
-		static constexpr bool weight_fits_result_type(Weight weight) noexcept{
-			using weight_type = std::remove_cv_t<Weight>;
-			if constexpr(std::signed_integral<weight_type>){
-				if(weight < 0){
-					return false;
-				}
-			}
+		template <class T>
+		static constexpr bool valid_weight_type =
+			std::unsigned_integral<std::remove_cv_t<T>> &&
+			!std::same_as<std::remove_cv_t<T>, bool> && 
+			(std::numeric_limits<std::remove_cv_t<T>>::digits <= value_bits);
 
-			if constexpr(std::numeric_limits<weight_type>::digits <= value_bits){
-				return true;
-			} else{
-				return weight <= static_cast<weight_type>(
-					std::numeric_limits<typename E::result_type>::max());
-			}
-		}
+		template <class R, class Projection>
+		using projected_weight_t = std::remove_cvref_t<std::invoke_result_t<Projection&, std::ranges::range_reference_t<R>>>;
+
 	public:
 		using engine_type = E;
 		using result_type = typename E::result_type;
@@ -264,79 +256,35 @@ namespace rnd {
 			return *iterator(std::forward<R>(collection));
 		}
 
-		// Pick an index proportionally to non-negative integral weights.
+		// Pick an index proportionally to unsigned integral weights.
 		// A zero weight excludes the corresponding index from selection.
 		// At least one weight must be positive and the sum must fit in result_type.
 		template <std::ranges::forward_range R>
 			requires std::ranges::sized_range<R> &&
-				std::integral<std::ranges::range_value_t<R>>
+				valid_weight_type<std::ranges::range_value_t<R>>
 		[[nodiscard]] constexpr auto weighted_index(R&& weights) noexcept{
-			using weight_type = std::ranges::range_value_t<R>;
 			using size_type = std::ranges::range_size_t<R>;
 
-			const size_type size = std::ranges::size(weights);
-			assert(size != 0 && "Random::weighted_index(): empty weight range.");
-			if(size == 0){
-				return size_type{0};
-			}
+			assert(!std::ranges::empty(weights) && "Random::weighted_index(): empty weight range.");
 
 			result_type total{};
-			for(const weight_type weight : weights){
-				if constexpr(std::signed_integral<weight_type>){
-					assert(weight >= 0 && "Random::weighted_index(): weights must be non-negative.");
-					if(weight < 0){
-						continue;
-					}
-				}
-
-				const bool weight_fits = weight_fits_result_type(weight);
-				assert(weight_fits && "Random::weighted_index(): total weight is too large for this engine.");
-				if(!weight_fits){
-					return size_type{0};
-				}
-
-				const result_type converted = static_cast<result_type>(weight);
-				const bool sum_fits = converted <= max() - total;
-				assert(sum_fits && "Random::weighted_index(): total weight is too large for this engine.");
-				if(!sum_fits){
-					return size_type{0};
-				}
-
-				total += converted;
+			for(const auto weight : weights){
+				assert(weight <= max() - total && "Random::weighted_index(): total weight is too large for this engine.");
+				total += weight;
 			}
 
 			assert(total != 0 && "Random::weighted_index(): at least one weight must be positive.");
-			if(total == 0){
-				return size_type{0};
-			}
 
 			result_type target = next(total);
 			size_type selected{};
-			for(const weight_type weight : weights){
-				if constexpr(std::signed_integral<weight_type>){
-					if(weight < 0){
-						++selected;
-						continue;
-					}
-				}
-
-				if(!weight_fits_result_type(weight)){
-					++selected;
-					continue;
-				}
-
-				const result_type converted = static_cast<result_type>(weight);
-				if(target < converted){
+			for(const auto weight : weights){
+				if(target < weight){
 					return selected;
 				}
-
-				target -= converted;
+				target -= weight;
 				++selected;
-			}
-
-			// Unreachable when the weights remain stable between the two passes.
-			assert(false && "Random::weighted_index(): failed to select an index.");
-			return size - size_type{1};
+			}			
+			std::unreachable(); //with stable weights, a positive total, and target < total, the loop must return.
 		}
 
 		// Get an iterator to an element selected proportionally to its projected weight.
@@ -344,103 +292,25 @@ namespace rnd {
 		// At least one projected weight must be positive, the sum must fit in
 		// result_type, and the projection must return stable weights across both passes.
 		template <std::ranges::forward_range R, class Projection>
-			requires std::ranges::sized_range<R> &&
-				std::ranges::borrowed_range<R> &&
-				std::invocable<Projection&, std::ranges::range_reference_t<R>> &&
-				std::integral<std::remove_cvref_t<std::invoke_result_t<
-					Projection&, std::ranges::range_reference_t<R>>>>
-		[[nodiscard]] constexpr auto weighted_iterator(
-			R&& collection,
-			Projection projection
-		) noexcept{
-			using weight_type = std::remove_cvref_t<std::invoke_result_t<
-				Projection&, std::ranges::range_reference_t<R>>>;
-
-			const auto begin = std::ranges::begin(collection);
-			const auto end = std::ranges::end(collection);
-			assert(begin != end && "Random::weighted_iterator(): empty collection.");
-			if(begin == end){
-				return begin;
-			}
-
-			result_type total{};
-			for(auto it = begin; it != end; ++it){
-				const weight_type weight = std::invoke(projection, *it);
-				if constexpr(std::signed_integral<weight_type>){
-					assert(weight >= 0 && "Random::weighted_iterator(): weights must be non-negative.");
-					if(weight < 0){
-						continue;
-					}
-				}
-
-				const bool weight_fits = weight_fits_result_type(weight);
-				assert(weight_fits && "Random::weighted_iterator(): total weight is too large for this engine.");
-				if(!weight_fits){
-					return begin;
-				}
-
-				const result_type converted = static_cast<result_type>(weight);
-				const bool sum_fits = converted <= max() - total;
-				assert(sum_fits && "Random::weighted_iterator(): total weight is too large for this engine.");
-				if(!sum_fits){
-					return begin;
-				}
-
-				total += converted;
-			}
-
-			assert(total != 0 && "Random::weighted_iterator(): at least one weight must be positive.");
-			if(total == 0){
-				return begin;
-			}
-
-			result_type target = next(total);
-			auto last_positive = begin;
-			for(auto it = begin; it != end; ++it){
-				const weight_type weight = std::invoke(projection, *it);
-				if constexpr(std::signed_integral<weight_type>){
-					if(weight < 0){
-						continue;
-					}
-				}
-
-				if(!weight_fits_result_type(weight)){
-					continue;
-				}
-
-				const result_type converted = static_cast<result_type>(weight);
-				if(converted == 0){
-					continue;
-				}
-
-				last_positive = it;
-				if(target < converted){
-					return it;
-				}
-
-				target -= converted;
-			}
-
-			// Unreachable when the projected weights remain stable between the two passes.
-			assert(false && "Random::weighted_iterator(): failed to select an element.");
-			return last_positive;
+			requires std::ranges::sized_range<R>&&
+				std::ranges::borrowed_range<R>&&
+				std::invocable<Projection&, std::ranges::range_reference_t<R>>&&
+				valid_weight_type<projected_weight_t<R, Projection>>
+		[[nodiscard]] constexpr auto weighted_iterator(R&& collection, Projection projection) noexcept{
+			auto weights = collection | std::views::transform(std::move(projection));
+			const auto offset = static_cast<std::ranges::range_difference_t<R>>(weighted_index(weights));
+			return std::ranges::next(std::ranges::begin(collection), offset);
 		}
 
 		// Return a reference to an element selected proportionally to its projected weight.
+		// Note: if your projection throws an exception, we die.
 		template <std::ranges::forward_range R, class Projection>
-			requires std::ranges::sized_range<R> &&
-				std::ranges::borrowed_range<R> &&
-				std::invocable<Projection&, std::ranges::range_reference_t<R>> &&
-				std::integral<std::remove_cvref_t<std::invoke_result_t<
-					Projection&, std::ranges::range_reference_t<R>>>>
-		[[nodiscard]] constexpr decltype(auto) weighted_element(
-			R&& collection,
-			Projection projection
-		) noexcept{
-			return *weighted_iterator(
-				std::forward<R>(collection),
-				std::move(projection)
-			);
+			requires std::ranges::sized_range<R>&&
+				std::ranges::borrowed_range<R>&&
+				std::invocable<Projection&, std::ranges::range_reference_t<R>>&&
+				valid_weight_type<projected_weight_t<R, Projection>>
+		[[nodiscard]] constexpr decltype(auto) weighted_element(R&& collection, Projection projection) noexcept{
+			return *weighted_iterator(std::forward<R>(collection), std::move(projection));
 		}
 
 		template <std::floating_point F = float>
@@ -477,9 +347,8 @@ namespace rnd {
 
 			if constexpr(N <= value_bits){
 				return take_high_bits<T>(next(), N);
-			} else{
-				// Still centralized: reuse runtime gather (the loop count is deterministic anyway).
-				return gather_bits_runtime<T>(N);
+			} else{				
+				return gather_bits_runtime<T>(N); // reuse runtime gather (the loop count is deterministic anyway).
 			}
 		}
 

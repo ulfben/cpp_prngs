@@ -55,7 +55,7 @@ Pass a range of weights to `weighted_index()` when the weights themselves form t
 ```cpp
 #include <array>
 
-constexpr std::array weights{50, 30, 15, 5};
+constexpr std::array weights{50u, 30u, 15u, 5u};
 const std::size_t tier = rng.weighted_index(weights);
 // tier 0 is selected with weight 50, tier 1 with weight 30, and so on.
 ```
@@ -72,20 +72,18 @@ struct LootDrop{
 };
 
 constexpr std::array loot_table{
-    LootDrop{"potion", 50},
-    LootDrop{"gold", 30},
-    LootDrop{"magic sword", 15},
-    LootDrop{"dragon egg", 5}
+    LootDrop{"potion", 50u},
+    LootDrop{"gold", 30u},
+    LootDrop{"magic sword", 15u},
+    LootDrop{"dragon egg", 5u}
 };
 
 const LootDrop& drop = rng.weighted_element(loot_table, &LootDrop::weight);
 ```
 
-Weights must be positive. A weight of zero excludes that index or element from selection.
+Weights should be non-negative whole numbers. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
 
 [Try it on Compiler Explorer!](https://compiler-explorer.com/z/YTbGcreEe)
-
-Want to use your own engine? It only needs to satisfy the `RandomBitEngine` concept ([concepts.hpp](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp)).
 
 ---
 
@@ -104,9 +102,13 @@ They are also compact (16-32 bytes), produce high-quality randomness, and can ev
 | [`small_fast32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast32.hpp)  | 32 bits      | C++ port of [Bob Jenkins’ 32-bit “Small Fast”](https://burtleburtle.net/bob/rand/smallprng.html) PRNG (two-rotate). |
 | [`small_fast64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast64.hpp)  | 64 bits      | A 64-bit three-rotate implementation of the above. Three rotates (7, 13, 37) ensure stronger avalanche behavior than a naïve two-rotate 64-bit variant. |
 
-Each engine satisfies the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp) concept, which extends the C++20 [UniformRandomBitGenerator](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) to ensure compatibility with the STL. You can use the engines directly, but `RandomBitEngine` provides only a minimal set of features: seeding, advancing, reporting `min()` and `max()`, comparison (of state) and generating random unsigned integers.
+Each included engine is a small, self-contained random number generator. You can use an engine directly, but it deliberately provides only the basics: seeding, advancing its state, comparing states, and generating random unsigned integers.
 
-The engines are kept simple so they can be swapped easily with the [`Random<E>`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) template. `Random<E>` wraps any engine - including your own - to provide a consistent, user-friendly interface designed for game development. See the full interface below.
+For everyday use, wrap an engine in [`Random<E>`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp). `Random<E>` adds the game-friendly interface - bounded numbers, floats, coin flips, random elements, weighted selection, Gaussian samples, and more - while letting you swap the underlying engine without changing the rest of your code.
+
+All included engines satisfy the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp) concept and can therefore be used with `Random<E>`. They are also compatible with standard C++ facilities such as `std::shuffle` and `std::sample`.
+
+Want to use your own engine? If it satisfies `RandomBitEngine`, you can plug it into `Random<E>` too.
 
 ---
 
@@ -134,7 +136,7 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 | `index(range)`                      | Returns a random index into any sized range                                                                                                                         |
 | `iterator(range)`                   | Returns an iterator to a random element                                                                                                                             |
 | `element(range)`                    | Returns a reference to a random element                                                                                                                             |
-| `weighted_index(weights)`           | Returns an index selected proportionally to non-negative integral weights; zero-weight indices are excluded                                                        |
+| `weighted_index(weights)`           | Returns an index selected proportionally to (unsigned) weights; zero-weight indices are excluded                                                            |
 | `weighted_iterator(range, projection)` | Returns an iterator selected proportionally to weights returned by `projection(element)`                                               |
 | `weighted_element(range, projection)` | Returns a reference selected proportionally to weights returned by `projection(element)`                                                |
 | `gaussian(mean, stddev)`            | Approximate normal sample via the Irwin–Hall sum-of-12 method                                                                                                       |
@@ -144,11 +146,9 @@ The engines are kept simple so they can be swapped easily with the [`Random<E>`]
 | `split()`                           | Produces a decorrelated, forked engine (useful for parallel streams)                                                                                                |
 | `engine()` / `engine() const`       | Access the underlying engine instance (for manual serialization, debugging, etc.)                                                                                   |
 
-The weighted helpers require a sized forward range. Weights must be non-negative
-integral values, at least one must be positive, and their sum must fit in the
-engine's `result_type`. A projection is evaluated during both passes, so it must
-return stable weights. As with `iterator()` and `element()`, the iterator- and
-element-returning weighted overloads reject non-borrowed temporary ranges.
+The weighted helpers let you pick items with different chances of being selected.
+
+Weights should be non-negative whole numbers, such as {70u, 25u, 5u}. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
 
 
 [^1]: Although `bits(n)` and `bits<N>()` *can* be used for power-of-two integer ranges, this is not their intended purpose. Prefer `next<N,T>()` instead. It chooses the same fast, unbiased bit-shift specialization, but makes your code clearer and safer.

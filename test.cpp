@@ -66,9 +66,9 @@ struct FloatingWeightProjection{
     }
 };
 
-struct BooleanWeightProjection{
-    constexpr bool operator()(const WeightedValue& item) const noexcept{
-        return item.weight != 0;
+struct SignedWeightProjection{
+    constexpr int operator()(const WeightedValue& item) const noexcept{
+        return item.weight;
     }
 };
 
@@ -119,16 +119,14 @@ static_assert(!std::is_same_v<PCG32::result_type, PCG32::seed_type>);
 
 consteval bool weightedHelpersAreConstexpr(){
     rnd::Random<PCG32> rng{123u};
-    std::array<unsigned, 3> weights{0, 7, 0};
-    std::array<bool, 3> boolean_weights{false, true, false};
+    std::array<unsigned, 3> weights{0, 7, 0};    
     std::array<WeightedValue, 3> values{{
         {10, 0},
         {20, 7},
         {30, 0}
     }};
 
-    return rng.weighted_index(weights) == 1 &&
-        rng.weighted_index(boolean_weights) == 1 &&
+    return rng.weighted_index(weights) == 1 &&        
         rng.weighted_element(values, &WeightedValue::weight).value == 20;
 }
 
@@ -654,10 +652,13 @@ TYPED_TEST(RandomTypedTest, CollectionHelpersReturnValidMutableAndConstElements)
 TYPED_TEST(RandomTypedTest, WeightedHelpersHaveSafeRangeAndWeightConstraints){
     using Rng = rnd::Random<TypeParam>;
 
-    static_assert(CanGetWeightedIndex<Rng, std::array<int, 3>&>);
+    static_assert(CanGetWeightedIndex<Rng, std::array<unsigned, 3>&>);
+    static_assert(!CanGetWeightedIndex<Rng, std::array<int, 3>&>);
     static_assert(CanGetWeightedIndex<Rng, std::array<std::uint8_t, 3>>);
-    static_assert(!CanGetWeightedIndex<Rng, std::array<float, 3>&>);
-    static_assert(CanGetWeightedIndex<Rng, std::array<bool, 3>&>);
+    static_assert(!CanGetWeightedIndex<Rng, std::array<float, 3>&>);    
+    static_assert(CanGetWeightedIndex<Rng, std::array<std::uint64_t, 3>&> ==
+        (std::numeric_limits<std::uint64_t>::digits <=
+            std::numeric_limits<typename Rng::result_type>::digits));
 
     static_assert(CanGetWeightedIterator<
         Rng, std::vector<WeightedValue>&, decltype(&WeightedValue::weight)>);
@@ -669,8 +670,8 @@ TYPED_TEST(RandomTypedTest, WeightedHelpersHaveSafeRangeAndWeightConstraints){
         Rng, std::vector<WeightedValue>, decltype(&WeightedValue::weight)>);
     static_assert(!CanGetWeightedIterator<
         Rng, std::array<WeightedValue, 3>&, FloatingWeightProjection>);
-    static_assert(CanGetWeightedElement<
-        Rng, std::array<WeightedValue, 3>&, BooleanWeightProjection>);
+    static_assert(!CanGetWeightedIterator<
+        Rng, std::array<WeightedValue, 3>&, SignedWeightProjection>);    
 
     std::array<WeightedValue, 3> values{{
         {10, 0},
