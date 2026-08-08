@@ -15,8 +15,7 @@
 // - Return result_type exactly from operator().
 // - Produce full-width values with min() == 0 and max() == numeric_limits<result_type>::max().
 //   In other words: the engine produces full-width, zero-based unsigned values in the inclusive range [min(), max()].
-//   These constraints let us treat e() as uniformly distributed over all 2^w bit patterns, which is what the fast 
-//   unbiased next(bound) implementation assumes.
+//   These constraints let us treat e() as uniformly distributed over all 2^w bit patterns, which is what the fast next(bound) implementation (Lemire) assumes.
 // - Support non-throwing default, copy, and seed construction.
 // - Support non-throwing generation, seeding, equality, and discard.
 //

@@ -6,12 +6,17 @@
 /*
   RomuDuoJr - Modern C++ Port
 
-  Based on "xromu2jr.h" by Rhet Butler (public domain)
+  Based on "xromu2jr.h" by Rhet Butler (public domain):
   https://github.com/Almightygir/rhet_RNG/blob/main/xromu2jr.h
 
-  "xromu2jr.h" is based on Mark Overton’s Romu family: https://romu-random.org/
-  Featured as a top performer in Rhet Butler’s “RNG Battle Royale” (2020):
+  "xromu2jr.h" is based on Mark Overton's Romu family:
+  https://romu-random.org/
+
+  Featured as a top performer in Rhet Butler's "RNG Battle Royale" (2020):
   https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/
+
+  The seed initializer uses mixing derived from Pelle Evensen's public-domain NASAM mixer family:
+  https://mostlymangling.blogspot.com/2020/01/nasam-not-another-strange-acronym-mixer.html
 
   C++ port and modifications by Ulf Benjaminsson, 2025
   https://github.com/ulfben/cpp_prngs/

@@ -78,7 +78,7 @@ int main(){
 
    // weighted_index() takes the weights directly, so it does not need a projection.
    constexpr std::array loot_tiers{"common", "uncommon", "rare", "legendary"};
-   constexpr std::array<unsigned, 4> tier_weights{50, 30, 15, 5};
+   constexpr std::array<unsigned, 4> tier_weights{50u, 30u, 15u, 5u};
    const std::size_t tier = random.weighted_index(tier_weights);
    std::println("  weighted_index: {} (weight {})", loot_tiers[tier], tier_weights[tier]);
 
@@ -87,10 +87,10 @@ int main(){
       unsigned weight;
    };
    constexpr std::array loot_table{
-      LootDrop{"potion", 50},
-      LootDrop{"gold", 30},
-      LootDrop{"magic sword", 15},
-      LootDrop{"dragon egg", 5}
+      LootDrop{"potion", 50u},
+      LootDrop{"gold", 30u},
+      LootDrop{"magic sword", 15u},
+      LootDrop{"dragon egg", 5u}
    };
 
    // For a collection of objects, the projection maps each object to its weight.
