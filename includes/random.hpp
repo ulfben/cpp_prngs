@@ -20,9 +20,16 @@
 // Benchmarks: https://github.com/ulfben/cpp_prngs/#performance-benchmarks
 
 namespace rnd {
+
+	template <class F>
+	concept supported_float =
+		(std::same_as<F, float> || std::same_as<F, double>) &&
+		(sizeof(F) == sizeof(std::uint32_t) || sizeof(F) == sizeof(std::uint64_t)) && //this is ... a bit belt-and-suspenders, but it's cool that we *can* check. :) 
+		std::numeric_limits<F>::is_iec559; //the IQ hack in normalized() requires IEEE 754 (IEC 559) floating point types.
+
 	template <RandomBitEngine E>
 	class Random final{
-		static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;
+		static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;	
 
 		template <class T>
 		static constexpr bool valid_weight_type =
@@ -197,25 +204,24 @@ namespace rnd {
 		// real in [0.0,1.0) using the "IQ float hack"
 		//   see Iñigo Quilez, "sfrand": https://iquilezles.org/articles/sfrand/
 		// Fast, branchless and, now, portable.
-		template <std::floating_point F = float>
-		constexpr F normalized() noexcept{
-			static_assert(std::numeric_limits<F>::is_iec559, "normalized() requires IEEE 754 (IEC 559) floating point types.");
-			using UInt = std::conditional_t<sizeof(F) == 4, uint32_t, uint64_t>; // Pick wide enough unsigned int type for F
+		template <supported_float F = float>
+		constexpr F normalized() noexcept{			
+			using UInt = std::conditional_t<sizeof(F) == sizeof(std::uint32_t), std::uint32_t, std::uint64_t>;  // Pick wide enough unsigned int type for F
 			constexpr int mantissa_bits = std::numeric_limits<F>::digits - 1; // Number of mantissa bits for F (e.g., 23 for float)
-			constexpr UInt base = std::bit_cast<UInt>(F(1.0)); // Bit pattern for F(1.0), i.e., exponent set, mantissa 0
-			UInt mantissa = this->template bits<mantissa_bits, UInt>();      // Get random bits to fill the mantissa field
-			UInt as_int = base | mantissa; // Combine base (1.0) with random mantissa bits
-			return std::bit_cast<F>(as_int) - F(1.0); // Convert bits to float/double, then subtract 1.0 to get [0,1)
-		}
+			constexpr UInt base = std::bit_cast<UInt>(F{1}); // Bit pattern for F{1}, i.e., exponent set, mantissa 0
+			const UInt mantissa = this->template bits<mantissa_bits, UInt>();      // Get random bits to fill the mantissa field
+			const UInt as_int = base | mantissa; // Combine base (1.0) with random mantissa bits
+			return std::bit_cast<F>(as_int) - F{1}; // Convert bits to float/double, then subtract 1.0 to get [0,1)
+		}			
 
 		// real in [-1.0,1.0) using the IQ float hack.
-		template <std::floating_point F = float>
+		template <supported_float F = float>
 		constexpr F signed_norm() noexcept{
-			return F(2) * normalized<F>() - F(1); // scale to [0.0, 2.0), then shift to [-1.0, 1.0)
+			return F{2} * normalized<F>() - F{1}; // scale to [0.0, 2.0), then shift to [-1.0, 1.0)
 		}
 
 		// real in [lo, hi)
-		template <std::floating_point F = float> 
+		template <supported_float F = float>
 		constexpr F between(F lo, F hi) noexcept{
 			return lo + (hi - lo) * normalized<F>();
 		}
@@ -228,12 +234,12 @@ namespace rnd {
 		}
 
 		// boolean with probability
-		template <std::floating_point F = float>
+		template <supported_float F = float>
 		constexpr bool coin_flip(F probability) noexcept{
 			return normalized<F>() < probability;
 		}
 
-		template <std::floating_point F = float>
+		template <supported_float F = float>
 		constexpr F gaussian(F mean, F stddev) noexcept{
 			// Based on the Central Limit Theorem; https://en.wikipedia.org/wiki/Central_limit_theorem
 			// the Irwin–Hall distribution (sum of 12 U(0,1) has mean = 6, variance = 1).
