@@ -123,8 +123,8 @@ static_assert(std::is_unsigned_v<result_type>);
 static_assert(E::min() == 0);
 static_assert(E::max() == std::numeric_limits<result_type>::max());
 constexpr Random() noexcept = default;  
+explicit constexpr Random(seed_type seed_val) noexcept : _e(seed_val){}
 explicit constexpr Random(engine_type engine) noexcept : _e(engine){}
-explicit constexpr Random(seed_type seed_val) noexcept : _e(seed_val){};
 constexpr bool operator==(const Random& rhs) const noexcept = default;
 constexpr const E& engine() const noexcept{
 return _e;
@@ -132,15 +132,15 @@ return _e;
 constexpr E& engine() noexcept{
 return _e;
 }
-constexpr void discard(unsigned long long n) noexcept{
-_e.discard(n);
-}
 constexpr void seed() noexcept{
-_e.seed();
+_e.seed();  
 }
 constexpr void seed(seed_type v) noexcept{
-_e.seed(v);
+_e.seed(v);  
 }
+constexpr void discard(unsigned long long n) noexcept{
+_e.discard(n);
+}				
 [[nodiscard]] constexpr Random split() noexcept{
 return Random{bits_as<seed_type>()};  
 }
@@ -155,6 +155,32 @@ return _e();
 }
 constexpr result_type operator()() noexcept{
 return next();
+}
+template <class T = result_type>
+constexpr T bits(unsigned n) noexcept{
+static_assert(std::is_unsigned_v<T>, "bits<T>(n) requires an unsigned T");
+assert(n > 0);
+assert(n <= std::numeric_limits<T>::digits);
+if(n <= value_bits){
+return take_high_bits<T>(next(), n);
+}
+return gather_bits_runtime<T>(n);
+}
+template <unsigned N, class T = result_type>
+constexpr T bits() noexcept{
+static_assert(N > 0, "Need at least 1 bit");
+static_assert(std::is_unsigned_v<T>, "bits<N,T> requires an unsigned T");
+static_assert(N <= std::numeric_limits<T>::digits, "T cannot hold N bits");
+if constexpr(N <= value_bits){
+return take_high_bits<T>(next(), N);
+} else{
+return gather_bits_runtime<T>(N);  
+}
+}
+template <class T>
+constexpr T bits_as() noexcept{
+static_assert(std::is_unsigned_v<T>, "bits_as<T>() requires an unsigned T");
+return bits<std::numeric_limits<T>::digits, T>();
 }
 constexpr result_type next(result_type bound) noexcept{
 assert(bound > 0 && "bound must be non-zero and positive");
@@ -201,9 +227,6 @@ assert(bound <= E::max() &&
 auto safe_bound = static_cast<result_type>(bound);
 return static_cast<I>(U(lo) + static_cast<U>(next(safe_bound)));
 }
-template <std::floating_point F = float> constexpr F between(F lo, F hi) noexcept{
-return lo + (hi - lo) * normalized<F>();
-}
 template <std::floating_point F = float>
 constexpr F normalized() noexcept{
 static_assert(std::numeric_limits<F>::is_iec559, "normalized() requires IEEE 754 (IEC 559) floating point types.");
@@ -218,12 +241,24 @@ template <std::floating_point F = float>
 constexpr F signed_norm() noexcept{
 return F(2) * normalized<F>() - F(1);  
 }
+template <std::floating_point F = float> 
+constexpr F between(F lo, F hi) noexcept{
+return lo + (hi - lo) * normalized<F>();
+}
 constexpr bool coin_flip() noexcept{
 return bits<1, unsigned>() != 0;
 }
 template <std::floating_point F = float>
 constexpr bool coin_flip(F probability) noexcept{
 return normalized<F>() < probability;
+}
+template <std::floating_point F = float>
+constexpr F gaussian(F mean, F stddev) noexcept{
+F sum{};
+for(auto i = 0; i < 12; ++i){
+sum += normalized<F>();
+}
+return mean + (sum - F(6)) * stddev;
 }
 template <std::ranges::sized_range R>
 [[nodiscard]] constexpr auto index(R&& collection) noexcept{
@@ -287,45 +322,11 @@ std::invocable<Projection&, std::ranges::range_reference_t<R>>&&
 valid_weight_type<projected_weight_t<R, Projection>>
 [[nodiscard]] constexpr decltype(auto) weighted_element(R&& collection, Projection projection) noexcept{
 return *weighted_iterator(std::forward<R>(collection), std::move(projection));
-}
-template <std::floating_point F = float>
-constexpr F gaussian(F mean, F stddev) noexcept{
-F sum{};
-for(auto i = 0; i < 12; ++i){
-sum += normalized<F>();
-}
-return mean + (sum - F(6)) * stddev;
-}
-template <class T = result_type>
-constexpr T bits(unsigned n) noexcept{
-static_assert(std::is_unsigned_v<T>, "bits<T>(n) requires an unsigned T");
-assert(n > 0);
-assert(n <= std::numeric_limits<T>::digits);
-if(n <= value_bits){
-return take_high_bits<T>(next(), n);
-}
-return gather_bits_runtime<T>(n);
-}
-template <unsigned N, class T = result_type>
-constexpr T bits() noexcept{
-static_assert(N > 0, "Need at least 1 bit");
-static_assert(std::is_unsigned_v<T>, "bits<N,T> requires an unsigned T");
-static_assert(N <= std::numeric_limits<T>::digits, "T cannot hold N bits");
-if constexpr(N <= value_bits){
-return take_high_bits<T>(next(), N);
-} else{				
-return gather_bits_runtime<T>(N);  
-}
-}
-template <class T>
-constexpr T bits_as() noexcept{
-static_assert(std::is_unsigned_v<T>, "bits_as<T>() requires an unsigned T");
-return bits<std::numeric_limits<T>::digits, T>();
-}
+}			
 private:
 E _e{};  
 template <class T>
-static constexpr T mask_low(unsigned n) noexcept{
+static constexpr T low_bits_mask(unsigned n) noexcept{
 assert(n <= std::numeric_limits<T>::digits);  
 constexpr unsigned W = std::numeric_limits<T>::digits;
 if(n == 0) return T{0};
@@ -336,7 +337,7 @@ template <class T>
 constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
 assert(1 <= n && n <= std::numeric_limits<T>::digits);  
 const unsigned shift = value_bits - n;     
-return static_cast<T>(x >> shift) & mask_low<T>(n);
+return static_cast<T>(x >> shift) & low_bits_mask<T>(n);
 }
 template <class T>
 constexpr T gather_bits_runtime(unsigned n) noexcept{
@@ -349,7 +350,7 @@ const T chunk = take_high_bits<T>(next(), take);
 acc |= (chunk << filled);              
 filled += take;
 }
-return acc & mask_low<T>(n);
+return acc & low_bits_mask<T>(n);
 }
 };
 }  
