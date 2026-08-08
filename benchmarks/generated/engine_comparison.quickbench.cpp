@@ -409,6 +409,7 @@ static_assert(RandomBitEngine<SmallFast64>);
 #include <cstdint>
 #include <span>
 #include <bit>  
+#include <cassert>
 class Xoshiro256SS{
 using u64 = std::uint64_t;
 u64 s[4]{};
