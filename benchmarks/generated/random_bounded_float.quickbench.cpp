@@ -36,9 +36,6 @@ requires(E& e, const E& ce, typename E::seed_type seed, unsigned long long n){
 #ifdef _MSC_VER
 #include <intrin.h>     
 #endif
-#ifndef RND_ENABLE_SELFTESTS
-#define RND_ENABLE_SELFTESTS 0  
-#endif
 namespace rnd{
 namespace detail {
 struct u128_parts final{
@@ -96,28 +93,6 @@ static_assert(false, "mul_shift_high64 requires either __uint128_t or MSVC _umul
 #endif
 }
 }  
-#if RND_ENABLE_SELFTESTS
-namespace detail::selftest {
-constexpr std::uint64_t HI = 0x0123'4567'89AB'CDEFull;
-constexpr std::uint64_t LO = 0xFEDC'BA98'7654'3210ull;
-static_assert(shr128_to_u64<64>(HI, LO) == HI);  
-static_assert(shr128_to_u64<1>(HI, LO) == ((LO >> 1) | (HI << 63)));  
-static_assert(shr128_to_u64<63>(HI, LO) == ((LO >> 63) | (HI << 1)));
-constexpr bool check_mul(std::uint64_t a, std::uint64_t b, std::uint64_t expect_lo, std::uint64_t expect_hi){
-const auto p = mul64_to_128_parts(a, b);
-return p.lo == expect_lo && p.hi == expect_hi;
-}
-static_assert(check_mul(0, 0, 0, 0));
-static_assert(check_mul(UINT64_MAX, 1, UINT64_MAX, 0));
-static_assert(check_mul(1ULL << 32, 1ULL << 32, 0, 1));
-static_assert(check_mul(UINT64_MAX, UINT64_MAX, 1, 0xFFFFFFFFFFFFFFFEull));
-static_assert(check_mul(UINT64_MAX, 1ULL << 32, 0xFFFFFFFF00000000ull, 0x00000000FFFFFFFFull));
-static_assert(check_mul(0x0000'0001'FFFF'FFFFull, 0x0000'0001'FFFF'FFFFull, 0xFFFF'FFFC'0000'0001ull, 0x0000'0000'0000'0003ull));
-template <std::uint64_t> struct require_constexpr{};
-using test_inst_1 = require_constexpr<mul_shift_u64<1>(HI, LO)>;
-using test_inst_64 = require_constexpr<mul_shift_u64<64>(HI, LO)>;
-}  
-#endif
 }  
 #include <algorithm>
 #include <bit>  
@@ -133,38 +108,10 @@ namespace rnd {
 template <RandomBitEngine E>
 class Random final{
 static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;
-E _e{};  
-template <class T>
-static constexpr T mask_low(unsigned n) noexcept{			
-assert(n <= std::numeric_limits<T>::digits);  
-constexpr unsigned W = std::numeric_limits<T>::digits;
-if(n == 0) return T{0};
-if(n >= W) return std::numeric_limits<T>::max();  
-return static_cast<T>((T{1} << n) - T{1});
-}
-template <class T>
-constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
-assert(1 <= n && n <= std::numeric_limits<T>::digits);  
-const unsigned shift = value_bits - n;     
-return static_cast<T>(x >> shift) & mask_low<T>(n);
-}
-template <class T>
-constexpr T gather_bits_runtime(unsigned n) noexcept{
-assert(1 <= n && n <= std::numeric_limits<T>::digits);  
-T acc = 0;
-unsigned filled = 0;
-while(filled < n){
-const unsigned take = std::min<unsigned>(value_bits, n - filled);
-const T chunk = take_high_bits<T>(next(), take);
-acc |= (chunk << filled);              
-filled += take;
-}
-return acc & mask_low<T>(n);
-}
 template <class T>
 static constexpr bool valid_weight_type =
 std::unsigned_integral<std::remove_cv_t<T>> &&
-!std::same_as<std::remove_cv_t<T>, bool> && 
+!std::same_as<std::remove_cv_t<T>, bool> &&
 (std::numeric_limits<std::remove_cv_t<T>>::digits <= value_bits);
 template <class R, class Projection>
 using projected_weight_t = std::remove_cvref_t<std::invoke_result_t<Projection&, std::ranges::range_reference_t<R>>>;
@@ -374,7 +321,36 @@ template <class T>
 constexpr T bits_as() noexcept{
 static_assert(std::is_unsigned_v<T>, "bits_as<T>() requires an unsigned T");
 return bits<std::numeric_limits<T>::digits, T>();
-}		
+}
+private:
+E _e{};  
+template <class T>
+static constexpr T mask_low(unsigned n) noexcept{
+assert(n <= std::numeric_limits<T>::digits);  
+constexpr unsigned W = std::numeric_limits<T>::digits;
+if(n == 0) return T{0};
+if(n >= W) return std::numeric_limits<T>::max();  
+return static_cast<T>((T{1} << n) - T{1});
+}
+template <class T>
+constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
+assert(1 <= n && n <= std::numeric_limits<T>::digits);  
+const unsigned shift = value_bits - n;     
+return static_cast<T>(x >> shift) & mask_low<T>(n);
+}
+template <class T>
+constexpr T gather_bits_runtime(unsigned n) noexcept{
+assert(1 <= n && n <= std::numeric_limits<T>::digits);  
+T acc = 0;
+unsigned filled = 0;
+while(filled < n){
+const unsigned take = std::min<unsigned>(value_bits, n - filled);
+const T chunk = take_high_bits<T>(next(), take);
+acc |= (chunk << filled);              
+filled += take;
+}
+return acc & mask_low<T>(n);
+}
 };
 }  
 #include <limits>
