@@ -1,6 +1,8 @@
 
 # cpp_prngs
 
+[![Build and test](https://github.com/ulfben/cpp_prngs/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/ulfben/cpp_prngs/actions/workflows/build-and-test.yml)
+
 When generating random numbers for games, the priorities are usually speed, reproducibility, portability, and convenience - not cryptographic security. The C and C++ standard facilities are often an awkward fit for those goals.
 
 The classic C `srand()` / `rand()` interface is explicitly described by the C++ standard as a [low-quality, non-portable and a source of possible data races](https://eel.is/c++draft/rand#c.math.rand). It relies on hidden global state: `srand()` changes the sequence used by `rand()`, and any part of a program can call either function. This makes random behavior hard to isolate and reproduce. Its underlying algorithm is unspecified, so the same seed may produce different results on different platforms. `RAND_MAX` is permitted to be [as low as 32,767](https://web.archive.org/web/20260410163728/https://www.codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/#fn1), and common attempts to turn its output into a useful range - such as `rand() % n` - [are slow](https://github.com/ulfben/cpp_prngs/#bounded-integers) and can introduce [modulo bias](https://web.archive.org/web/20260410163728/https://www.codingnest.com/generating-random-numbers-using-c-standard-library-the-problems/).
