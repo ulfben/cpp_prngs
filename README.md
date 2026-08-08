@@ -28,7 +28,7 @@ So, if you are making games and want a random-number generator that is:
 
 …go ahead and copy any of these engines together with the random.hpp interface, and go forth and prosper. Let me know if you find bugs or add any cool new features!
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/YTbGcreEe)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/zTh6nazxj)
 
 ---
 
@@ -83,7 +83,7 @@ const LootDrop& drop = rng.weighted_element(loot_table, &LootDrop::weight);
 
 Weights should be non-negative whole numbers. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/YTbGcreEe)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/zTh6nazxj)
 
 ---
 

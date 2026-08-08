@@ -13,14 +13,12 @@
 #include <utility>
 
 // This is an RNG interface that wraps around any engine that meets the RandomBitEngine concept.
-// It provides useful functions for generating values, including integers, floating-point numbers, and colors
+// It provides useful functions for generating values, including integers, floating-point numbers, weighted picks,
 // as well as methods for Gaussian distribution, coin flips (with odds), picking from collections (index or element), etc.
 // Source: https://github.com/ulfben/cpp_prngs/
-// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/nzK9joeYE
-// Benchmarks:
-   // Quick Bench for generating raw random values: https://quick-bench.com/q/vWdKKNz7kEyf6kQSNnUEFOX_4DI
-   // Quick Bench for generating normalized floats: https://quick-bench.com/q/GARc3WSfZu4sdVeCAMSWWPMQwSE
-   // Quick Bench for generating bounded values: https://quick-bench.com/q/WHEcW9iSV7I8qB_4eb1KWOvNZU0
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/zTh6nazxj
+// Benchmarks: https://github.com/ulfben/cpp_prngs/#performance-benchmarks
+
 namespace rnd {
 	template <RandomBitEngine E>
 	class Random final{
@@ -44,11 +42,8 @@ namespace rnd {
 		static_assert(E::max() == std::numeric_limits<result_type>::max());
 
 		constexpr Random() noexcept = default; //the engine will default initialize
-
+		explicit constexpr Random(seed_type seed_val) noexcept : _e(seed_val){}
 		explicit constexpr Random(engine_type engine) noexcept : _e(engine){}
-
-		explicit constexpr Random(seed_type seed_val) noexcept : _e(seed_val){};
-
 		constexpr bool operator==(const Random& rhs) const noexcept = default;
 
 		//access to the underlying engine for manual serialization, etc.
@@ -60,23 +55,22 @@ namespace rnd {
 			return _e;
 		}
 
+		constexpr void seed() noexcept{
+			_e.seed(); //reseed to default state
+		}
+
+		constexpr void seed(seed_type v) noexcept{
+			_e.seed(v); //reseed with custom seed
+		}
+
 		//advance the random engine n steps.
 		//some engines (like PCG32) can do this faster than linear time
 		constexpr void discard(unsigned long long n) noexcept{
 			_e.discard(n);
-		}
-
-		constexpr void seed() noexcept{
-			_e.seed();
-		}
-
-		constexpr void seed(seed_type v) noexcept{
-			_e.seed(v);
-		}
+		}				
 	
 		// Returns a child generator derived from the parent.		
-		// Suitable for deriving task- or thread-local random streams when strict
-		// non-overlap is not required. 
+		// Suitable for deriving task- or thread-local random streams when strict non-overlap is not required. 
 		[[nodiscard]] constexpr Random split() noexcept{
 			return Random{bits_as<seed_type>()}; //consume enough engine outputs to fill one seed_type value.		
 		}
@@ -89,6 +83,8 @@ namespace rnd {
 			return E::max();
 		}
 
+		// --- raw values/bits ---
+
 		// Produces a random value in the range [min(), max()], inclusive.
 		constexpr result_type next() noexcept{
 			return _e();
@@ -99,6 +95,42 @@ namespace rnd {
 			return next();
 		}
 						
+		// Runtime: returns n random bits in the low n bits of T.
+		// Works for n > value_bits by concatenating successive outputs (high bits from each draw).
+		template <class T = result_type>
+		constexpr T bits(unsigned n) noexcept{
+			static_assert(std::is_unsigned_v<T>, "bits<T>(n) requires an unsigned T");
+			assert(n > 0);
+			assert(n <= std::numeric_limits<T>::digits);
+			if(n <= value_bits){
+				return take_high_bits<T>(next(), n);
+			}
+			return gather_bits_runtime<T>(n);
+		}
+
+		// Compile-time: returns N random bits in the low N bits of T.
+		template <unsigned N, class T = result_type>
+		constexpr T bits() noexcept{
+			static_assert(N > 0, "Need at least 1 bit");
+			static_assert(std::is_unsigned_v<T>, "bits<N,T> requires an unsigned T");
+			static_assert(N <= std::numeric_limits<T>::digits, "T cannot hold N bits");
+
+			if constexpr(N <= value_bits){
+				return take_high_bits<T>(next(), N);
+			} else{
+				return gather_bits_runtime<T>(N); // reuse runtime gather (the loop count is deterministic anyway).
+			}
+		}
+
+		// Convenience: fill T with random bits.
+		template <class T>
+		constexpr T bits_as() noexcept{
+			static_assert(std::is_unsigned_v<T>, "bits_as<T>() requires an unsigned T");
+			return bits<std::numeric_limits<T>::digits, T>();
+		}
+
+		// --- integers ---
+
 		// Produces a random value in [0, bound) (exclusive) via multiply-high range reduction (Lemire-style).
 		// This much faster than naive modulo and has very small bias for non power-of-two bounds, and no bias for powers of two bounds.
 		// See: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
@@ -159,10 +191,8 @@ namespace rnd {
 			return static_cast<I>(U(lo) + static_cast<U>(next(safe_bound)));
 		}
 
-		// real in [lo, hi)
-		template <std::floating_point F = float> constexpr F between(F lo, F hi) noexcept{
-			return lo + (hi - lo) * normalized<F>();
-		}
+
+		// --- floating point ---				
 
 		// real in [0.0,1.0) using the "IQ float hack"
 		//   see Iñigo Quilez, "sfrand": https://iquilezles.org/articles/sfrand/
@@ -184,6 +214,14 @@ namespace rnd {
 			return F(2) * normalized<F>() - F(1); // scale to [0.0, 2.0), then shift to [-1.0, 1.0)
 		}
 
+		// real in [lo, hi)
+		template <std::floating_point F = float> 
+		constexpr F between(F lo, F hi) noexcept{
+			return lo + (hi - lo) * normalized<F>();
+		}
+
+		// --- probability/distributions ---
+
 		// boolean
 		constexpr bool coin_flip() noexcept{
 			return bits<1, unsigned>() != 0;
@@ -194,6 +232,20 @@ namespace rnd {
 		constexpr bool coin_flip(F probability) noexcept{
 			return normalized<F>() < probability;
 		}
+
+		template <std::floating_point F = float>
+		constexpr F gaussian(F mean, F stddev) noexcept{
+			// Based on the Central Limit Theorem; https://en.wikipedia.org/wiki/Central_limit_theorem
+			// the Irwin–Hall distribution (sum of 12 U(0,1) has mean = 6, variance = 1).
+			// Subtract 6 and multiply by stddev to get an approximate N(mean, stddev) sample.
+			F sum{};
+			for(auto i = 0; i < 12; ++i){
+				sum += normalized<F>();
+			}
+			return mean + (sum - F(6)) * stddev;
+		}
+
+		// --- collections ---
 
 		// pick an index in [0, size)
 		template <std::ranges::sized_range R>
@@ -232,7 +284,6 @@ namespace rnd {
 				valid_weight_type<std::ranges::range_value_t<R>>
 		[[nodiscard]] constexpr auto weighted_index(R&& weights) noexcept{
 			using size_type = std::ranges::range_size_t<R>;
-
 			assert(!std::ranges::empty(weights) && "Random::weighted_index(): empty weight range.");
 
 			result_type total{};
@@ -240,7 +291,6 @@ namespace rnd {
 				assert(weight <= max() - total && "Random::weighted_index(): total weight is too large for this engine.");
 				total += weight;
 			}
-
 			assert(total != 0 && "Random::weighted_index(): at least one weight must be positive.");
 
 			result_type target = next(total);
@@ -279,59 +329,13 @@ namespace rnd {
 				valid_weight_type<projected_weight_t<R, Projection>>
 		[[nodiscard]] constexpr decltype(auto) weighted_element(R&& collection, Projection projection) noexcept{
 			return *weighted_iterator(std::forward<R>(collection), std::move(projection));
-		}
-
-		template <std::floating_point F = float>
-		constexpr F gaussian(F mean, F stddev) noexcept{
-			// Based on the Central Limit Theorem; https://en.wikipedia.org/wiki/Central_limit_theorem
-			// the Irwin–Hall distribution (sum of 12 U(0,1) has mean = 6, variance = 1).
-			// Subtract 6 and multiply by stddev to get an approximate N(mean, stddev) sample.
-			F sum{};
-			for(auto i = 0; i < 12; ++i){
-				sum += normalized<F>();
-			}
-			return mean + (sum - F(6)) * stddev;
-		}
-
-		// Runtime: returns n random bits in the low n bits of T.
-		// Works for n > value_bits by concatenating successive outputs (high bits from each draw).
-		template <class T = result_type>
-		constexpr T bits(unsigned n) noexcept{
-			static_assert(std::is_unsigned_v<T>, "bits<T>(n) requires an unsigned T");
-			assert(n > 0);
-			assert(n <= std::numeric_limits<T>::digits);
-			if(n <= value_bits){
-				return take_high_bits<T>(next(), n);
-			}
-			return gather_bits_runtime<T>(n);
-		}
-
-		// Compile-time: returns N random bits in the low N bits of T.
-		template <unsigned N, class T = result_type>
-		constexpr T bits() noexcept{
-			static_assert(N > 0, "Need at least 1 bit");
-			static_assert(std::is_unsigned_v<T>, "bits<N,T> requires an unsigned T");
-			static_assert(N <= std::numeric_limits<T>::digits, "T cannot hold N bits");
-
-			if constexpr(N <= value_bits){
-				return take_high_bits<T>(next(), N);
-			} else{				
-				return gather_bits_runtime<T>(N); // reuse runtime gather (the loop count is deterministic anyway).
-			}
-		}
-
-		// Convenience: fill T with random bits.
-		template <class T>
-		constexpr T bits_as() noexcept{
-			static_assert(std::is_unsigned_v<T>, "bits_as<T>() requires an unsigned T");
-			return bits<std::numeric_limits<T>::digits, T>();
-		}
+		}			
 
 	private:
 		E _e{}; //the underlying engine providing random bits. This class will turn those into useful values.
 
 		template <class T>
-		static constexpr T mask_low(unsigned n) noexcept{
+		static constexpr T low_bits_mask(unsigned n) noexcept{
 			assert(n <= std::numeric_limits<T>::digits); // n in [0, digits(T)]
 			constexpr unsigned W = std::numeric_limits<T>::digits;
 			if(n == 0) return T{0};
@@ -343,7 +347,7 @@ namespace rnd {
 		constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
 			assert(1 <= n && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= value_bits, and n <= digits(T)
 			const unsigned shift = value_bits - n;    // shift in [0, value_bits-1]
-			return static_cast<T>(x >> shift) & mask_low<T>(n);
+			return static_cast<T>(x >> shift) & low_bits_mask<T>(n);
 		}
 
 		template <class T>
@@ -357,8 +361,8 @@ namespace rnd {
 				acc |= (chunk << filled);             // filled < digits(T) always holds here
 				filled += take;
 			}
-			// If n == digits(T), mask_low returns all-ones, so this is cheap and safe.
-			return acc & mask_low<T>(n);
+			// If n == digits(T), low_bits_mask returns all-ones, so this is cheap and safe.
+			return acc & low_bits_mask<T>(n);
 		}
 	};
 } //namespace rnd
