@@ -24,8 +24,9 @@ namespace rnd {
 	template <class F>
 	concept supported_float =
 		(std::same_as<F, float> || std::same_as<F, double>) &&
-		(sizeof(F) == sizeof(std::uint32_t) || sizeof(F) == sizeof(std::uint64_t)) && //this is ... a bit belt-and-suspenders, but it's cool that we *can* check. :) 
-		std::numeric_limits<F>::is_iec559; //the IQ hack in normalized() requires IEEE 754 (IEC 559) floating point types.
+		(sizeof(F) == sizeof(std::uint32_t) || sizeof(F) == sizeof(std::uint64_t)) && //this is ... a bit belt-and-suspenders, but it's cool that we *can* constrain our types with such specificity. :) 
+		std::numeric_limits<F>::is_iec559 &&  //the IQ hack in normalized() requires IEEE 754 (IEC 559) floating point types.
+		std::numeric_limits<F>::radix == 2; //the IQ hack assumes digits - 1 is the number of *binary* mantissa bits.
 
 	template <RandomBitEngine E>
 	class Random final{
@@ -43,10 +44,7 @@ namespace rnd {
 	public:
 		using engine_type = E;
 		using result_type = typename E::result_type;
-		using seed_type = typename E::seed_type;
-		static_assert(std::is_unsigned_v<result_type>);
-		static_assert(E::min() == 0);
-		static_assert(E::max() == std::numeric_limits<result_type>::max());
+		using seed_type = typename E::seed_type;		
 
 		constexpr Random() noexcept = default; //the engine will default initialize
 		explicit constexpr Random(seed_type seed_val) noexcept : _e(seed_val){}
@@ -172,8 +170,7 @@ namespace rnd {
 			if constexpr(Bound == 1){
 				return T{0};
 			}else if constexpr((Bound & (Bound - 1)) == 0){ // if Bound is a power of two, we can use a mask / bit-extract.
-				constexpr unsigned bits_needed = std::countr_zero(Bound);
-				static_assert(bits_needed <= value_bits, "Bound is too large for this engine's result_type");
+				constexpr unsigned bits_needed = std::countr_zero(Bound);				
 				return bits<bits_needed, T>();
 			} else{
 				// Otherwise just call the runtime version.
@@ -223,6 +220,7 @@ namespace rnd {
 		// real in [lo, hi)
 		template <supported_float F = float>
 		constexpr F between(F lo, F hi) noexcept{
+			assert(lo < hi && "between(lo, hi): inverted or empty range");
 			return lo + (hi - lo) * normalized<F>();
 		}
 
@@ -236,6 +234,7 @@ namespace rnd {
 		// boolean with probability
 		template <supported_float F = float>
 		constexpr bool coin_flip(F probability) noexcept{
+			assert(F{0} <= probability && probability <= F{1} && "coin_flip(probability): probability must be in [0, 1]");
 			return normalized<F>() < probability;
 		}
 
@@ -244,11 +243,12 @@ namespace rnd {
 			// Based on the Central Limit Theorem; https://en.wikipedia.org/wiki/Central_limit_theorem
 			// the Irwin–Hall distribution (sum of 12 U(0,1) has mean = 6, variance = 1).
 			// Subtract 6 and multiply by stddev to get an approximate N(mean, stddev) sample.
+			assert(stddev >= F{0} && "gaussian(mean, stddev): standard deviation must be non-negative");
 			F sum{};
 			for(auto i = 0; i < 12; ++i){
 				sum += normalized<F>();
 			}
-			return mean + (sum - F(6)) * stddev;
+			return mean + (sum - F{6}) * stddev;
 		}
 
 		// --- collections ---
@@ -351,7 +351,7 @@ namespace rnd {
 
 		template <class T>
 		constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
-			assert(1 <= n && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= value_bits, and n <= digits(T)
+			assert(1 <= n && n <= value_bits && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= value_bits, and n <= digits(T)
 			const unsigned shift = value_bits - n;    // shift in [0, value_bits-1]
 			return static_cast<T>(x >> shift) & low_bits_mask<T>(n);
 		}
