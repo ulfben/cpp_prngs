@@ -48,6 +48,14 @@ Win32/    # 32-bit Windows builds
 *.userosscache
 *.sln.docstates
 *.vcxproj.user
+
+# CMake
+CMakeUserPresets.json
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+cmake-build-*/
  
 # Temporary files
 # Files created during development that are not needed for the build process.

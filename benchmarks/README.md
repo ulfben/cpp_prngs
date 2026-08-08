@@ -3,13 +3,12 @@
 The canonical benchmark sources are:
 
 - `engine_comparison.cpp`: compares the raw engines available to the library.
-- `random_next.cpp`: compares `Random<E>::next()` with standard alternatives.
 - `random_bounded_integer.cpp`: compares bounded integer generation.
 - `random_bounded_float.cpp`: compares bounded floating-point generation.
 
 The public API comparisons currently include `QuarkBurst64`, `RomuDuoJr`, and
 `Konadare192`. Add or remove engine headers and their `BENCHMARK_TEMPLATE`
-registrations in the three `random_*.cpp` sources to change that set.
+registrations in the two `random_bounded_*.cpp` sources to change that set.
 
 Run the generator from the repository root with Windows PowerShell:
 
@@ -18,7 +17,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
     -File .\benchmarks\generate-quickbench.ps1
 ```
 
-This creates four standalone files under `benchmarks/generated/`. They are
+This creates three standalone files under `benchmarks/generated/`. They are
 intended to be pasted separately into Quick Bench. Do not edit generated files
 directly.
 

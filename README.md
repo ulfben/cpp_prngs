@@ -26,7 +26,7 @@ So, if you are making games and want a random-number generator that is:
 * usable at compile time with `constexpr`
 * [compatible](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) with STL algorithms and distributions such as `std::shuffle`, `std::sample`, and `std::*_distribution`
 
-…go ahead and copy any of these engines together with the random.hpp interface, and go forth and prosper. Let me know if you find bugs or add any cool new features!
+…go ahead and copy the complete `includes/` directory into your project, and go forth and prosper. Let me know if you find bugs or add any cool new features!
 
 [Try it on Compiler Explorer!](https://compiler-explorer.com/z/zTh6nazxj)
 
@@ -34,10 +34,12 @@ So, if you are making games and want a random-number generator that is:
 
 ## Getting Started
 
+cpp_prngs is a header-only C++23 library. Copy the complete `includes/` directory into your project and add it to your compiler's include path.
+
 To use a PRNG:
 
 ```cpp
-#include "romuduojr.hpp" //the engine; pick your favorite from the provided /engines
+#include "engines/romuduojr.hpp" //the engine; pick your favorite from the provided /engines
 #include "random.hpp" //the user-friendly wrapper that provides a consistent interface and utilities across all engines
 
 using rnd::Random;
@@ -227,6 +229,35 @@ Random<Xoshiro256SS> rng6(seed::from_all());          // Combines all sources (t
 ```
 
 These utilities help you seed your random number generators appropriately - whether you need compile-time evaluation, reproducibility, run-to-run variation, or unpredictability.
+
+---
+
+## Building and testing with CMake
+
+The CMake build requires CMake 3.21 or newer. The repository provides a header-only target named `cpp_prngs::cpp_prngs`. When using cpp_prngs as a subdirectory, link that target to inherit its include path and C++23 requirement:
+
+```cmake
+add_subdirectory(path/to/cpp_prngs)
+target_link_libraries(your_target PRIVATE cpp_prngs::cpp_prngs)
+```
+
+To configure, build, and run the test suite directly:
+
+```sh
+cmake -S . -B build -DCPP_PRNGS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
+```
+
+The test build downloads the pinned GoogleTest dependency automatically. A shared development preset is also available:
+
+```sh
+cmake --preset dev
+cmake --build --preset dev
+ctest --preset dev
+```
+
+---
 
 ## License
 
