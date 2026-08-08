@@ -159,22 +159,7 @@ function Add-SourceFile {
 	}
 
 	$sourceDirectory = Split-Path -Parent $resolvedPath
-	$validationDepth = 0
 	foreach($line in [System.IO.File]::ReadLines($resolvedPath)){
-		if($validationDepth -gt 0){
-			if($line -match '^\s*#\s*(if|ifdef|ifndef)\b'){
-				++$validationDepth
-			} elseif($line -match '^\s*#\s*endif\b'){
-				--$validationDepth
-			}
-			continue
-		}
-
-		if($line -match '^\s*#\s*(if|ifdef|ifndef)\s+(defined\s*\(\s*)?VALIDATE_PRNGS\b'){
-			$validationDepth = 1
-			continue
-		}
-
 		$includeMatch = [regex]::Match(
 			$line,
 			'^\s*#\s*include\s*"([^"]+)"'
@@ -201,10 +186,6 @@ function Add-SourceFile {
 		}
 
 		$output.Add($line)
-	}
-
-	if($validationDepth -ne 0){
-		throw "Unterminated VALIDATE_PRNGS block in $resolvedPath"
 	}
 
 	if($IsIncludedFile){
