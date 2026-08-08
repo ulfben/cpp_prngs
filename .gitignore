@@ -43,6 +43,7 @@ Win32/    # 32-bit Windows builds
 # be shared across the team.
 *.user
 *.filters
+!msvc/cpp_prng_tests/cpp_prng_tests.vcxproj.filters
 *.suo
 *.userosscache
 *.sln.docstates

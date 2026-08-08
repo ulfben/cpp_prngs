@@ -1,19 +1,26 @@
 #pragma once
-#include "includes/detail/validation.hpp"
-#include "includes/engines/konadare192.hpp"
-#include "includes/engines/pcg32.hpp"
-#include "includes/engines/quarkburst64.hpp"
-#include "includes/engines/romuduojr.hpp"
-#include "includes/engines/small_fast32.hpp"
-#include "includes/engines/small_fast64.hpp"
-#include "includes/engines/xoshiro256ss.hpp"
+#include "../includes/engines/konadare192.hpp"
+#include "../includes/engines/pcg32.hpp"
+#include "../includes/engines/quarkburst64.hpp"
+#include "../includes/engines/romuduojr.hpp"
+#include "../includes/engines/small_fast32.hpp"
+#include "../includes/engines/small_fast64.hpp"
+#include "../includes/engines/xoshiro256ss.hpp"
 #include <array>
 #include <bit>
+#include <cstddef>
 #include <cstdint>
 
 // Compile-time comparisons with the engines' reference implementations.
 // Include this header in any translation unit that should perform validation.
 namespace rnd::detail::validation {
+	template <typename Engine, std::size_t N = 6>
+	consteval std::array<typename Engine::result_type, N> prng_outputs(Engine rng){
+		std::array<typename Engine::result_type, N> out{};
+		for(auto& value : out) value = rng();
+		return out;
+	}
+
 	constexpr std::array pcg32_reference{
 		std::uint32_t{0xa15c02b7}, std::uint32_t{0x7b47f409},
 		std::uint32_t{0xba1d3330}, std::uint32_t{0x83d2f293},

@@ -1,19 +1,10 @@
 #pragma once
-#include "wide_multiply.hpp"
-#include <array>
-#include <cstddef>
+#include "../includes/detail/wide_multiply.hpp"
 #include <cstdint>
 #include <limits>
 
-// Compile-time validation helpers. Production headers do not include this file.
+// Compile-time validation of the portable wide-multiplication helpers.
 namespace rnd::detail::validation {
-	template <typename Engine, std::size_t N = 6>
-	consteval std::array<typename Engine::result_type, N> prng_outputs(Engine rng){
-		std::array<typename Engine::result_type, N> out{};
-		for(auto& value : out) value = rng();
-		return out;
-	}
-
 	constexpr std::uint64_t HI = 0x0123'4567'89AB'CDEFull;
 	constexpr std::uint64_t LO = 0xFEDC'BA98'7654'3210ull;
 	constexpr std::uint64_t MAX = std::numeric_limits<std::uint64_t>::max();

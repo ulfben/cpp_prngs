@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="includes">
+      <UniqueIdentifier>{E61ED542-856B-46C5-8D18-91A887204CF4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="includes\detail">
+      <UniqueIdentifier>{460CF787-B8B9-4CC8-86AA-145515488B1D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="includes\engines">
+      <UniqueIdentifier>{F0461E16-C392-4C35-A571-9809371A8BCB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tests">
+      <UniqueIdentifier>{89DF721E-0440-4769-B1C7-C29CF461132D}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\tests\random_tests.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\includes\concepts.hpp">
+      <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\includes\random.hpp">
+      <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\includes\detail\wide_multiply.hpp">
+      <Filter>includes\detail</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\includes\engines\konadare192.hpp">
+      <Filter>includes\engines</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\includes\engines\pcg32.hpp">
+      <Filter>includes\engines</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\includes\engines\quarkburst64.hpp">
+      <Filter>includes\engines</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\includes\engines\romuduojr.hpp">
+      <Filter>includes\engines</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\includes\engines\small_fast32.hpp">
+      <Filter>includes\engines</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\includes\engines\small_fast64.hpp">
+      <Filter>includes\engines</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\includes\engines\xoshiro256ss.hpp">
+      <Filter>includes\engines</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tests\engine_reference_validation.hpp">
+      <Filter>tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tests\wide_multiply_validation.hpp">
+      <Filter>tests</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

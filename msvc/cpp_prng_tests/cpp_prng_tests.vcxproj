@@ -139,11 +139,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\test.cpp" />
+    <ClCompile Include="..\..\tests\random_tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\includes\concepts.hpp" />
+    <ClInclude Include="..\..\includes\detail\wide_multiply.hpp" />
+    <ClInclude Include="..\..\includes\engines\konadare192.hpp" />
+    <ClInclude Include="..\..\includes\engines\pcg32.hpp" />
+    <ClInclude Include="..\..\includes\engines\quarkburst64.hpp" />
+    <ClInclude Include="..\..\includes\engines\romuduojr.hpp" />
+    <ClInclude Include="..\..\includes\engines\small_fast32.hpp" />
+    <ClInclude Include="..\..\includes\engines\small_fast64.hpp" />
+    <ClInclude Include="..\..\includes\engines\xoshiro256ss.hpp" />
     <ClInclude Include="..\..\includes\random.hpp" />
+    <ClInclude Include="..\..\tests\engine_reference_validation.hpp" />
+    <ClInclude Include="..\..\tests\wide_multiply_validation.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
