@@ -105,9 +105,14 @@ static_assert(false, "mul_shift_high64 requires either __uint128_t or MSVC _umul
 #include <type_traits>
 #include <utility>
 namespace rnd {
+template <class F>
+concept supported_float =
+(std::same_as<F, float> || std::same_as<F, double>) &&
+(sizeof(F) == sizeof(std::uint32_t) || sizeof(F) == sizeof(std::uint64_t)) &&  
+std::numeric_limits<F>::is_iec559;  
 template <RandomBitEngine E>
 class Random final{
-static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;
+static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;	
 template <class T>
 static constexpr bool valid_weight_type =
 std::unsigned_integral<std::remove_cv_t<T>> &&
@@ -227,32 +232,31 @@ assert(bound <= E::max() &&
 auto safe_bound = static_cast<result_type>(bound);
 return static_cast<I>(U(lo) + static_cast<U>(next(safe_bound)));
 }
-template <std::floating_point F = float>
-constexpr F normalized() noexcept{
-static_assert(std::numeric_limits<F>::is_iec559, "normalized() requires IEEE 754 (IEC 559) floating point types.");
-using UInt = std::conditional_t<sizeof(F) == 4, uint32_t, uint64_t>;  
+template <supported_float F = float>
+constexpr F normalized() noexcept{			
+using UInt = std::conditional_t<sizeof(F) == sizeof(std::uint32_t), std::uint32_t, std::uint64_t>;   
 constexpr int mantissa_bits = std::numeric_limits<F>::digits - 1;  
-constexpr UInt base = std::bit_cast<UInt>(F(1.0));  
-UInt mantissa = this->template bits<mantissa_bits, UInt>();       
-UInt as_int = base | mantissa;  
-return std::bit_cast<F>(as_int) - F(1.0);  
-}
-template <std::floating_point F = float>
+constexpr UInt base = std::bit_cast<UInt>(F{1});  
+const UInt mantissa = this->template bits<mantissa_bits, UInt>();       
+const UInt as_int = base | mantissa;  
+return std::bit_cast<F>(as_int) - F{1};  
+}			
+template <supported_float F = float>
 constexpr F signed_norm() noexcept{
-return F(2) * normalized<F>() - F(1);  
+return F{2} * normalized<F>() - F{1};  
 }
-template <std::floating_point F = float> 
+template <supported_float F = float>
 constexpr F between(F lo, F hi) noexcept{
 return lo + (hi - lo) * normalized<F>();
 }
 constexpr bool coin_flip() noexcept{
 return bits<1, unsigned>() != 0;
 }
-template <std::floating_point F = float>
+template <supported_float F = float>
 constexpr bool coin_flip(F probability) noexcept{
 return normalized<F>() < probability;
 }
-template <std::floating_point F = float>
+template <supported_float F = float>
 constexpr F gaussian(F mean, F stddev) noexcept{
 F sum{};
 for(auto i = 0; i < 12; ++i){
