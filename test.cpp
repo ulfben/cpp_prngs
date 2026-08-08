@@ -1,11 +1,5 @@
+#include "engine_validation.hpp"
 #include "gtest/gtest.h"
-#include "./engines/romuduojr.hpp"
-#include "./engines/konadare192.hpp"
-#include "./engines/pcg32.hpp"
-#include "./engines/small_fast32.hpp"
-#include "./engines/small_fast64.hpp"
-#include "./engines/xoshiro256ss.hpp"
-#include "./engines/quarkburst64.hpp"
 #include "random.hpp"
 #include <array>
 #include <cmath>

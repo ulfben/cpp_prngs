@@ -95,29 +95,3 @@ public:
    constexpr bool operator==(const RomuDuoJr& rhs) const noexcept = default;
 };
 static_assert(RandomBitEngine<RomuDuoJr>);
-
-#if VALIDATE_PRNGS
-// Original implementation of RomuDuoJr from Mark Overton´s 2020 paper for validation purposes 
-// see: https://www.romu-random.org/code.c
-// adjusted for constexpr evaluation, but otherwise unchanged
-#define ROTL(d,lrot) ((d<<(lrot)) | (d>>(8*sizeof(d)-(lrot))))
-struct romu_state{
-   uint64_t xState, yState;  // set to nonzero seed
-};
-constexpr uint64_t romuDuoJr_random(romu_state& s) noexcept {
-   uint64_t xp = s.xState;
-   s.xState = 15241094284759029579u * s.yState;
-   s.yState = s.yState - xp;  s.yState = ROTL(s.yState,27);
-   return xp;
-}
-
-static constexpr auto ROMUDUJR_REFERENCE = []{
-   romu_state s{123, 0};
-   std::array<RomuDuoJr::result_type, 6> out{};
-   for(auto& v : out){ v = romuDuoJr_random(s); }
-   return out;
-   }();
-
-static_assert(prng_outputs(RomuDuoJr::from_state(123, 0)) == ROMUDUJR_REFERENCE, "RomuDuoJr output does not match romuDuoJr reference");
-
-#endif //VALIDATE_PRNGS

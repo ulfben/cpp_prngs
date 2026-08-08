@@ -1,7 +1,5 @@
-#define VALIDATE_PRNGS 0 // The demo does not need per-engine reference validation.
-
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/concepts.hpp>
-#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail.hpp>
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/wide_multiply.hpp> //constexpr fallback for 128bit multiplication on msvc
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/engines/pcg32.hpp> //pcg32 engine
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/engines/romuduojr.hpp> // RomuDuoJr engine 
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/random.hpp> // the Random interface, which wraps any engine to provide a rich set of random generation features

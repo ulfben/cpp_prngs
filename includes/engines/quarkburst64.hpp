@@ -109,21 +109,3 @@ public:
 };
 
 static_assert(RandomBitEngine<QuarkBurst64>);
-
-#if VALIDATE_PRNGS
-static constexpr std::array<QuarkBurst64::result_type, 6>
-QuarkBurst64_REFERENCE{
-    0x0000060020000002ULL,
-    0x0403F68CF7217209ULL,
-    0xE1C95D285697B7AFULL,
-    0x394DE3E1A9574CE0ULL,
-    0x717616275935DAEFULL,
-    0x03745D2F175D0105ULL,
-};
-
-static_assert(
-    prng_outputs(QuarkBurst64::from_state(1, 2, 3)) ==
-        QuarkBurst64_REFERENCE,
-    "QuarkBurst64 output does not match the archived reference implementation"
-);
-#endif // VALIDATE_PRNGS

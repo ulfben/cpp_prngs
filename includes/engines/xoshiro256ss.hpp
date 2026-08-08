@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <span>
 #include <bit> //std::rotl
+#include <cassert>
 
 /*
   Xoshiro256SS - a modern C++ port of xoshiro256** 1.0.
@@ -121,42 +122,3 @@ public:
 	constexpr bool operator==(const Xoshiro256SS& rhs) const noexcept = default; //will do the right thing since C++20! 
 };
 static_assert(RandomBitEngine<Xoshiro256SS>);
-
-#if VALIDATE_PRNGS
-
-//original implementation of xoshiro256** 1.0 by David Blackman and Sebastiano Vigna
-// https://prng.di.unimi.it/xoshiro256starstar.c
-
-constexpr uint64_t rotl(const uint64_t x, int k) noexcept{
-	return (x << k) | (x >> (64 - k));
-}
-
-static constexpr auto Xoshiro256SS_REFERENCE = [](){	
-	uint64_t s_local[4] = {0xFEEDFACECAFEBEEFuLL, 0, 0, 0};	
-	auto next_fn = [](uint64_t state[4]) -> uint64_t{		
-		const uint64_t result = rotl(state[1] * 5, 7) * 9;
-		const uint64_t t = state[1] << 17;
-		state[2] ^= state[0];
-		state[3] ^= state[1];
-		state[1] ^= state[2];
-		state[0] ^= state[3];
-		state[2] ^= t;
-		state[3] = rotl(state[3], 45);
-		return result;
-	};
-
-	std::array<uint64_t, 6> out{};
-	for(auto& v : out){
-		v = next_fn(s_local);
-	}
-	return out;
-	}();
-
-constexpr uint64_t s2[4]{0xFEEDFACECAFEBEEFuLL, 0, 0, 0};
-
-static_assert(
-	prng_outputs(Xoshiro256SS::from_state(s2)) == Xoshiro256SS_REFERENCE,
-	"Xoshiro256SS output does not match Xoshiro256** reference"
-	);
-
-#endif // VALIDATE_PRNGS

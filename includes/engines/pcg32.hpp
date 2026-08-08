@@ -76,7 +76,7 @@ public:
 	constexpr void seed(seed_type seed_val, seed_type sequence = DEFAULT_STREAM) noexcept{
 		state = 0U;
 		inc = (sequence << 1u) | 1u; //ensure inc is odd
-		(void) next(); //“Warm up” the internal LCG so the first returned bits are mixed.
+		(void) next(); //â€œWarm upâ€ the internal LCG so the first returned bits are mixed.
 		state += seed_val;
 		(void) next();
 	}
@@ -115,20 +115,3 @@ public:
 	constexpr bool operator==(const PCG32& rhs) const noexcept = default;
 };
 static_assert(RandomBitEngine<PCG32>);
-
-#if VALIDATE_PRNGS
-// Test values for PCG32 to ensure it works as expected
-static constexpr auto PCG32_REFERENCE_FROM_SEED = []{
-	PCG32 rng(42u, 54u); //example seed and sequence, from https://github.com/imneme/pcg-c-basic/blob/master/pcg32-demo.c
-	std::array<PCG32::result_type, 6> vals{};
-	for(auto& v : vals){ v = rng.next(); };
-	return vals;
-	}();
-	//expected values for the above seed and sequence from: https://www.pcg-random.org/using-pcg-c-basic.html
-static_assert(PCG32_REFERENCE_FROM_SEED[0] == 0xa15c02b7);
-static_assert(PCG32_REFERENCE_FROM_SEED[1] == 0x7b47f409);
-static_assert(PCG32_REFERENCE_FROM_SEED[2] == 0xba1d3330);
-static_assert(PCG32_REFERENCE_FROM_SEED[3] == 0x83d2f293);
-static_assert(PCG32_REFERENCE_FROM_SEED[4] == 0xbfa4784b);
-static_assert(PCG32_REFERENCE_FROM_SEED[5] == 0xcbed606e);
-#endif //VALIDATE_PRNGS

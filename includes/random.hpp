@@ -1,6 +1,6 @@
 #pragma once
 #include "concepts.hpp" //for RandomBitEngine concept
-#include "detail.hpp"   //for constexpr and portable 128-bit multiplication
+#include "detail/wide_multiply.hpp" //for constexpr and portable 128-bit multiplication
 #include <algorithm>
 #include <bit> // for std::bit_cast
 #include <cassert>
@@ -25,43 +25,11 @@ namespace rnd {
 	template <RandomBitEngine E>
 	class Random final{
 		static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;
-		E _e{}; //the underlying engine providing random bits. This class will turn those into useful values.
-		
-		template <class T>
-		static constexpr T mask_low(unsigned n) noexcept{			
-			assert(n <= std::numeric_limits<T>::digits); // n in [0, digits(T)]
-			constexpr unsigned W = std::numeric_limits<T>::digits;
-			if(n == 0) return T{0};
-			if(n >= W) return std::numeric_limits<T>::max(); // avoid UB on (1<<W)
-			return static_cast<T>((T{1} << n) - T{1});
-		}
-			
-		template <class T>
-		constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
-			assert(1 <= n && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= value_bits, and n <= digits(T)
-			const unsigned shift = value_bits - n;    // shift in [0, value_bits-1]
-			return static_cast<T>(x >> shift) & mask_low<T>(n);
-		}
-		
-		template <class T>
-		constexpr T gather_bits_runtime(unsigned n) noexcept{
-			assert(1 <= n && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= digits(T)			
-			T acc = 0;
-			unsigned filled = 0;
-			while(filled < n){
-				const unsigned take = std::min<unsigned>(value_bits, n - filled);
-				const T chunk = take_high_bits<T>(next(), take);
-				acc |= (chunk << filled);             // filled < digits(T) always holds here
-				filled += take;
-			}
-			// If n == digits(T), mask_low returns all-ones, so this is cheap and safe.
-			return acc & mask_low<T>(n);
-		}
 
 		template <class T>
 		static constexpr bool valid_weight_type =
 			std::unsigned_integral<std::remove_cv_t<T>> &&
-			!std::same_as<std::remove_cv_t<T>, bool> && 
+			!std::same_as<std::remove_cv_t<T>, bool> &&
 			(std::numeric_limits<std::remove_cv_t<T>>::digits <= value_bits);
 
 		template <class R, class Projection>
@@ -357,6 +325,40 @@ namespace rnd {
 		constexpr T bits_as() noexcept{
 			static_assert(std::is_unsigned_v<T>, "bits_as<T>() requires an unsigned T");
 			return bits<std::numeric_limits<T>::digits, T>();
-		}		
+		}
+
+	private:
+		E _e{}; //the underlying engine providing random bits. This class will turn those into useful values.
+
+		template <class T>
+		static constexpr T mask_low(unsigned n) noexcept{
+			assert(n <= std::numeric_limits<T>::digits); // n in [0, digits(T)]
+			constexpr unsigned W = std::numeric_limits<T>::digits;
+			if(n == 0) return T{0};
+			if(n >= W) return std::numeric_limits<T>::max(); // avoid UB on (1<<W)
+			return static_cast<T>((T{1} << n) - T{1});
+		}
+
+		template <class T>
+		constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
+			assert(1 <= n && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= value_bits, and n <= digits(T)
+			const unsigned shift = value_bits - n;    // shift in [0, value_bits-1]
+			return static_cast<T>(x >> shift) & mask_low<T>(n);
+		}
+
+		template <class T>
+		constexpr T gather_bits_runtime(unsigned n) noexcept{
+			assert(1 <= n && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= digits(T)
+			T acc = 0;
+			unsigned filled = 0;
+			while(filled < n){
+				const unsigned take = std::min<unsigned>(value_bits, n - filled);
+				const T chunk = take_high_bits<T>(next(), take);
+				acc |= (chunk << filled);             // filled < digits(T) always holds here
+				filled += take;
+			}
+			// If n == digits(T), mask_low returns all-ones, so this is cheap and safe.
+			return acc & mask_low<T>(n);
+		}
 	};
 } //namespace rnd

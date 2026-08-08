@@ -56,19 +56,3 @@ std::numeric_limits<typename E::seed_type>::is_integer &&
         { e.seed(seed) } noexcept -> std::same_as<void>;
         { e.discard(n) } noexcept -> std::same_as<void>;
 };
-
-
-#ifndef VALIDATE_PRNGS
-// Define VALIDATE_PRNGS to enable compile-time validation of PRNG outputs.
-#define VALIDATE_PRNGS 1
-#endif  
-
-#if VALIDATE_PRNGS
-#include <array>
-template <typename Engine, typename T = typename Engine::result_type, std::size_t N = 6>
-constexpr std::array<T, N> prng_outputs(Engine&& rng) {
-    std::array<T, N> out{};
-    for (auto& v : out) v = rng();
-    return out;
-}
-#endif // VALIDATE

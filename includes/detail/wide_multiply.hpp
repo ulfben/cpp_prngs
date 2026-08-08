@@ -3,14 +3,11 @@
 #ifdef _MSC_VER
 #include <intrin.h>    // for _umul128, 64x64 multiplication
 #endif
-// detail.hpp: private helpers to keep Random<E> constexpr and portable.		
+
+// Private helpers to keep Random<E> constexpr and portable.
 // Provides a constexpr 128-bit multiply and shift for platforms without native __uint128_t support, such as MSVC.
 // including a fully constexpr fallback on MSVC, where _umul128 is not constexpr
-// This is all used to implement Daniel Lemire's fastrange trick (see Random<E> for useage)
-#ifndef RND_ENABLE_SELFTESTS
-#define RND_ENABLE_SELFTESTS 0 // define to enable compile-time self-tests for the constexpr 128-bit multiply helper.
-#endif
-
+// This is used to implement Daniel Lemire's FastRange mapping (see Random<E> for usage).
 namespace rnd{
 	namespace detail {
 		// Helper for constexpr 128-bit multiply on MSVC, where _umul128 is not constexpr.
@@ -85,47 +82,4 @@ namespace rnd{
 #endif
 		}
 	} //detail namespace
-
-#if RND_ENABLE_SELFTESTS
-	namespace detail::selftest {
-		//quick-and-dirty test suite to make sure our 128-bit helper is constexpr and correct
-		// feel free to delete this namespace or gate it behind a macro so headers don’t spam every TU. :)
-
-		// 1. Verify Shift Logic
-		constexpr std::uint64_t HI = 0x0123'4567'89AB'CDEFull;
-		constexpr std::uint64_t LO = 0xFEDC'BA98'7654'3210ull;
-		static_assert(shr128_to_u64<64>(HI, LO) == HI); // digits = 64 -> returns hi		
-		static_assert(shr128_to_u64<1>(HI, LO) == ((LO >> 1) | (HI << 63))); // digits = 1 -> cross-word shift		
-		static_assert(shr128_to_u64<63>(HI, LO) == ((LO >> 63) | (HI << 1)));
-
-		// 2. Verify 128-bit Multiply Logic
-		constexpr bool check_mul(std::uint64_t a, std::uint64_t b, std::uint64_t expect_lo, std::uint64_t expect_hi){
-			const auto p = mul64_to_128_parts(a, b);
-			return p.lo == expect_lo && p.hi == expect_hi;
-		}
-
-		// Identity & Zero
-		static_assert(check_mul(0, 0, 0, 0));
-		static_assert(check_mul(UINT64_MAX, 1, UINT64_MAX, 0));
-
-		// Boundary: 2^32 * 2^32 = 2^64 (Result: Lo=0, Hi=1)
-		static_assert(check_mul(1ULL << 32, 1ULL << 32, 0, 1));
-
-		// Stress Test: Max * Max = (2^64 - 1)^2 = 2^128 - 2^65 + 1
-		// Result: Lo = 1, Hi = F...FE
-		static_assert(check_mul(UINT64_MAX, UINT64_MAX, 1, 0xFFFFFFFFFFFFFFFEull));
-
-		// Middle Carry: (2^64 - 1) * 2^32 = 2^96 - 2^32
-		// Result: Hi = 2^32 - 1, Lo = -2^32 (wrapped)
-		static_assert(check_mul(UINT64_MAX, 1ULL << 32, 0xFFFFFFFF00000000ull, 0x00000000FFFFFFFFull));
-
-		// Low carry stress
-		static_assert(check_mul(0x0000'0001'FFFF'FFFFull, 0x0000'0001'FFFF'FFFFull, 0xFFFF'FFFC'0000'0001ull, 0x0000'0000'0000'0003ull));
-
-		// 3. Verify constexpr instantiation
-		template <std::uint64_t> struct require_constexpr{};
-		using test_inst_1 = require_constexpr<mul_shift_u64<1>(HI, LO)>;
-		using test_inst_64 = require_constexpr<mul_shift_u64<64>(HI, LO)>;
-	} // namespace detail::selftest
-#endif
 } // namespace rnd
