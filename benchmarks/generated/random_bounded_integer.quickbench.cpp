@@ -109,7 +109,8 @@ template <class F>
 concept supported_float =
 (std::same_as<F, float> || std::same_as<F, double>) &&
 (sizeof(F) == sizeof(std::uint32_t) || sizeof(F) == sizeof(std::uint64_t)) &&  
-std::numeric_limits<F>::is_iec559;  
+std::numeric_limits<F>::is_iec559 &&   
+std::numeric_limits<F>::radix == 2;  
 template <RandomBitEngine E>
 class Random final{
 static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;	
@@ -123,10 +124,7 @@ using projected_weight_t = std::remove_cvref_t<std::invoke_result_t<Projection&,
 public:
 using engine_type = E;
 using result_type = typename E::result_type;
-using seed_type = typename E::seed_type;
-static_assert(std::is_unsigned_v<result_type>);
-static_assert(E::min() == 0);
-static_assert(E::max() == std::numeric_limits<result_type>::max());
+using seed_type = typename E::seed_type;		
 constexpr Random() noexcept = default;  
 explicit constexpr Random(seed_type seed_val) noexcept : _e(seed_val){}
 explicit constexpr Random(engine_type engine) noexcept : _e(engine){}
@@ -211,8 +209,7 @@ static_assert(Bound - 1 <= static_cast<result_type>(std::numeric_limits<T>::max(
 if constexpr(Bound == 1){
 return T{0};
 }else if constexpr((Bound & (Bound - 1)) == 0){  
-constexpr unsigned bits_needed = std::countr_zero(Bound);
-static_assert(bits_needed <= value_bits, "Bound is too large for this engine's result_type");
+constexpr unsigned bits_needed = std::countr_zero(Bound);				
 return bits<bits_needed, T>();
 } else{
 return static_cast<T>(next(Bound));
@@ -247,6 +244,7 @@ return F{2} * normalized<F>() - F{1};
 }
 template <supported_float F = float>
 constexpr F between(F lo, F hi) noexcept{
+assert(lo < hi && "between(lo, hi): inverted or empty range");
 return lo + (hi - lo) * normalized<F>();
 }
 constexpr bool coin_flip() noexcept{
@@ -254,15 +252,17 @@ return bits<1, unsigned>() != 0;
 }
 template <supported_float F = float>
 constexpr bool coin_flip(F probability) noexcept{
+assert(F{0} <= probability && probability <= F{1} && "coin_flip(probability): probability must be in [0, 1]");
 return normalized<F>() < probability;
 }
 template <supported_float F = float>
 constexpr F gaussian(F mean, F stddev) noexcept{
+assert(stddev > F{0} && "gaussian(mean, stddev): standard deviation must be non-negative");
 F sum{};
 for(auto i = 0; i < 12; ++i){
 sum += normalized<F>();
 }
-return mean + (sum - F(6)) * stddev;
+return mean + (sum - F{6}) * stddev;
 }
 template <std::ranges::sized_range R>
 [[nodiscard]] constexpr auto index(R&& collection) noexcept{
@@ -339,7 +339,7 @@ return static_cast<T>((T{1} << n) - T{1});
 }
 template <class T>
 constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
-assert(1 <= n && n <= std::numeric_limits<T>::digits);  
+assert(1 <= n && n <= value_bits && n <= std::numeric_limits<T>::digits);  
 const unsigned shift = value_bits - n;     
 return static_cast<T>(x >> shift) & low_bits_mask<T>(n);
 }
