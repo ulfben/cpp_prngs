@@ -31,7 +31,7 @@ namespace rnd::detail::validation {
 	// https://www.pcg-random.org/using-pcg-c-basic.html
 	static_assert(prng_outputs(PCG32{42u, 54u}) == pcg32_reference);
 
-	constexpr std::array quarkburst64_reference{
+	constexpr std::array<std::uint64_t, 6> quarkburst64_reference{
 		0x0000060020000002ULL, 0x0403F68CF7217209ULL,
 		0xE1C95D285697B7AFULL, 0x394DE3E1A9574CE0ULL,
 		0x717616275935DAEFULL, 0x03745D2F175D0105ULL
