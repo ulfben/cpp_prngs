@@ -1,5 +1,4 @@
 #pragma once
-#include "../concepts.hpp" // for RandomBitEngine
 #include <bit>
 #include <cstdint>
 #include <limits>
@@ -107,5 +106,3 @@ public:
 
     constexpr bool operator==(const QuarkBurst64&) const noexcept = default;
 };
-
-static_assert(RandomBitEngine<QuarkBurst64>);

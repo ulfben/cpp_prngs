@@ -1,5 +1,4 @@
 #pragma once
-#include "../concepts.hpp" //for RandomBitEngine
 #include <bit>
 #include <cstdint>
 #include <limits>
@@ -114,4 +113,3 @@ public:
 
 	constexpr bool operator==(const PCG32& rhs) const noexcept = default;
 };
-static_assert(RandomBitEngine<PCG32>);

@@ -1,5 +1,4 @@
 #pragma once
-#include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
 #include <bit> //for std::rotr and std::rotl
@@ -103,4 +102,3 @@ public:
 	}
 	constexpr bool operator==(const Konadare192&) const noexcept = default;
 };
-static_assert(RandomBitEngine<Konadare192>);

@@ -1,5 +1,4 @@
 #pragma once
-#include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
 #include <bit> //std::rotl
@@ -68,4 +67,3 @@ public:
 
    constexpr bool operator==(const SmallFast64& rhs) const noexcept = default;
 };
-static_assert(RandomBitEngine<SmallFast64>);

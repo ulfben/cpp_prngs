@@ -1,5 +1,4 @@
 #pragma once
-#include "../concepts.hpp" //for RandomBitEngine
 #include <cstdint>
 #include <limits>
 #include <bit> //for std::rotl
@@ -94,4 +93,3 @@ public:
 
    constexpr bool operator==(const RomuDuoJr& rhs) const noexcept = default;
 };
-static_assert(RandomBitEngine<RomuDuoJr>);

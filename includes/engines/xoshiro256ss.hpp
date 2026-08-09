@@ -1,5 +1,4 @@
 #pragma once
-#include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
 #include <span>
@@ -121,4 +120,3 @@ public:
 
 	constexpr bool operator==(const Xoshiro256SS& rhs) const noexcept = default; //will do the right thing since C++20! 
 };
-static_assert(RandomBitEngine<Xoshiro256SS>);

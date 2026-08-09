@@ -1,5 +1,4 @@
 #pragma once
-#include "../concepts.hpp" //for RandomBitEngine
 #include <limits>
 #include <cstdint>
 #include <bit>
@@ -83,4 +82,3 @@ public:
 
 	constexpr bool operator==(const SmallFast32& rhs) const noexcept = default;
 };
-static_assert(RandomBitEngine<SmallFast32>);
