@@ -32,6 +32,11 @@ if(CPP_PRNGS_BUILD_TESTS)
 	target_compile_features(cpp_prngs_engine_cxx17_tests PRIVATE cxx_std_17)
 	add_test(NAME EngineCxx17Compatibility COMMAND cpp_prngs_engine_cxx17_tests)
 
+	add_executable(cpp_prngs_random_avr_tests tests/random_avr_tests.cpp)
+	target_include_directories(cpp_prngs_random_avr_tests PRIVATE includes)
+	target_compile_features(cpp_prngs_random_avr_tests PRIVATE cxx_std_17)
+	add_test(NAME RandomAvrCompatibility COMMAND cpp_prngs_random_avr_tests)
+
 	add_executable(cpp_prngs_tests tests/random_tests.cpp)
 	target_link_libraries(cpp_prngs_tests PRIVATE cpp_prngs::cpp_prngs GTest::gtest)
 

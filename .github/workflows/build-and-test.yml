@@ -62,5 +62,5 @@ jobs:
           arduino-cli compile
           --fqbn arduino:avr:leonardo
           --warnings all
-          --build-property "compiler.cpp.extra_flags=-std=gnu++17 -I${{ github.workspace }}/tests"
+          --build-property "compiler.cpp.extra_flags=-std=gnu++17 -I${{ github.workspace }}/tests -I${{ github.workspace }}/includes"
           tests/arduino/engine_validation
