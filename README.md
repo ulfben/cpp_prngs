@@ -15,16 +15,16 @@ C++11 introduced `<random>`, which is much better, but it still has several prac
 
 * **The standard random facilities cannot currently run at compile time.** Engines and distributions in `<random>` are not `constexpr`, so they cannot be used to generate lookup tables, test data, procedural content, or other random-derived values during compilation. Making the deterministic `<random>` facilities `constexpr` is still only proposed for C++29 in [P3791R1](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p3791r1.html).
 
-The most widely used general-purpose engine in the C++ standard library is probably the Mersenne Twister, [`std::mt19937`](https://eel.is/c++draft/rand.predef). It is a respectable generator, but it requires **624 state words - typically around 2.5 KiB of internal state**. All else being equal, a large state puts more pressure on CPU caches. Modern generators such as [xoshiro256**](https://prng.di.unimi.it/), [PCG](https://www.pcg-random.org/paper.html), and [Romu](https://www.romu-random.org/) requires much smaller state (**16-32 bytes**) and offers [significantly better performance](https://github.com/ulfben/cpp_prngs/#performance-benchmarks).
+The most widely used general-purpose engine in the C++ standard library is probably the Mersenne Twister, [`std::mt19937`](https://eel.is/c++draft/rand.predef). It is a respectable generator, but it requires **624 state words - typically around 2.5 KiB of internal state**. All else being equal, a large state puts more pressure on CPU caches. Modern generators such as [xoshiro256**](https://prng.di.unimi.it/), [PCG](https://www.pcg-random.org/paper.html), and [Romu](https://www.romu-random.org/) require much less state and offer [significantly better performance](https://github.com/ulfben/cpp_prngs/#performance-benchmarks). The engines included here range from **4 bytes of state** for tiny microcontroller-oriented generators to 32 bytes for general-purpose 64-bit generators.
 
 For a deep, game-focused comparison of 47 PRNGs across nine platforms, see Rhet Butler's excellent [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/). It compares the performance, portability, state size, and statistical quality that matter in real-world game development. Several of its top-performing generators - including Romu and SmallFast - are included here.
 
-So, if you are making games and want a random-number generator that is:
+So, if you want a random-number generator that is:
 
-* small (**16-32 bytes**) and [fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks)
+* compact (**4–32 bytes of state**) and [fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks)
 * deterministic across platforms
 * [easy to seed](https://github.com/ulfben/cpp_prngs#seeding)
-* [feature-rich](https://github.com/ulfben/cpp_prngs#randomhpp), with integers, floats, coin flips, weighted draws, random element selection, Gaussian samples, raw bits
+* [feature-rich](https://github.com/ulfben/cpp_prngs#random-api), with integers, floats, coin flips, weighted draws, random element selection, Gaussian samples, raw bits
 * usable at compile time with `constexpr`
 * [compatible](https://en.cppreference.com/w/cpp/named_req/UniformRandomBitGenerator) with STL algorithms and distributions such as `std::shuffle`, `std::sample`, and `std::*_distribution`
 
@@ -36,25 +36,50 @@ So, if you are making games and want a random-number generator that is:
 
 ## Getting Started
 
-cpp_prngs is a header-only C++23 library. Copy the complete `includes/` directory into your project and add it to your compiler's include path.
+cpp_prngs is header-only. Copy the complete `includes/` directory into your project and add it to your compiler's include path. Choose the frontend that matches your target:
 
-To use a PRNG:
+| Target | Header | C++ version | Collection interface |
+|--------|--------|-------------|----------------------|
+| Desktop and other full standard-library targets | [`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) | C++23 | Standard ranges and iterators |
+| Classic AVR-based Arduino boards | [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp) | C++17 | C arrays and pointer-plus-length buffers |
+
+Both frontends expose `rnd::Random<E>` and provide the same generation features: bounded integers, floats, coin flips, Gaussian samples, random element selection, weighted draws and raw bits. The included engines themselves are C++17-compatible.
+
+### Desktop and full standard-library targets
+
+Choose an engine and wrap it in `Random<E>`:
 
 ```cpp
-#include "engines/romuduojr.hpp" //the engine; pick your favorite from the provided /engines
-#include "random.hpp" //the user-friendly wrapper that provides a consistent interface and utilities across all engines
+#include "engines/romuduojr.hpp" // The engine; choose another from includes/engines if you prefer.
+#include "random.hpp"            // The full C++23 Random<E> frontend.
 
 using rnd::Random;
 
-Random<RomuDuoJr> rng{1234}; // generator with fixed seed, powered by the romuduojr engine.
-int damage = rng.between(10, 20);   // Random int in [10, 20)
+Random<RomuDuoJr> rng{1234};      // A generator with a fixed seed.
+int damage = rng.between(10, 20); // Random integer in [10, 20).
 ```
 
-Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#randomhpp) like bounds, floats, coin flips, Gaussian samples, picking from containers, raw bits, and more.
+Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_prngs#random-api) while keeping the engine easy to replace.
+
+### Arduino AVR
+
+On a classic AVR-based Arduino, include the C++17 frontend and consider one of the small-output engines:
+
+```cpp
+#include "engines/small_fast16.hpp"
+#include "random_avr.hpp" //note: _avr is for embedded targets
+
+rnd::Random<SmallFast16> rng{1234};
+
+const uint16_t blink_ms = rng.between(uint16_t{100}, uint16_t{500});
+const bool turn_left = rng.coin_flip();
+```
+
+The Arduino AVR core defaults to C++11, so compile the sketch as C++17. See [Building for Arduino AVR](#building-for-arduino-avr) for a complete Arduino CLI command.
 
 ### Weighted draws
 
-Pass a range of weights to `weighted_index()` when the weights themselves form the lookup table. Each returned index corresponds to the weight at that index:
+Pass a collection of weights to `weighted_index()` when the weights themselves form the lookup table. Each returned index corresponds to the weight at that index:
 
 ```cpp
 #include <array>
@@ -87,39 +112,45 @@ const LootDrop& drop = rng.weighted_element(loot_table, &LootDrop::weight);
 
 Weights should be non-negative whole numbers. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
 
+On AVR, an ordinary C array works directly: `rng.weighted_index(weights)` deduces the array length automatically. `std::array` is available in the Arduino AVR toolchain too; pass it through the pointer-plus-length overload as `rng.weighted_index(weights.data(), weights.size())`.
+
 [Try it on Compiler Explorer!](https://compiler-explorer.com/z/zTh6nazxj)
 
 ---
 
 ## [Engines](https://github.com/ulfben/cpp_prngs/tree/main/includes/engines)
-All the provided engines [are very fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks):
 
-They are also compact (4-32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions on desktop systems unless you have a measured performance reason not to; narrower engines are useful on constrained targets such as 8-bit microcontrollers.
+All included engines are header-only, C++17-compatible, usable during constant evaluation, and [very fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks). Their state ranges from 4 to 32 bytes.
 
-`Random<E>` can only generate a bound that fits the engine's output type. The 8-bit engines therefore support ranges up to 255, SmallFast16 up to 65,535, and the 32-bit engines up to roughly 4.29 billion. In debug builds, the API alerts you if a requested range is too large for the chosen engine.
+### General-purpose engines
 
-SmallFast8 is deliberately specialized: its 4-byte state is useful where memory is scarce, but [O’Neill reports](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html) a PractRand failure at 2^28 bytes, so it is not intended for long streams.
+These are the normal choices for desktop applications and other targets with efficient 32- or 64-bit arithmetic. Prefer a 64-bit-output engine on desktop unless you have a reason to choose otherwise.
 
-XorShift32Star8 uses the same 4-byte state while guaranteeing a period of 2^32 − 1. In [O’Neill’s PractRand comparison](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html), it completed roughly 4.29 billion raw outputs before repetition became detectable during the second cycle. It remains a specialized tiny engine, not the general-purpose XorShift\* 64/32 variant.
+| Engine | Output | State | Description |
+|--------|-------:|------:|-------------|
+| [`RomuDuoJr`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/romuduojr.hpp) | 64 bits | 16 bytes | C++ port of [Mark Overton’s RomuDuoJr](https://romu-random.org/). Winner of Rhet Butler’s [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/). |
+| [`Konadare192`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/konadare192.hpp) | 64 bits | 24 bytes | C++ port of [Pelle Evensen's konadare192px++](https://github.com/pellevensen/PReenactiNG); the second-fastest 64-bit engine in the current benchmarks. |
+| [`QuarkBurst64`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/quarkburst64.hpp) | 64 bits | 24 bytes | C++ port of Eightomic’s quarkburst1x64, previously published as GhostScramble64. |
+| [`PCG32`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/pcg32.hpp) | 32 bits | 16 bytes | C++ port of [Melissa O’Neill’s minimal PCG32](https://www.pcg-random.org/download.html#minimal-c-implementation). |
+| [`SmallFast32`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast32.hpp) | 32 bits | 16 bytes | C++ port of [Bob Jenkins’ 32-bit Small Fast](https://burtleburtle.net/bob/rand/smallprng.html) generator. |
+| [`SmallFast64`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast64.hpp) | 64 bits | 32 bytes | A 64-bit three-rotate Small Fast implementation, using rotates (7, 13, 37). |
+| [`Xoshiro256SS`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xoshiro256ss.hpp) | 64 bits | 32 bytes | C++ port of David Blackman and Sebastiano Vigna's [xoshiro256\*\* 1.0](https://prng.di.unimi.it/) generator. |
 
-| File Name           | Output Width | Description                                                                                                                                |
-|---------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
-| [`romuduojr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/romuduojr.hpp) | 64 bits | C++ port of [Mark Overton’s RomuDuoJr](https://romu-random.org/). Winner of Rhet Butler’s [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/)! |
-| [`konadare192.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/konadare192.hpp)         | 64 bits      | C++ port of [Pelle Evensen's konadare192px++](https://github.com/pellevensen/PReenactiNG). Second fastest and second smallest 64-bit PRNG in this lineup!  |
-| [`quarkburst64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/quarkburst64.hpp) | 64 bits | A C++ port of Eightomic’s quarkburst1x64, previously published as GhostScramble64. |
-| [`pcg32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/pcg32.hpp)         | 32 bits      | C++ port of [Melissa O’Neill’s minimal PCG32](https://www.pcg-random.org/download.html#minimal-c-implementation). Wikipedia: [Permuted congruential generator](https://en.wikipedia.org/wiki/Permuted_congruential_generator) |
-| [`xoshiro256ss.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xoshiro256ss.hpp)  | 64 bits      | C++ port of [David Blackman & Sebastiano Vigna's xoshiro256\*\* 1.0](https://prng.di.unimi.it/) generator. Wikipedia: [Xorshift](https://en.wikipedia.org/wiki/Xorshift). |
-| [`small_fast8.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast8.hpp)  | 8 bits       | C++ port of [Melissa O’Neill’s tested 8-bit Small Fast variant](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html), with 32 bits of state and two rotates (1, 4). |
-| [`small_fast16.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast16.hpp)  | 16 bits      | C++ port of [Melissa O’Neill’s tested 16-bit Small Fast variant](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html), with 64 bits of state and two rotates (13, 8). |
-| [`small_fast32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast32.hpp)  | 32 bits      | C++ port of [Bob Jenkins’ 32-bit “Small Fast”](https://burtleburtle.net/bob/rand/smallprng.html) PRNG (two-rotate). |
-| [`small_fast64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast64.hpp)  | 64 bits      | A 64-bit three-rotate implementation of the above. Three rotates (7, 13, 37) ensure stronger avalanche behavior than a naïve two-rotate 64-bit variant. |
-| [`xorshift32star8.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xorshift32star8.hpp) | 8 bits | A 32-bit-state specialization of [M.E. O’Neill’s truncated XorShift\* family](https://gist.github.com/imneme/9b769cefccac1f2bd728596da3a856dd). |
+### Small-output engines for microcontrollers
+
+These engines return 8 or 16 bits at a time and use only 4–8 bytes of state. Their narrow arithmetic can be a better fit for small microcontrollers such as AVR-based Arduino boards.
+
+| Engine | Output | State | Best fit and trade-off |
+|--------|-------:|------:|------------------------|
+| [`SmallFast8`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast8.hpp) | 8 bits | 4 bytes | The smallest Small Fast variant, intended for short streams where every byte of state matters. |
+| [`SmallFast16`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast16.hpp) | 16 bits | 8 bytes | A useful middle ground when an 8-bit result is too restrictive; uses O’Neill’s tested 16-bit constants. |
+| [`XorShift32Star8`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xorshift32star8.hpp) | 8 bits | 4 bytes | Keeps a 32-bit state cycle while returning one byte per call. |
+
+An engine's output width limits bounds, collection sizes, and total weights used by `Random<E>`. An 8-bit engine accepts bounds up to 255, `SmallFast16` up to 65,535, and a 32-bit engine up to roughly 4.29 billion. Methods such as `bits_as<T>()` can combine several engine outputs when you need a wider raw value. Debug builds alert you when a requested range is too large.
 
 Each included engine is a small, self-contained random number generator. You can use an engine directly, but it deliberately provides only the basics: seeding, advancing its state, comparing states, and generating random unsigned integers.
 
-For everyday use, wrap an engine in [`Random<E>`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp). `Random<E>` adds the game-friendly interface - bounded numbers, floats, coin flips, random elements, weighted selection, Gaussian samples, and more - while letting you swap the underlying engine without changing the rest of your code.
-
-AVR-libc targets can instead include [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp), an experimental, reduced C++17 `Random<E>` for the same engines to run on Arduinos. 
+For everyday use, wrap an engine in `Random<E>`. It adds bounded numbers, floats, coin flips, random elements, weighted selection, Gaussian samples, and more while letting you swap the underlying engine without changing the rest of your code.
 
 All included engines satisfy the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp) concept and can therefore be used with `Random<E>`. They are also compatible with standard C++ facilities such as `std::shuffle` and `std::sample`.
 
@@ -127,7 +158,9 @@ Want to use your own engine? If it satisfies `RandomBitEngine`, you can plug it 
 
 ---
 
-## [random.hpp](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp)
+## Random API
+
+[`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) and [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp) both expose `rnd::Random<E>`. The generation API is shared; only the collection interface and a few platform details differ.
 
 | Method                              | Description                                                                                                                                                         |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -161,9 +194,16 @@ Want to use your own engine? If it satisfies `RandomBitEngine`, you can plug it 
 | `split()`                           | Produces a decorrelated, forked engine (useful for parallel streams)                                                                                                |
 | `engine()` / `engine() const`       | Access the underlying engine instance (for manual serialization, debugging, etc.)                                                                                   |
 
-The weighted helpers let you pick items with different chances of being selected.
+The weighted helpers let you pick items with different chances of being selected. Weights should be non-negative whole numbers, such as `{70u, 25u, 5u}`. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
 
-Weights should be non-negative whole numbers, such as {70u, 25u, 5u}. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
+### AVR frontend details
+
+`random_avr.hpp` provides the same generation features without relying on the standard-library facilities unavailable in AVR-libc:
+
+* Collection methods accept C arrays directly and deduce their length, so `rng.element(values)` and `rng.weighted_index(weights)` work as written. They also accept a pointer and element count. Standard containers available in the Arduino toolchain, such as `std::array`, can be passed with `.data()` and `.size()`. The desktop frontend accepts standard sized ranges directly.
+* AVR `float` and `double` are both 32-bit IEEE 754 types. The floating-point methods therefore accept either spelling but produce binary32 precision.
+* Floating-point generation is `constexpr` by default. Defining `RND_AVR_FAST_FLOAT` consistently for the whole program selects the faster [Inigo Quilez representation-based implementation](https://iquilezles.org/articles/sfrand/) but makes the floating-point methods runtime-only.
+* Methods are templates or inline functions, so unused features do not add code to the final program.
 
 
 [^1]: Although `bits(n)` and `bits<N>()` *can* be used for power-of-two integer ranges, this is not their intended purpose. Prefer `next<N,T>()` instead. It chooses the same fast, unbiased bit-shift specialization, but makes your code clearer and safer.
@@ -245,9 +285,11 @@ These utilities help you seed your random number generators appropriately - whet
 
 ---
 
-## Building and testing with CMake
+## Building and testing
 
-The CMake build requires CMake 3.21 or newer. The repository provides a header-only target named `cpp_prngs::cpp_prngs`. When using cpp_prngs as a subdirectory, link that target to inherit its include path and C++23 requirement:
+### CMake
+
+The CMake build requires CMake 3.21 or newer. The repository provides a header-only target named `cpp_prngs::cpp_prngs` for the full desktop frontend. When using cpp_prngs as a subdirectory, link that target to inherit its include path and C++23 requirement:
 
 ```cmake
 add_subdirectory(path/to/cpp_prngs)
@@ -269,6 +311,24 @@ cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev
 ```
+
+The test suite also builds the engines and both `random_avr.hpp` floating-point modes as C++17 targets.
+
+### Building for Arduino AVR
+
+The Arduino AVR core defaults to C++11, while the engines and `random_avr.hpp` require C++17. The repository's CI validates an ATmega32U4 target with Arduino AVR core 1.8.8. You can compile a sketch with the same language setting through Arduino CLI:
+
+```sh
+arduino-cli core update-index
+arduino-cli core install arduino:avr@1.8.8
+arduino-cli compile \
+  --fqbn arduino:avr:leonardo \
+  --warnings all \
+  --build-property "compiler.cpp.extra_flags=-std=gnu++17 -I/path/to/cpp_prngs/includes" \
+  /path/to/your/sketch
+```
+
+Replace the two example paths with the location of this repository and your sketch. To enable the optional runtime-optimized floating-point path, add `-DRND_AVR_FAST_FLOAT` to `compiler.cpp.extra_flags`. CI compiles both modes.
 
 ---
 

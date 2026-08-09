@@ -57,10 +57,20 @@ jobs:
           arduino-cli core update-index
           arduino-cli core install arduino:avr@1.8.8
 
-      - name: Compile engine validation sketch
+      - name: Compile engine validation sketch (constexpr floats)
         run: >-
           arduino-cli compile
           --fqbn arduino:avr:leonardo
           --warnings all
+          --build-path build/arduino-avr-constexpr
           --build-property "compiler.cpp.extra_flags=-std=gnu++17 -I${{ github.workspace }}/tests -I${{ github.workspace }}/includes"
+          tests/arduino/engine_validation
+
+      - name: Compile engine validation sketch (fast floats)
+        run: >-
+          arduino-cli compile
+          --fqbn arduino:avr:leonardo
+          --warnings all
+          --build-path build/arduino-avr-fast-float
+          --build-property "compiler.cpp.extra_flags=-std=gnu++17 -DRND_AVR_FAST_FLOAT -I${{ github.workspace }}/tests -I${{ github.workspace }}/includes"
           tests/arduino/engine_validation

@@ -35,8 +35,8 @@
 // engine outputs to produce wider random values. Bounds, collection sizes, and
 // total weights must still fit in the engine's result_type.
 // 
-// AVR-libc targets can instead include random_avr.hpp, an experimental,
-// reduced C++17 Random<E> for the same engines.
+// AVR-libc targets can instead include random_avr.hpp, a C++17 frontend that
+// uses C arrays and pointer-plus-length buffers rather than C++20 ranges.
 //
 // The library operations are constexpr where their inputs permit constant evaluation.
 //

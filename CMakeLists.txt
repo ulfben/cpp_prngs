@@ -37,6 +37,12 @@ if(CPP_PRNGS_BUILD_TESTS)
 	target_compile_features(cpp_prngs_random_avr_tests PRIVATE cxx_std_17)
 	add_test(NAME RandomAvrCompatibility COMMAND cpp_prngs_random_avr_tests)
 
+	add_executable(cpp_prngs_random_avr_fast_float_tests tests/random_avr_tests.cpp)
+	target_include_directories(cpp_prngs_random_avr_fast_float_tests PRIVATE includes)
+	target_compile_features(cpp_prngs_random_avr_fast_float_tests PRIVATE cxx_std_17)
+	target_compile_definitions(cpp_prngs_random_avr_fast_float_tests PRIVATE RND_AVR_FAST_FLOAT)
+	add_test(NAME RandomAvrFastFloatCompatibility COMMAND cpp_prngs_random_avr_fast_float_tests)
+
 	add_executable(cpp_prngs_tests tests/random_tests.cpp)
 	target_link_libraries(cpp_prngs_tests PRIVATE cpp_prngs::cpp_prngs GTest::gtest)
 

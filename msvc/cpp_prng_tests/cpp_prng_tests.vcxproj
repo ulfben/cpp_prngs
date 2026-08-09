@@ -143,6 +143,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\includes\concepts.hpp" />
+    <ClInclude Include="..\..\includes\detail\avr_compat.hpp" />
     <ClInclude Include="..\..\includes\detail\portable_wide_multiply.hpp" />
     <ClInclude Include="..\..\includes\detail\wide_multiply.hpp" />
     <ClInclude Include="..\..\includes\engines\konadare192.hpp" />
@@ -156,6 +157,7 @@
     <ClInclude Include="..\..\includes\engines\xorshift32star8.hpp" />
     <ClInclude Include="..\..\includes\engines\xoshiro256ss.hpp" />
     <ClInclude Include="..\..\includes\random.hpp" />
+    <ClInclude Include="..\..\includes\random_avr.hpp" />
     <ClInclude Include="..\..\tests\engine_reference_validation.hpp" />
     <ClInclude Include="..\..\tests\wide_multiply_validation.hpp" />
   </ItemGroup>
