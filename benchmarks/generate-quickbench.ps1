@@ -214,6 +214,11 @@ $generatedSource = [regex]::Replace(
 	'(?m)^[\t ]+',
 	''
 )
+$generatedSource = [regex]::Replace(
+	$generatedSource,
+	'(?m)[\t ]+(?=\r?$)',
+	''
+)
 [System.IO.File]::WriteAllText(
 	$OutputFile,
 	$generatedSource + [Environment]::NewLine,

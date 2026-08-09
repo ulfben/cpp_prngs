@@ -22,6 +22,7 @@
 // - PCG32
 // - QuarkBurst64
 // - RomuDuoJr
+// - SmallFast16
 // - SmallFast32
 // - SmallFast64
 // - Xoshiro256SS

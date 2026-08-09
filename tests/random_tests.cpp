@@ -131,6 +131,7 @@ using EnginesUnderTest = ::testing::Types<
     RomuDuoJr,
     Konadare192,
     PCG32,
+    SmallFast16,
     SmallFast32,
     SmallFast64,
     Xoshiro256SS,
@@ -455,9 +456,8 @@ TYPED_TEST(RandomTypedTest, EngineAccessorsPreserveConstnessAndExposeState){
 TYPED_TEST(RandomTypedTest, SameSeedProducesSameSequence){
     using Engine = TypeParam;
     using Rng = rnd::Random<Engine>;
-    using result_type = Engine::result_type;
 
-    auto seed = result_type{123456789u};
+    auto seed = typename Engine::seed_type{12345u};
 
     Rng a{seed};
     Rng b{seed};
@@ -579,7 +579,11 @@ TYPED_TEST(RandomTypedTest, BitsCanFillATypeWiderThanEngineOutput){
     Rng expected_rng{123u};
 
     std::uint64_t expected = expected_rng.next();
-    if constexpr(std::numeric_limits<typename TypeParam::result_type>::digits == 32){
+    if constexpr(std::numeric_limits<typename TypeParam::result_type>::digits == 16){
+        expected |= std::uint64_t{expected_rng.next()} << 16;
+        expected |= std::uint64_t{expected_rng.next()} << 32;
+        expected |= std::uint64_t{expected_rng.next()} << 48;
+    } else if constexpr(std::numeric_limits<typename TypeParam::result_type>::digits == 32){
         expected |= std::uint64_t{expected_rng.next()} << 32;
     }
     EXPECT_EQ(bits_rng.template bits_as<std::uint64_t>(), expected);
@@ -597,9 +601,8 @@ TYPED_TEST(RandomTypedTest, BitsAsUsesAllDigitsOfTargetType){
 TYPED_TEST(RandomTypedTest, SeedWithValueResetsToGivenSequence){
     using Engine = TypeParam;
     using Rng = rnd::Random<Engine>;
-    using result_type = typename Engine::result_type;
 
-    const result_type seed_val{987654321u};
+    const typename Engine::seed_type seed_val{54321u};
 
     Rng a{seed_val};
     Rng b{};
@@ -647,7 +650,9 @@ TYPED_TEST(RandomTypedTest, CollectionHelpersReturnValidMutableAndConstElements)
 TYPED_TEST(RandomTypedTest, WeightedHelpersHaveSafeRangeAndWeightConstraints){
     using Rng = rnd::Random<TypeParam>;
 
-    static_assert(CanGetWeightedIndex<Rng, std::array<unsigned, 3>&>);
+    static_assert(CanGetWeightedIndex<Rng, std::array<unsigned, 3>&> ==
+        (std::numeric_limits<unsigned>::digits <=
+            std::numeric_limits<typename Rng::result_type>::digits));
     static_assert(!CanGetWeightedIndex<Rng, std::array<int, 3>&>);
     static_assert(CanGetWeightedIndex<Rng, std::array<std::uint8_t, 3>>);
     static_assert(!CanGetWeightedIndex<Rng, std::array<float, 3>&>);    
