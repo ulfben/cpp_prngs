@@ -517,6 +517,63 @@ constexpr bool operator!=(const SmallFast64& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+#include <assert.h>
+#include <stdint.h>
+class XorShift32Star8 final{
+using u8 = uint8_t;
+using u32 = uint32_t;
+static constexpr u32 DEFAULT_SEED = 0x7C62C6E0u;
+static constexpr u32 MULTIPLIER = 0xB2E1CB1Du;
+u32 state_;
+struct Direct{};
+constexpr XorShift32Star8(u32 state, Direct) noexcept : state_(state){
+assert(state_ != 0 && "XorShift32Star8 all-zero state is invalid");
+}
+public:
+using result_type = u8;
+using seed_type = u32;
+using state_type = u32;
+constexpr XorShift32Star8() noexcept
+: XorShift32Star8(DEFAULT_SEED){}
+explicit constexpr XorShift32Star8(seed_type seed) noexcept
+: state_(seed != 0 ? seed : DEFAULT_SEED){}
+static constexpr XorShift32Star8 from_state(state_type state) noexcept{
+return XorShift32Star8{state, Direct{}};
+}
+constexpr void seed() noexcept{
+*this = XorShift32Star8{};
+}
+constexpr void seed(seed_type value) noexcept{
+*this = XorShift32Star8{value};
+}
+static constexpr result_type (min)() noexcept{
+return result_type{0};
+}
+static constexpr result_type (max)() noexcept{
+return static_cast<result_type>(~result_type{0});
+}
+constexpr result_type next() noexcept{
+const u32 product = state_ * MULTIPLIER;
+state_ ^= state_ >> 6;
+state_ ^= state_ << 17;
+state_ ^= state_ >> 9;
+return static_cast<result_type>(product >> 24);
+}
+constexpr result_type operator()() noexcept{
+return next();
+}
+constexpr void discard(unsigned long long count) noexcept{
+while(count--){
+next();
+}
+}
+constexpr bool operator==(const XorShift32Star8& rhs) const noexcept{
+return state_ == rhs.state_;
+}
+constexpr bool operator!=(const XorShift32Star8& rhs) const noexcept{
+return !(*this == rhs);
+}
+};
 #include <stdint.h>
 #include <assert.h>
 class Xoshiro256SS{
@@ -615,6 +672,7 @@ BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast8);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast16);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast32);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast64);
+BENCHMARK_TEMPLATE(BM_EngineNext, XorShift32Star8);
 BENCHMARK_TEMPLATE(BM_EngineNext, Xoshiro256SS);
 BENCHMARK_TEMPLATE(BM_EngineNext, RomuDuoJr);
 BENCHMARK_TEMPLATE(BM_EngineNext, Konadare192);

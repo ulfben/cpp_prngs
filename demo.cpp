@@ -17,22 +17,28 @@
 //
 // Random<E> wraps any engine satisfying RandomBitEngine.
 //
-// Engines currently provided:
-// - Konadare192
-// - PCG32
-// - QuarkBurst64
-// - RomuDuoJr
-// - SmallFast8
-// - SmallFast16
-// - SmallFast32
-// - SmallFast64
-// - Xoshiro256SS
+// General-purpose engines:
+// - Konadare192       // 64-bit output
+// - PCG32             // 32-bit output
+// - QuarkBurst64      // 64-bit output
+// - RomuDuoJr         // 64-bit output
+// - SmallFast32       // 32-bit output
+// - SmallFast64       // 64-bit output
+// - Xoshiro256SS      // 64-bit output
 //
-// All Random<E> operations work with every engine. Operations that require
-// more random bits in a single engine result may require a 64-bit engine.
+// Narrow-output engines for resource-constrained targets:
+// - SmallFast8        // 8-bit output, 4-byte state
+// - SmallFast16       // 16-bit output, 8-byte state
+// - XorShift32Star8   // 8-bit output, 4-byte state
 //
-// The library operations are constexpr where their inputs and underlying
-// engine permit constant evaluation.
+// Random<E> works with every engine above. When necessary, it combines multiple
+// engine outputs to produce wider random values. Bounds, collection sizes, and
+// total weights must still fit in the engine's result_type.
+// 
+// AVR-libc targets can instead include random_avr.hpp, an experimental,
+// reduced C++17 Random<E> for the same engines.
+//
+// The library operations are constexpr where their inputs permit constant evaluation.
 //
 // Demo is available on Compiler Explorer: https://compiler-explorer.com/z/zTh6nazxj
 // Benchmarks: https://github.com/ulfben/cpp_prngs#performance-benchmarks

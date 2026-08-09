@@ -7,6 +7,7 @@
 #include "../includes/engines/small_fast16.hpp"
 #include "../includes/engines/small_fast32.hpp"
 #include "../includes/engines/small_fast64.hpp"
+#include "../includes/engines/xorshift32star8.hpp"
 #include "../includes/engines/xoshiro256ss.hpp"
 #include <stddef.h>
 #include <stdint.h>
@@ -140,6 +141,19 @@ namespace rnd::detail::validation {
 		arrays_equal(prng_outputs(SmallFast16{uint16_t{123}}), jsf16_reference),
 		"SmallFast16 output does not match Melissa O'Neill's reference implementation"
 	);
+
+	// First outputs from M.E. O'Neill's xorshift32star8 parameter set A,
+	// starting from raw state 123. Output is multiplied before state advances.
+	// https://gist.github.com/imneme/9b769cefccac1f2bd728596da3a856dd
+	constexpr fixed_array<uint8_t, 6> xorshift32star8_reference{{
+		0xf2, 0x72, 0x37, 0x2e, 0xd4, 0x80
+	}};
+
+	static_assert(
+		arrays_equal(prng_outputs(XorShift32Star8::from_state(123)), xorshift32star8_reference),
+		"XorShift32Star8 output does not match M.E. O'Neill's reference implementation"
+	);
+	static_assert(XorShift32Star8{uint32_t{0}} == XorShift32Star8{});
 
 	struct jsf64_state{
 		uint64_t a, b, c, d;

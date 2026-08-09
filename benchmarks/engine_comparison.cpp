@@ -12,6 +12,7 @@
 #include "../includes/engines/small_fast16.hpp"
 #include "../includes/engines/small_fast32.hpp"
 #include "../includes/engines/small_fast64.hpp"
+#include "../includes/engines/xorshift32star8.hpp"
 #include "../includes/engines/xoshiro256ss.hpp"
 
 #include <benchmark/benchmark.h>
@@ -45,6 +46,7 @@ BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast8);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast16);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast32);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast64);
+BENCHMARK_TEMPLATE(BM_EngineNext, XorShift32Star8);
 BENCHMARK_TEMPLATE(BM_EngineNext, Xoshiro256SS);
 BENCHMARK_TEMPLATE(BM_EngineNext, RomuDuoJr);
 BENCHMARK_TEMPLATE(BM_EngineNext, Konadare192);

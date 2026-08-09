@@ -96,9 +96,11 @@ All the provided engines [are very fast](https://github.com/ulfben/cpp_prngs#per
 
 They are also compact (4-32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions on desktop systems unless you have a measured performance reason not to; narrower engines are useful on constrained targets such as 8-bit microcontrollers.
 
-`Random<E>` can only generate a bound that fits the engine's output type. SmallFast8 therefore supports ranges up to 255, SmallFast16 up to 65,535, and the 32-bit engines up to roughly 4.29 billion. In debug builds, the API alerts you if a requested range is too large for the chosen engine.
+`Random<E>` can only generate a bound that fits the engine's output type. The 8-bit engines therefore support ranges up to 255, SmallFast16 up to 65,535, and the 32-bit engines up to roughly 4.29 billion. In debug builds, the API alerts you if a requested range is too large for the chosen engine.
 
 SmallFast8 is deliberately specialized: its 4-byte state is useful where memory is scarce, but [O’Neill reports](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html) a PractRand failure at 2^28 bytes, so it is not intended for long streams.
+
+XorShift32Star8 uses the same 4-byte state while guaranteeing a period of 2^32 − 1. In [O’Neill’s PractRand comparison](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html), it completed roughly 4.29 billion raw outputs before repetition became detectable during the second cycle. It remains a specialized tiny engine, not the general-purpose XorShift\* 64/32 variant.
 
 | File Name           | Output Width | Description                                                                                                                                |
 |---------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
@@ -111,10 +113,13 @@ SmallFast8 is deliberately specialized: its 4-byte state is useful where memory 
 | [`small_fast16.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast16.hpp)  | 16 bits      | C++ port of [Melissa O’Neill’s tested 16-bit Small Fast variant](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html), with 64 bits of state and two rotates (13, 8). |
 | [`small_fast32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast32.hpp)  | 32 bits      | C++ port of [Bob Jenkins’ 32-bit “Small Fast”](https://burtleburtle.net/bob/rand/smallprng.html) PRNG (two-rotate). |
 | [`small_fast64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast64.hpp)  | 64 bits      | A 64-bit three-rotate implementation of the above. Three rotates (7, 13, 37) ensure stronger avalanche behavior than a naïve two-rotate 64-bit variant. |
+| [`xorshift32star8.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xorshift32star8.hpp) | 8 bits | A 32-bit-state specialization of [M.E. O’Neill’s truncated XorShift\* family](https://gist.github.com/imneme/9b769cefccac1f2bd728596da3a856dd). |
 
 Each included engine is a small, self-contained random number generator. You can use an engine directly, but it deliberately provides only the basics: seeding, advancing its state, comparing states, and generating random unsigned integers.
 
 For everyday use, wrap an engine in [`Random<E>`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp). `Random<E>` adds the game-friendly interface - bounded numbers, floats, coin flips, random elements, weighted selection, Gaussian samples, and more - while letting you swap the underlying engine without changing the rest of your code.
+
+AVR-libc targets can instead include [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp), an experimental, reduced C++17 `Random<E>` for the same engines to run on Arduinos. 
 
 All included engines satisfy the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp) concept and can therefore be used with `Random<E>`. They are also compatible with standard C++ facilities such as `std::shuffle` and `std::sample`.
 
@@ -279,6 +284,7 @@ This project includes, or is based on, the following PRNG engines and reference 
 - **RomuDuoJr**: Based on Rhet Butler’s C++ wrapper ([public domain](https://github.com/Almightygir/rhet_RNG/blob/main/xromu2jr.h)), itself inspired by Mark Overton’s [Romu family](https://romu-random.org/).
 - **SmallFast8 / SmallFast16**: Based on Bob Jenkins’ algorithm and M.E. O’Neill’s narrow-width constants and reference implementation ([MIT License](https://gist.github.com/imneme/85cff47d4bad8de6bdeb671f9c76c814)); see her excellent [PractRand analysis](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html).
 - **SmallFast32 / SmallFast64**: Based on Bob Jenkins’ reference implementation ([public domain](https://burtleburtle.net/bob/rand/smallprng.html)).
+- **XorShift32Star8**: XorShift transition by [George Marsaglia](https://doi.org/10.18637/jss.v008.i14), XorShift\* scrambler by [Sebastiano Vigna](https://arxiv.org/abs/1402.6246), and truncated parameterization and implementation by [M.E. O’Neill](https://gist.github.com/imneme/9b769cefccac1f2bd728596da3a856dd) ([MIT License](https://gist.github.com/imneme/9b769cefccac1f2bd728596da3a856dd)).
 - **xoshiro256\*\***: Based on David Blackman & Sebastiano Vigna’s reference code ([public domain](https://prng.di.unimi.it/xoshiro256starstar.c)).
 - **splitmix64**: By Sebastiano Vigna ([public domain](https://prng.di.unimi.it/splitmix64.c)).
 - **PCG32**: Based on M.E. O’Neill’s reference implementation ([Apache License 2.0](https://github.com/imneme/pcg-c-basic/)).

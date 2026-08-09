@@ -135,6 +135,7 @@ using EnginesUnderTest = ::testing::Types<
     SmallFast16,
     SmallFast32,
     SmallFast64,
+    XorShift32Star8,
     Xoshiro256SS,
     QuarkBurst64    
 >;

@@ -56,6 +56,9 @@
     <ClInclude Include="..\..\includes\engines\small_fast64.hpp">
       <Filter>includes\engines</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\includes\engines\xorshift32star8.hpp">
+      <Filter>includes\engines</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\includes\engines\xoshiro256ss.hpp">
       <Filter>includes\engines</Filter>
     </ClInclude>

@@ -13,10 +13,12 @@ void setup(){
 	SmallFast16 small_fast_16;
 	SmallFast32 small_fast_32;
 	SmallFast64 small_fast_64;
+	XorShift32Star8 xorshift_32_star_8{static_cast<uint32_t>(input)};
 	Xoshiro256SS xoshiro;
 
 	output = pcg() ^ konadare() ^ quarkburst() ^ romu() ^
-		small_fast_8() ^ small_fast_16() ^ small_fast_32() ^ small_fast_64() ^ xoshiro();
+		small_fast_8() ^ small_fast_16() ^ small_fast_32() ^ small_fast_64() ^
+		xorshift_32_star_8() ^ xoshiro();
 
 	// Exercise the reduced Random<E> frontend across all supported result widths.
 	rnd::Random<PCG32> random_32;
