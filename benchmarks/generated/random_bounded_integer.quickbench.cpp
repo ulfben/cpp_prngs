@@ -1,7 +1,7 @@
 #include <concepts>
 #include <limits>
-#include <random>       
-#include <type_traits>  
+#include <random>
+#include <type_traits>
 template<typename E>
 concept RandomBitEngine =
 requires {
@@ -32,35 +32,37 @@ requires(E& e, const E& ce, typename E::seed_type seed, unsigned long long n){
 { e.seed(seed) } noexcept -> std::same_as<void>;
 { e.discard(n) } noexcept -> std::same_as<void>;
 };
+#include <stdint.h>
+namespace rnd{
+namespace detail{
+struct u128_parts final{
+uint64_t lo;
+uint64_t hi;
+};
+[[nodiscard]] constexpr u128_parts mul64_to_128_parts(uint64_t a, uint64_t b) noexcept{
+const uint64_t a0 = static_cast<uint32_t>(a);
+const uint64_t a1 = a >> 32;
+const uint64_t b0 = static_cast<uint32_t>(b);
+const uint64_t b1 = b >> 32;
+const uint64_t p00 = a0 * b0;
+const uint64_t p01 = a0 * b1;
+const uint64_t p10 = a1 * b0;
+const uint64_t p11 = a1 * b1;
+const uint64_t mid = p01 + p10;
+const uint64_t mid_carry = mid < p01 ? (uint64_t{1} << 32) : uint64_t{0};
+const uint64_t mid_low = (mid & UINT32_MAX) << 32;
+const uint64_t low = p00 + mid_low;
+const uint64_t high = p11 + (mid >> 32) + mid_carry + (low < p00 ? 1u : 0u);
+return {low, high};
+}
+}
+}
 #include <cstdint>
 #ifdef _MSC_VER
-#include <intrin.h>     
+#include <intrin.h>
 #endif
 namespace rnd{
 namespace detail {
-struct u128_parts final{
-std::uint64_t lo;
-std::uint64_t hi;
-};
-[[nodiscard]] constexpr u128_parts mul64_to_128_parts(std::uint64_t a, std::uint64_t b) noexcept{
-const std::uint64_t a0 = static_cast<std::uint32_t>(a);
-const std::uint64_t a1 = a >> 32;
-const std::uint64_t b0 = static_cast<std::uint32_t>(b);
-const std::uint64_t b1 = b >> 32;
-const std::uint64_t p00 = a0 * b0;
-const std::uint64_t p01 = a0 * b1;
-const std::uint64_t p10 = a1 * b0;
-const std::uint64_t p11 = a1 * b1;
-constexpr std::uint64_t lo32_mask = 0xFFFF'FFFFull;
-const std::uint64_t mid = p01 + p10;
-const std::uint64_t mid_carry = (mid < p01) ? (1ull << 32) : 0ull;
-const std::uint64_t mid_lo = (mid & lo32_mask) << 32;
-const std::uint64_t mid_hi = mid >> 32;
-const std::uint64_t lo = p00 + mid_lo;
-const std::uint64_t lo_carry = (lo < p00) ? 1ull : 0ull;
-const std::uint64_t hi = p11 + mid_hi + mid_carry + lo_carry;
-return {lo, hi};
-}
 template <unsigned digits>
 [[nodiscard]] constexpr std::uint64_t shr128_to_u64(std::uint64_t hi, std::uint64_t lo) noexcept{
 static_assert(digits > 0 && digits <= 64);
@@ -81,10 +83,10 @@ return static_cast<std::uint64_t>(
 std::uint64_t hi = 0;
 std::uint64_t lo = 0;
 if consteval{
-const auto p = mul64_to_128_parts(x, bound);  
+const auto p = mul64_to_128_parts(x, bound);
 lo = p.lo;
 hi = p.hi;
-} else{  
+} else{
 lo = _umul128(x, bound, &hi);
 }
 return shr128_to_u64<digits>(hi, lo);
@@ -92,10 +94,10 @@ return shr128_to_u64<digits>(hi, lo);
 static_assert(false, "mul_shift_high64 requires either __uint128_t or MSVC _umul128");
 #endif
 }
-}  
-}  
+}
+}
 #include <algorithm>
-#include <bit>  
+#include <bit>
 #include <cassert>
 #include <concepts>
 #include <cstdint>
@@ -108,12 +110,12 @@ namespace rnd {
 template <class F>
 concept supported_float =
 (std::same_as<F, float> || std::same_as<F, double>) &&
-(sizeof(F) == sizeof(std::uint32_t) || sizeof(F) == sizeof(std::uint64_t)) &&  
-std::numeric_limits<F>::is_iec559 &&   
-std::numeric_limits<F>::radix == 2;  
+(sizeof(F) == sizeof(std::uint32_t) || sizeof(F) == sizeof(std::uint64_t)) &&
+std::numeric_limits<F>::is_iec559 &&
+std::numeric_limits<F>::radix == 2;
 template <RandomBitEngine E>
 class Random final{
-static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;	
+static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;
 template <class T>
 static constexpr bool valid_weight_type =
 std::unsigned_integral<std::remove_cv_t<T>> &&
@@ -124,8 +126,8 @@ using projected_weight_t = std::remove_cvref_t<std::invoke_result_t<Projection&,
 public:
 using engine_type = E;
 using result_type = typename E::result_type;
-using seed_type = typename E::seed_type;		
-constexpr Random() noexcept = default;  
+using seed_type = typename E::seed_type;
+constexpr Random() noexcept = default;
 explicit constexpr Random(seed_type seed_val) noexcept : _e(seed_val){}
 explicit constexpr Random(engine_type engine) noexcept : _e(engine){}
 constexpr bool operator==(const Random& rhs) const noexcept = default;
@@ -136,19 +138,19 @@ constexpr E& engine() noexcept{
 return _e;
 }
 constexpr void seed() noexcept{
-_e.seed();  
+_e.seed();
 }
 constexpr void seed(seed_type v) noexcept{
-_e.seed(v);  
+_e.seed(v);
 }
 constexpr void discard(unsigned long long n) noexcept{
 _e.discard(n);
-}				
+}
 [[nodiscard]] constexpr Random split() noexcept{
-return Random{bits_as<seed_type>()};  
+return Random{bits_as<seed_type>()};
 }
 static constexpr result_type  min() noexcept{
-return 0; 
+return 0;
 }
 static constexpr result_type  max() noexcept{
 return E::max();
@@ -177,7 +179,7 @@ static_assert(N <= std::numeric_limits<T>::digits, "T cannot hold N bits");
 if constexpr(N <= value_bits){
 return take_high_bits<T>(next(), N);
 } else{
-return gather_bits_runtime<T>(N);  
+return gather_bits_runtime<T>(N);
 }
 }
 template <class T>
@@ -187,15 +189,15 @@ return bits<std::numeric_limits<T>::digits, T>();
 }
 constexpr result_type next(result_type bound) noexcept{
 assert(bound > 0 && "bound must be non-zero and positive");
-result_type raw_value = next();  
-if constexpr(value_bits <= 32){  
-auto product = std::uint64_t(raw_value) * std::uint64_t(bound);	 
-auto result = result_type(product >> value_bits);  
-return result;                     
+result_type raw_value = next();
+if constexpr(value_bits <= 32){
+auto product = std::uint64_t(raw_value) * std::uint64_t(bound);
+auto result = result_type(product >> value_bits);
+return result;
 } else if constexpr(value_bits <= 64){
 return detail::mul_shift_u64<value_bits>(raw_value, bound);
-} else{  
-return bound > 0 ? raw_value % bound : bound;  
+} else{
+return bound > 0 ? raw_value % bound : bound;
 }
 }
 constexpr result_type operator()(result_type bound) noexcept{
@@ -205,11 +207,11 @@ template <result_type Bound, std::integral T = result_type>
 constexpr T next() noexcept{
 static_assert(Bound > 0, "Bound must be positive");
 static_assert(Bound - 1 <= static_cast<result_type>(std::numeric_limits<T>::max()),
-"Bound is too large for return type T");			
+"Bound is too large for return type T");
 if constexpr(Bound == 1){
 return T{0};
-}else if constexpr((Bound & (Bound - 1)) == 0){  
-constexpr unsigned bits_needed = std::countr_zero(Bound);				
+}else if constexpr((Bound & (Bound - 1)) == 0){
+constexpr unsigned bits_needed = std::countr_zero(Bound);
 return bits<bits_needed, T>();
 } else{
 return static_cast<T>(next(Bound));
@@ -230,17 +232,17 @@ auto safe_bound = static_cast<result_type>(bound);
 return static_cast<I>(U(lo) + static_cast<U>(next(safe_bound)));
 }
 template <supported_float F = float>
-constexpr F normalized() noexcept{			
-using UInt = std::conditional_t<sizeof(F) == sizeof(std::uint32_t), std::uint32_t, std::uint64_t>;   
-constexpr int mantissa_bits = std::numeric_limits<F>::digits - 1;  
-constexpr UInt base = std::bit_cast<UInt>(F{1});  
-const UInt mantissa = this->template bits<mantissa_bits, UInt>();       
-const UInt as_int = base | mantissa;  
-return std::bit_cast<F>(as_int) - F{1};  
-}			
+constexpr F normalized() noexcept{
+using UInt = std::conditional_t<sizeof(F) == sizeof(std::uint32_t), std::uint32_t, std::uint64_t>;
+constexpr int mantissa_bits = std::numeric_limits<F>::digits - 1;
+constexpr UInt base = std::bit_cast<UInt>(F{1});
+const UInt mantissa = this->template bits<mantissa_bits, UInt>();
+const UInt as_int = base | mantissa;
+return std::bit_cast<F>(as_int) - F{1};
+}
 template <supported_float F = float>
 constexpr F signed_norm() noexcept{
-return F{2} * normalized<F>() - F{1};  
+return F{2} * normalized<F>() - F{1};
 }
 template <supported_float F = float>
 constexpr F between(F lo, F hi) noexcept{
@@ -306,8 +308,8 @@ return selected;
 }
 target -= weight;
 ++selected;
-}			
-std::unreachable();  
+}
+std::unreachable();
 }
 template <std::ranges::forward_range R, class Projection>
 requires std::ranges::sized_range<R>&&
@@ -326,43 +328,67 @@ std::invocable<Projection&, std::ranges::range_reference_t<R>>&&
 valid_weight_type<projected_weight_t<R, Projection>>
 [[nodiscard]] constexpr decltype(auto) weighted_element(R&& collection, Projection projection) noexcept{
 return *weighted_iterator(std::forward<R>(collection), std::move(projection));
-}			
+}
 private:
-E _e{};  
+E _e{};
 template <class T>
 static constexpr T low_bits_mask(unsigned n) noexcept{
-assert(n <= std::numeric_limits<T>::digits);  
+assert(n <= std::numeric_limits<T>::digits);
 constexpr unsigned W = std::numeric_limits<T>::digits;
 if(n == 0) return T{0};
-if(n >= W) return std::numeric_limits<T>::max();  
+if(n >= W) return std::numeric_limits<T>::max();
 return static_cast<T>((T{1} << n) - T{1});
 }
 template <class T>
 constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
-assert(1 <= n && n <= value_bits && n <= std::numeric_limits<T>::digits);  
-const unsigned shift = value_bits - n;     
+assert(1 <= n && n <= value_bits && n <= std::numeric_limits<T>::digits);
+const unsigned shift = value_bits - n;
 return static_cast<T>(x >> shift) & low_bits_mask<T>(n);
 }
 template <class T>
 constexpr T gather_bits_runtime(unsigned n) noexcept{
-assert(1 <= n && n <= std::numeric_limits<T>::digits);  
+assert(1 <= n && n <= std::numeric_limits<T>::digits);
 T acc = 0;
 unsigned filled = 0;
 while(filled < n){
 const unsigned take = std::min<unsigned>(value_bits, n - filled);
 const T chunk = take_high_bits<T>(next(), take);
-acc |= (chunk << filled);              
+acc |= (chunk << filled);
 filled += take;
 }
 return acc & low_bits_mask<T>(n);
 }
 };
-}  
-#include <limits>
-#include <cstdint>
-#include <bit>  
+}
+#include <limits.h>
+#if __cplusplus >= 202002L || (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L)
+#include <bit>
+#endif
+namespace rnd::detail {
+template <class T>
+[[nodiscard]] constexpr T rotl(T value, unsigned shift) noexcept{
+#if defined(__cpp_lib_bitops) && __cpp_lib_bitops >= 201907L
+return std::rotl(value, static_cast<int>(shift));
+#else
+constexpr unsigned digits = sizeof(T) * CHAR_BIT;
+const unsigned amount = shift % digits;
+return amount == 0 ? value : static_cast<T>((value << amount) | (value >> (digits - amount)));
+#endif
+}
+template <class T>
+[[nodiscard]] constexpr T rotr(T value, unsigned shift) noexcept{
+#if defined(__cpp_lib_bitops) && __cpp_lib_bitops >= 201907L
+return std::rotr(value, static_cast<int>(shift));
+#else
+constexpr unsigned digits = sizeof(T) * CHAR_BIT;
+const unsigned amount = shift % digits;
+return amount == 0 ? value : static_cast<T>((value >> amount) | (value << (digits - amount)));
+#endif
+}
+}
+#include <stdint.h>
 class Konadare192 final{
-using u64 = std::uint64_t;
+using u64 = uint64_t;
 static constexpr u64 INC = 0xBB67AE8584CAA73BULL;
 static constexpr u64 DEFAULT_SEED = 1;
 u64 a_{};
@@ -372,7 +398,7 @@ static constexpr u64 mix(u64 a, u64 b) noexcept{
 u64 c = b;
 u64 x = a;
 for(u64 i = 0; i < 5; ++i){
-x ^= std::rotr(x, 25) ^ std::rotr(x, 49);
+x ^= rnd::detail::rotr(x, 25) ^ rnd::detail::rotr(x, 49);
 c += INC + (c << 15) + (c << 7) + i;
 c ^= (c >> 47) ^ (c >> 23);
 x += c;
@@ -381,26 +407,26 @@ x ^= (x >> 11) ^ (x >> 3);
 return x;
 }
 public:
-using result_type = std::uint64_t;
+using result_type = uint64_t;
 using seed_type = u64;
 constexpr Konadare192() noexcept : Konadare192(DEFAULT_SEED){}
 constexpr explicit Konadare192(seed_type seed_val) noexcept : a_(seed_val), b_(seed_val + 1), c_(seed_val + 2){
-for(int m = 0; m < 2; ++m){  
+for(int m = 0; m < 2; ++m){
 result_type t0 = mix(a_, c_);
 result_type t1 = mix(b_, a_);
 result_type t2 = mix(c_, b_);
 a_ = t0; b_ = t1; c_ = t2;
 }
-if((a_ | b_ | c_) == 0){  
-a_ = 0x3C6EF372FE94F82BULL;  
+if((a_ | b_ | c_) == 0){
+a_ = 0x3C6EF372FE94F82BULL;
 }
 }
 constexpr result_type next() noexcept{
 result_type out = b_ ^ c_;
 result_type a0 = a_ ^ (a_ >> 32);
 a_ += INC;
-b_ = std::rotr(b_ + a0, 11);
-c_ = std::rotl(c_ + b_, 8);
+b_ = rnd::detail::rotr(b_ + a0, 11);
+c_ = rnd::detail::rotl(c_ + b_, 8);
 return out;
 }
 constexpr result_type operator()() noexcept{ return next(); }
@@ -415,19 +441,22 @@ constexpr void seed(result_type value) noexcept{
 constexpr void seed() noexcept{
 *this = Konadare192{};
 }
-static constexpr result_type min() noexcept{
+static constexpr result_type (min)() noexcept{
 return result_type{0};
 }
-static constexpr result_type max() noexcept{
-return std::numeric_limits<result_type>::max();
+static constexpr result_type (max)() noexcept{
+return static_cast<result_type>(~result_type{0});
 }
-constexpr bool operator==(const Konadare192&) const noexcept = default;
+constexpr bool operator==(const Konadare192& rhs) const noexcept{
+return a_ == rhs.a_ && b_ == rhs.b_ && c_ == rhs.c_;
+}
+constexpr bool operator!=(const Konadare192& rhs) const noexcept{
+return !(*this == rhs);
+}
 };
-#include <bit>
-#include <cstdint>
-#include <limits>
+#include <stdint.h>
 class QuarkBurst64 final{
-using u64 = std::uint64_t;
+using u64 = uint64_t;
 static constexpr u64 DEFAULT_SEED = 0xFEEDFACECAFEBEEFULL;
 static constexpr u64 INCREMENT = 1'111'111'111'111'111ULL;
 u64 a_{};
@@ -469,9 +498,9 @@ constexpr void seed(seed_type seed_value) noexcept{
 *this = QuarkBurst64{seed_value};
 }
 constexpr result_type next() noexcept{
-a_ = std::rotl(a_, 29) ^ b_;
+a_ = rnd::detail::rotl(a_, 29) ^ b_;
 b_ += INCREMENT;
-c_ = std::rotl(c_, 41) + a_;
+c_ = rnd::detail::rotl(c_, 41) + a_;
 return c_;
 }
 constexpr result_type operator()() noexcept{
@@ -482,35 +511,38 @@ while(n--){
 next();
 }
 }
-static constexpr result_type min() noexcept{
+static constexpr result_type (min)() noexcept{
 return result_type{0};
 }
-static constexpr result_type max() noexcept{
-return std::numeric_limits<result_type>::max();
+static constexpr result_type (max)() noexcept{
+return static_cast<result_type>(~result_type{0});
 }
-constexpr bool operator==(const QuarkBurst64&) const noexcept = default;
+constexpr bool operator==(const QuarkBurst64& rhs) const noexcept{
+return a_ == rhs.a_ && b_ == rhs.b_ && c_ == rhs.c_;
+}
+constexpr bool operator!=(const QuarkBurst64& rhs) const noexcept{
+return !(*this == rhs);
+}
 };
-#include <cstdint>
-#include <limits>
-#include <bit>  
+#include <stdint.h>
 class RomuDuoJr final{
-using u64 = std::uint64_t;
+using u64 = uint64_t;
 using state_type = u64;
 state_type x;
 state_type y;
-struct Direct{};  
+struct Direct{};
 constexpr RomuDuoJr(state_type xstate, state_type ystate, Direct) noexcept
 : x(xstate), y(ystate){}
 public:
 using result_type = u64;
-using seed_type = u64;   
+using seed_type = u64;
 constexpr RomuDuoJr() noexcept : RomuDuoJr(0xFEEDFACEFEEDFACEULL){}
 explicit constexpr RomuDuoJr(seed_type seed) noexcept
 : x(0x9E6C63D0676A9A99ULL), y(~seed - seed){
 y *= x;
 y = y ^ (y >> 23) ^ (y >> 51);
 y *= x;
-x *= std::rotl(y, 27);
+x *= rnd::detail::rotl(y, 27);
 y = y ^ (y >> 23) ^ (y >> 51);
 }
 constexpr void seed() noexcept{
@@ -525,7 +557,7 @@ return RomuDuoJr{xstate, ystate, Direct{}};
 constexpr result_type next() noexcept{
 const state_type old_x = x;
 x = y * 15241094284759029579ULL;
-y = std::rotl(y - old_x, 27);
+y = rnd::detail::rotl(y - old_x, 27);
 return old_x;
 }
 constexpr result_type operator()() noexcept{
@@ -536,13 +568,18 @@ while(n--){
 next();
 }
 }
-static constexpr result_type min() noexcept{
+static constexpr result_type (min)() noexcept{
 return result_type{0};
 }
-static constexpr result_type max() noexcept{
-return std::numeric_limits<result_type>::max();
+static constexpr result_type (max)() noexcept{
+return static_cast<result_type>(~result_type{0});
 }
-constexpr bool operator==(const RomuDuoJr& rhs) const noexcept = default;
+constexpr bool operator==(const RomuDuoJr& rhs) const noexcept{
+return x == rhs.x && y == rhs.y;
+}
+constexpr bool operator!=(const RomuDuoJr& rhs) const noexcept{
+return !(*this == rhs);
+}
 };
 #include <benchmark/benchmark.h>
 #include <cstdint>
@@ -596,4 +633,4 @@ BENCHMARK_TEMPLATE(BM_UniformIntDistribution, std::mt19937_64);
 BENCHMARK_TEMPLATE(BM_UniformIntDistribution, std::mt19937);
 BENCHMARK_TEMPLATE(BM_UniformIntDistribution, std::minstd_rand);
 BENCHMARK(BM_CstdlibRandModulo);
-}  
+}

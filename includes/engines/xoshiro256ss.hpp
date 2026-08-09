@@ -1,9 +1,7 @@
 #pragma once
-#include <limits>
-#include <cstdint>
-#include <span>
-#include <bit> //std::rotl
-#include <cassert>
+#include "../detail/bit_operations.hpp"
+#include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
+#include <assert.h>
 
 /*
   Xoshiro256SS - a modern C++ port of xoshiro256** 1.0.
@@ -20,8 +18,9 @@
 */
 
 class Xoshiro256SS{
-	using u64 = std::uint64_t;
+	using u64 = uint64_t;
 	u64 s[4]{};
+	struct Direct{};
 
 	static constexpr u64 splitmix64(u64& x) noexcept{
 		x += 0x9E3779B97F4A7C15ULL; // golden ratio increment
@@ -32,11 +31,8 @@ class Xoshiro256SS{
 	}
 	
 	//private constructor to allow factory function from_state() to bypass the seeding routines.
-	constexpr Xoshiro256SS(std::span<const u64, 4> state) noexcept{		
-		s[0] = state[0];
-		s[1] = state[1];
-		s[2] = state[2];
-		s[3] = state[3];	
+	constexpr Xoshiro256SS(u64 s0, u64 s1, u64 s2, u64 s3, Direct) noexcept
+		: s{s0, s1, s2, s3}{
 		assert((s[0] | s[1] | s[2] | s[3]) != 0 && "xoshiro256** all-zero state is invalid");
 	}
 
@@ -60,8 +56,9 @@ public:
 	}
 
 	//factory function to create a Xoshiro256SS from a state, bypassing the seeding routines.
-	static constexpr Xoshiro256SS from_state(std::span<const state_type, 4> state) noexcept{
-		return Xoshiro256SS{state};
+	template <class State>
+	static constexpr Xoshiro256SS from_state(const State& state) noexcept{
+		return Xoshiro256SS{state[0], state[1], state[2], state[3], Direct{}};
 	}
 	constexpr void seed() noexcept{
 		*this = Xoshiro256SS{};
@@ -69,21 +66,22 @@ public:
 	constexpr void seed(seed_type seed) noexcept{
 		*this = Xoshiro256SS{seed};
 	}
-	static constexpr result_type min() noexcept{
+	static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.
 		return result_type{0};
 	}
-	static constexpr result_type max() noexcept{
-		return std::numeric_limits<result_type>::max();
+	static constexpr result_type (max)() noexcept{ // Parentheses prevent expansion of Arduino's max macro.
+		// Equivalent to std::numeric_limits<result_type>::max(), but <limits> is not available on AVR-libc.
+		return static_cast<result_type>(~result_type{0});
 	}
 	constexpr result_type next() noexcept{
-		const auto result = std::rotl(s[1] * 5, 7) * 9;
+		const auto result = rnd::detail::rotl(s[1] * 5, 7) * 9;
 		const auto t = s[1] << 17;
 		s[2] ^= s[0];
 		s[3] ^= s[1];
 		s[1] ^= s[2];
 		s[0] ^= s[3];
 		s[2] ^= t;
-		s[3] = std::rotl(s[3], 45);
+		s[3] = rnd::detail::rotl(s[3], 45);
 		return result;
 	}
 	constexpr result_type operator()() noexcept{
@@ -118,5 +116,10 @@ public:
 		 s = temp;
 	 } */
 
-	constexpr bool operator==(const Xoshiro256SS& rhs) const noexcept = default; //will do the right thing since C++20! 
+	constexpr bool operator==(const Xoshiro256SS& rhs) const noexcept{
+		return s[0] == rhs.s[0] && s[1] == rhs.s[1] && s[2] == rhs.s[2] && s[3] == rhs.s[3];
+	}
+	constexpr bool operator!=(const Xoshiro256SS& rhs) const noexcept{
+		return !(*this == rhs);
+	}
 };

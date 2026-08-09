@@ -1,7 +1,6 @@
 #pragma once
-#include <limits>
-#include <cstdint>
-#include <bit> //std::rotl
+#include "../detail/bit_operations.hpp"
+#include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 /*
   SmallFast64 PRNG - a modern C++ 64-bit three-rotate implementation of Jenkins Small Fast PRNG.
 
@@ -14,7 +13,7 @@
 */
 
 class SmallFast64{
-   using u64 = std::uint64_t;
+   using u64 = uint64_t;
    u64 a;
    u64 b;
    u64 c;
@@ -38,18 +37,19 @@ public:
       *this = SmallFast64{seed};
    }
 
-   static constexpr result_type max() noexcept{
-      return std::numeric_limits<u64>::max();
+   static constexpr result_type (max)() noexcept{ // Parentheses prevent expansion of Arduino's max macro.
+      // Equivalent to std::numeric_limits<result_type>::max(), but <limits> is not available on AVR-libc.
+      return static_cast<result_type>(~result_type{0});
    }
-   static constexpr result_type min() noexcept{
+   static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.
        return result_type{0};
    }
    constexpr result_type next() noexcept{
        // The rotate constants (7, 13, 37) are chosen specifically for 64-bit terms, to provide
        // better avalanche characteristics, achieving 18.4 bits of avalanche after 5 rounds.
-      const u64 e = a - std::rotl(b, 7);
-      a = b ^ std::rotl(c, 13);
-      b = c + std::rotl(d, 37);
+      const u64 e = a - rnd::detail::rotl(b, 7);
+      a = b ^ rnd::detail::rotl(c, 13);
+      b = c + rnd::detail::rotl(d, 37);
       c = d + e;
       d = e + a;
       return d;
@@ -65,5 +65,10 @@ public:
       }
    }
 
-   constexpr bool operator==(const SmallFast64& rhs) const noexcept = default;
+   constexpr bool operator==(const SmallFast64& rhs) const noexcept{
+      return a == rhs.a && b == rhs.b && c == rhs.c && d == rhs.d;
+   }
+   constexpr bool operator!=(const SmallFast64& rhs) const noexcept{
+      return !(*this == rhs);
+   }
 };

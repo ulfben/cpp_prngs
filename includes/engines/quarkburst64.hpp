@@ -1,10 +1,9 @@
 #pragma once
-#include <bit>
-#include <cstdint>
-#include <limits>
+#include "../detail/bit_operations.hpp"
+#include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 
 /*
-    QuarkBurst64 - an independent C++26 implementation of the
+    QuarkBurst64 - an independent modern C++ implementation of the
     quarkburst1x64 algorithm by William Stafford Parsons.
 
     The algorithm was previously published under the name GhostScramble.
@@ -14,7 +13,7 @@
     https://github.com/eightomic/quarkburst
     Licensed under the BSD 3-Clause License.
 
-    C++26 implementation, seed expansion, value semantics, and
+    C++ implementation, seed expansion, value semantics, and
     RandomBitEngine integration:
     Copyright (c) 2026 Ulf Benjaminsson
     https://github.com/ulfben/cpp_prngs
@@ -24,7 +23,7 @@
 */
 
 class QuarkBurst64 final{
-    using u64 = std::uint64_t;
+    using u64 = uint64_t;
 
     static constexpr u64 DEFAULT_SEED = 0xFEEDFACECAFEBEEFULL;
     static constexpr u64 INCREMENT = 1'111'111'111'111'111ULL;
@@ -80,9 +79,9 @@ public:
     }
 
     constexpr result_type next() noexcept{
-        a_ = std::rotl(a_, 29) ^ b_;
+        a_ = rnd::detail::rotl(a_, 29) ^ b_;
         b_ += INCREMENT;
-        c_ = std::rotl(c_, 41) + a_;
+        c_ = rnd::detail::rotl(c_, 41) + a_;
         return c_;
     }
 
@@ -96,13 +95,19 @@ public:
         }
     }
 
-    static constexpr result_type min() noexcept{
+    static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.
         return result_type{0};
     }
 
-    static constexpr result_type max() noexcept{
-        return std::numeric_limits<result_type>::max();
+    static constexpr result_type (max)() noexcept{ // Parentheses prevent expansion of Arduino's max macro.
+        // Equivalent to std::numeric_limits<result_type>::max(), but <limits> is not available on AVR-libc.
+        return static_cast<result_type>(~result_type{0});
     }
 
-    constexpr bool operator==(const QuarkBurst64&) const noexcept = default;
+    constexpr bool operator==(const QuarkBurst64& rhs) const noexcept{
+        return a_ == rhs.a_ && b_ == rhs.b_ && c_ == rhs.c_;
+    }
+    constexpr bool operator!=(const QuarkBurst64& rhs) const noexcept{
+        return !(*this == rhs);
+    }
 };

@@ -1,7 +1,6 @@
 #pragma once
-#include <limits>
-#include <cstdint>
-#include <bit>
+#include "../detail/bit_operations.hpp"
+#include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 /*
   SmallFast64 PRNG - a modern C++ 32-bit two-rotate implementation of Jenkins Small Fast PRNG.
 
@@ -13,8 +12,8 @@
   https://github.com/ulfben/cpp_prngs/
 */
 class SmallFast32 final{
-	using u32 = std::uint32_t;
-	using u64 = std::uint64_t;
+	using u32 = uint32_t;
+	using u64 = uint64_t;
 
 	u32 a;
 	u32 b;
@@ -55,19 +54,20 @@ public:
 		*this = SmallFast32{seed};
 	}
 
-	static constexpr result_type min() noexcept{
+	static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.
 		return result_type{0};
 	}
-	static constexpr result_type max() noexcept{
-		return std::numeric_limits<result_type>::max();
+	static constexpr result_type (max)() noexcept{ // Parentheses prevent expansion of Arduino's max macro.
+		// Equivalent to std::numeric_limits<result_type>::max(), but <limits> is not available on AVR-libc.
+		return static_cast<result_type>(~result_type{0});
 	}
 	constexpr result_type operator()() noexcept{
 		return next();
 	}
 
 	constexpr result_type next() noexcept{
-		const u32 e = a - std::rotl(b, 27);
-		a = b ^ std::rotl(c, 17);
+		const u32 e = a - rnd::detail::rotl(b, 27);
+		a = b ^ rnd::detail::rotl(c, 17);
 		b = c + d;
 		c = d + e;
 		d = e + a;
@@ -80,5 +80,10 @@ public:
 		}
 	}
 
-	constexpr bool operator==(const SmallFast32& rhs) const noexcept = default;
+	constexpr bool operator==(const SmallFast32& rhs) const noexcept{
+		return a == rhs.a && b == rhs.b && c == rhs.c && d == rhs.d;
+	}
+	constexpr bool operator!=(const SmallFast32& rhs) const noexcept{
+		return !(*this == rhs);
+	}
 };

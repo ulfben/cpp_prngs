@@ -1,7 +1,6 @@
 #pragma once
-#include <bit>
-#include <cstdint>
-#include <limits>
+#include "../detail/bit_operations.hpp"
+#include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 
 // pcg32.hpp - Minimal PCG32 implementation for C++
 //
@@ -26,8 +25,8 @@
 
 class PCG32 final{
 	struct Direct{}; //tag for from_state()
-	using u64 = std::uint64_t;
-	using u32 = std::uint32_t; //Important! We must guarantee exactly 32 bits. std::uint_fast32_t is often 64-bit on modern 64-bit UNIX systems which would break this implementation
+	using u64 = uint64_t;
+	using u32 = uint32_t; //Important! We must guarantee exactly 32 bits. uint_fast32_t is often 64-bit on modern 64-bit UNIX systems which would break this implementation
 	static constexpr u64 DEFAULT_SEED = 0x853c49e6748fea9bULL;
 	static constexpr u64 DEFAULT_STREAM = 0xda3e39cb94b95bdbULL;
 	static constexpr u64 MULT = 6364136223846793005ULL;
@@ -61,7 +60,7 @@ public:
 		state = oldstate * MULT + inc;
 		const u32 xorshifted = static_cast<u32>(((oldstate >> 18u) ^ oldstate) >> 27u);
 		const u32 rot = static_cast<u32>(oldstate >> 59u);
-		return std::rotr(xorshifted, static_cast<int>(rot));
+		return rnd::detail::rotr(xorshifted, rot);
 	}
 	constexpr result_type operator()() noexcept{
 		return next();
@@ -103,13 +102,19 @@ public:
 		return PCG32{next(), (next() << 1u) | 1u};
 	}
 
-	static constexpr result_type min() noexcept{
+	static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.
 		return result_type{0};
 	}
 
-	static constexpr result_type max() noexcept{
-		return std::numeric_limits<result_type>::max();
+	static constexpr result_type (max)() noexcept{ // Parentheses prevent expansion of Arduino's max macro.
+		// Equivalent to std::numeric_limits<result_type>::max(), but <limits> is not available on AVR-libc.
+		return static_cast<result_type>(~result_type{0});
 	}
 
-	constexpr bool operator==(const PCG32& rhs) const noexcept = default;
+	constexpr bool operator==(const PCG32& rhs) const noexcept{
+		return state == rhs.state && inc == rhs.inc;
+	}
+	constexpr bool operator!=(const PCG32& rhs) const noexcept{
+		return !(*this == rhs);
+	}
 };

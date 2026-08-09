@@ -29,6 +29,9 @@
     <ClInclude Include="..\..\includes\detail\wide_multiply.hpp">
       <Filter>includes\detail</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\includes\detail\portable_wide_multiply.hpp">
+      <Filter>includes\detail</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\includes\engines\konadare192.hpp">
       <Filter>includes\engines</Filter>
     </ClInclude>
@@ -39,6 +42,9 @@
       <Filter>includes\engines</Filter>
     </ClInclude>
     <ClInclude Include="..\..\includes\engines\romuduojr.hpp">
+      <Filter>includes\engines</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\includes\engines\small_fast16.hpp">
       <Filter>includes\engines</Filter>
     </ClInclude>
     <ClInclude Include="..\..\includes\engines\small_fast32.hpp">
