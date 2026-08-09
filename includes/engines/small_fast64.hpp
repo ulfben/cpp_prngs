@@ -1,7 +1,7 @@
 #pragma once
+#include "../detail/bit_operations.hpp"
 #include <limits>
 #include <cstdint>
-#include <bit> //std::rotl
 /*
   SmallFast64 PRNG - a modern C++ 64-bit three-rotate implementation of Jenkins Small Fast PRNG.
 
@@ -47,9 +47,9 @@ public:
    constexpr result_type next() noexcept{
        // The rotate constants (7, 13, 37) are chosen specifically for 64-bit terms, to provide
        // better avalanche characteristics, achieving 18.4 bits of avalanche after 5 rounds.
-      const u64 e = a - std::rotl(b, 7);
-      a = b ^ std::rotl(c, 13);
-      b = c + std::rotl(d, 37);
+      const u64 e = a - rnd::detail::rotl(b, 7);
+      a = b ^ rnd::detail::rotl(c, 13);
+      b = c + rnd::detail::rotl(d, 37);
       c = d + e;
       d = e + a;
       return d;
@@ -65,5 +65,10 @@ public:
       }
    }
 
-   constexpr bool operator==(const SmallFast64& rhs) const noexcept = default;
+   constexpr bool operator==(const SmallFast64& rhs) const noexcept{
+      return a == rhs.a && b == rhs.b && c == rhs.c && d == rhs.d;
+   }
+   constexpr bool operator!=(const SmallFast64& rhs) const noexcept{
+      return !(*this == rhs);
+   }
 };

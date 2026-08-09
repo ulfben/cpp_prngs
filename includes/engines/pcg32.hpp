@@ -1,5 +1,5 @@
 #pragma once
-#include <bit>
+#include "../detail/bit_operations.hpp"
 #include <cstdint>
 #include <limits>
 
@@ -61,7 +61,7 @@ public:
 		state = oldstate * MULT + inc;
 		const u32 xorshifted = static_cast<u32>(((oldstate >> 18u) ^ oldstate) >> 27u);
 		const u32 rot = static_cast<u32>(oldstate >> 59u);
-		return std::rotr(xorshifted, static_cast<int>(rot));
+		return rnd::detail::rotr(xorshifted, rot);
 	}
 	constexpr result_type operator()() noexcept{
 		return next();
@@ -111,5 +111,10 @@ public:
 		return std::numeric_limits<result_type>::max();
 	}
 
-	constexpr bool operator==(const PCG32& rhs) const noexcept = default;
+	constexpr bool operator==(const PCG32& rhs) const noexcept{
+		return state == rhs.state && inc == rhs.inc;
+	}
+	constexpr bool operator!=(const PCG32& rhs) const noexcept{
+		return !(*this == rhs);
+	}
 };

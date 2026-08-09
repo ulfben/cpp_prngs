@@ -1,7 +1,7 @@
 #pragma once
+#include "../detail/bit_operations.hpp"
 #include <cstdint>
 #include <limits>
-#include <bit> //for std::rotl
 /*
   RomuDuoJr - Modern C++ Port
 
@@ -49,7 +49,7 @@ public:
       y *= x;
       y = y ^ (y >> 23) ^ (y >> 51);
       y *= x;
-      x *= std::rotl(y, 27);
+      x *= rnd::detail::rotl(y, 27);
       y = y ^ (y >> 23) ^ (y >> 51);
    }
 
@@ -69,7 +69,7 @@ public:
    constexpr result_type next() noexcept{
       const state_type old_x = x;
       x = y * 15241094284759029579ULL;
-      y = std::rotl(y - old_x, 27);
+      y = rnd::detail::rotl(y - old_x, 27);
       return old_x;
    }
 
@@ -91,5 +91,10 @@ public:
       return std::numeric_limits<result_type>::max();
    }
 
-   constexpr bool operator==(const RomuDuoJr& rhs) const noexcept = default;
+   constexpr bool operator==(const RomuDuoJr& rhs) const noexcept{
+      return x == rhs.x && y == rhs.y;
+   }
+   constexpr bool operator!=(const RomuDuoJr& rhs) const noexcept{
+      return !(*this == rhs);
+   }
 };

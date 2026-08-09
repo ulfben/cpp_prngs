@@ -1,10 +1,10 @@
 #pragma once
-#include <bit>
+#include "../detail/bit_operations.hpp"
 #include <cstdint>
 #include <limits>
 
 /*
-    QuarkBurst64 - an independent C++26 implementation of the
+    QuarkBurst64 - an independent modern C++ implementation of the
     quarkburst1x64 algorithm by William Stafford Parsons.
 
     The algorithm was previously published under the name GhostScramble.
@@ -14,7 +14,7 @@
     https://github.com/eightomic/quarkburst
     Licensed under the BSD 3-Clause License.
 
-    C++26 implementation, seed expansion, value semantics, and
+    C++ implementation, seed expansion, value semantics, and
     RandomBitEngine integration:
     Copyright (c) 2026 Ulf Benjaminsson
     https://github.com/ulfben/cpp_prngs
@@ -80,9 +80,9 @@ public:
     }
 
     constexpr result_type next() noexcept{
-        a_ = std::rotl(a_, 29) ^ b_;
+        a_ = rnd::detail::rotl(a_, 29) ^ b_;
         b_ += INCREMENT;
-        c_ = std::rotl(c_, 41) + a_;
+        c_ = rnd::detail::rotl(c_, 41) + a_;
         return c_;
     }
 
@@ -104,5 +104,10 @@ public:
         return std::numeric_limits<result_type>::max();
     }
 
-    constexpr bool operator==(const QuarkBurst64&) const noexcept = default;
+    constexpr bool operator==(const QuarkBurst64& rhs) const noexcept{
+        return a_ == rhs.a_ && b_ == rhs.b_ && c_ == rhs.c_;
+    }
+    constexpr bool operator!=(const QuarkBurst64& rhs) const noexcept{
+        return !(*this == rhs);
+    }
 };
