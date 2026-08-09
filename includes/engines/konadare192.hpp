@@ -1,7 +1,6 @@
 #pragma once
 #include "../detail/bit_operations.hpp"
-#include <limits>
-#include <cstdint>
+#include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 
 /*
  * konadare192.hpp - a minimal header-only C++ port of Pelle Evensen's "konadare192px++" PRNG,
@@ -33,7 +32,7 @@
  *    https://github.com/ulfben/cpp_prngs
  */
 class Konadare192 final{
-	using u64 = std::uint64_t;
+	using u64 = uint64_t;
 	static constexpr u64 INC = 0xBB67AE8584CAA73BULL;
 	static constexpr u64 DEFAULT_SEED = 1;
 	u64 a_{};
@@ -54,7 +53,7 @@ class Konadare192 final{
 		return x;
 	}
 public:
-	using result_type = std::uint64_t;
+	using result_type = uint64_t;
 	using seed_type = u64;
 
 	constexpr Konadare192() noexcept : Konadare192(DEFAULT_SEED){}
@@ -94,11 +93,12 @@ public:
 		*this = Konadare192{};
 	}
 
-	static constexpr result_type min() noexcept{
+	static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.
 		return result_type{0};
 	}
-	static constexpr result_type max() noexcept{
-		return std::numeric_limits<result_type>::max();
+	static constexpr result_type (max)() noexcept{ // Parentheses prevent expansion of Arduino's max macro.
+		// Equivalent to std::numeric_limits<result_type>::max(), but <limits> is not available on AVR-libc.
+		return static_cast<result_type>(~result_type{0});
 	}
 	constexpr bool operator==(const Konadare192& rhs) const noexcept{
 		return a_ == rhs.a_ && b_ == rhs.b_ && c_ == rhs.c_;

@@ -1,7 +1,6 @@
 #pragma once
 #include "../detail/bit_operations.hpp"
-#include <limits>
-#include <cstdint>
+#include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 /*
   SmallFast64 PRNG - a modern C++ 32-bit two-rotate implementation of Jenkins Small Fast PRNG.
 
@@ -13,8 +12,8 @@
   https://github.com/ulfben/cpp_prngs/
 */
 class SmallFast32 final{
-	using u32 = std::uint32_t;
-	using u64 = std::uint64_t;
+	using u32 = uint32_t;
+	using u64 = uint64_t;
 
 	u32 a;
 	u32 b;
@@ -55,11 +54,12 @@ public:
 		*this = SmallFast32{seed};
 	}
 
-	static constexpr result_type min() noexcept{
+	static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.
 		return result_type{0};
 	}
-	static constexpr result_type max() noexcept{
-		return std::numeric_limits<result_type>::max();
+	static constexpr result_type (max)() noexcept{ // Parentheses prevent expansion of Arduino's max macro.
+		// Equivalent to std::numeric_limits<result_type>::max(), but <limits> is not available on AVR-libc.
+		return static_cast<result_type>(~result_type{0});
 	}
 	constexpr result_type operator()() noexcept{
 		return next();

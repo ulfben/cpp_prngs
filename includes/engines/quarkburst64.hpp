@@ -1,7 +1,6 @@
 #pragma once
 #include "../detail/bit_operations.hpp"
-#include <cstdint>
-#include <limits>
+#include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 
 /*
     QuarkBurst64 - an independent modern C++ implementation of the
@@ -24,7 +23,7 @@
 */
 
 class QuarkBurst64 final{
-    using u64 = std::uint64_t;
+    using u64 = uint64_t;
 
     static constexpr u64 DEFAULT_SEED = 0xFEEDFACECAFEBEEFULL;
     static constexpr u64 INCREMENT = 1'111'111'111'111'111ULL;
@@ -96,12 +95,13 @@ public:
         }
     }
 
-    static constexpr result_type min() noexcept{
+    static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.
         return result_type{0};
     }
 
-    static constexpr result_type max() noexcept{
-        return std::numeric_limits<result_type>::max();
+    static constexpr result_type (max)() noexcept{ // Parentheses prevent expansion of Arduino's max macro.
+        // Equivalent to std::numeric_limits<result_type>::max(), but <limits> is not available on AVR-libc.
+        return static_cast<result_type>(~result_type{0});
     }
 
     constexpr bool operator==(const QuarkBurst64& rhs) const noexcept{

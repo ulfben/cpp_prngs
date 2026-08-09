@@ -38,3 +38,29 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
+
+  arduino-avr:
+    name: Arduino AVR (ATmega32U4)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: 1.5.1
+
+      - name: Install Arduino AVR core
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr@1.8.8
+
+      - name: Compile engine validation sketch
+        run: >-
+          arduino-cli compile
+          --fqbn arduino:avr:leonardo
+          --warnings all
+          --build-property "compiler.cpp.extra_flags=-std=gnu++17 -I${{ github.workspace }}/tests"
+          tests/arduino/engine_validation

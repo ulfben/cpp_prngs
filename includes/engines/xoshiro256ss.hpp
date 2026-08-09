@@ -1,8 +1,7 @@
 #pragma once
 #include "../detail/bit_operations.hpp"
-#include <limits>
-#include <cstdint>
-#include <cassert>
+#include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
+#include <assert.h>
 
 /*
   Xoshiro256SS - a modern C++ port of xoshiro256** 1.0.
@@ -19,7 +18,7 @@
 */
 
 class Xoshiro256SS{
-	using u64 = std::uint64_t;
+	using u64 = uint64_t;
 	u64 s[4]{};
 	struct Direct{};
 
@@ -67,11 +66,12 @@ public:
 	constexpr void seed(seed_type seed) noexcept{
 		*this = Xoshiro256SS{seed};
 	}
-	static constexpr result_type min() noexcept{
+	static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.
 		return result_type{0};
 	}
-	static constexpr result_type max() noexcept{
-		return std::numeric_limits<result_type>::max();
+	static constexpr result_type (max)() noexcept{ // Parentheses prevent expansion of Arduino's max macro.
+		// Equivalent to std::numeric_limits<result_type>::max(), but <limits> is not available on AVR-libc.
+		return static_cast<result_type>(~result_type{0});
 	}
 	constexpr result_type next() noexcept{
 		const auto result = rnd::detail::rotl(s[1] * 5, 7) * 9;
