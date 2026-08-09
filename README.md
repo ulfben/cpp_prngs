@@ -75,7 +75,7 @@ const uint16_t blink_ms = rng.between(uint16_t{100}, uint16_t{500});
 const bool turn_left = rng.coin_flip();
 ```
 
-The Arduino AVR core defaults to C++11, so compile the sketch as C++17. See [Building for Arduino AVR](#building-for-arduino-avr) for a complete Arduino CLI command.
+The Arduino AVR core defaults to C++11, so make sure to compile your sketch as C++17. See [Building for Arduino AVR](#building-for-arduino-avr) for a complete Arduino CLI command.
 
 ### Weighted draws
 
@@ -128,11 +128,11 @@ These are the normal choices for desktop applications and other targets with eff
 
 | Engine | Output | State | Description |
 |--------|-------:|------:|-------------|
-| [`RomuDuoJr`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/romuduojr.hpp) | 64 bits | 16 bytes | C++ port of [Mark Overton’s RomuDuoJr](https://romu-random.org/). Winner of Rhet Butler’s [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/). |
-| [`Konadare192`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/konadare192.hpp) | 64 bits | 24 bytes | C++ port of [Pelle Evensen's konadare192px++](https://github.com/pellevensen/PReenactiNG); the second-fastest 64-bit engine in the current benchmarks. |
-| [`QuarkBurst64`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/quarkburst64.hpp) | 64 bits | 24 bytes | C++ port of Eightomic’s quarkburst1x64, previously published as GhostScramble64. |
 | [`PCG32`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/pcg32.hpp) | 32 bits | 16 bytes | C++ port of [Melissa O’Neill’s minimal PCG32](https://www.pcg-random.org/download.html#minimal-c-implementation). |
 | [`SmallFast32`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast32.hpp) | 32 bits | 16 bytes | C++ port of [Bob Jenkins’ 32-bit Small Fast](https://burtleburtle.net/bob/rand/smallprng.html) generator. |
+| [`RomuDuoJr`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/romuduojr.hpp) | 64 bits | 16 bytes | C++ port of [Mark Overton’s RomuDuoJr](https://romu-random.org/). Winner of Rhet Butler’s [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/) and second fastest engine in the lineup! |
+| [`Konadare192`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/konadare192.hpp) | 64 bits | 24 bytes | C++ port of [Pelle Evensen's konadare192px++](https://github.com/pellevensen/PReenactiNG); the third-fastest 64-bit engine in the current benchmarks. |
+| [`QuarkBurst64`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/quarkburst64.hpp) | 64 bits | 24 bytes | C++ port of Eightomic’s quarkburst1x64, previously published as GhostScramble64. The fastest engine in the current benchmarks. |
 | [`SmallFast64`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast64.hpp) | 64 bits | 32 bytes | A 64-bit three-rotate Small Fast implementation, using rotates (7, 13, 37). |
 | [`Xoshiro256SS`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xoshiro256ss.hpp) | 64 bits | 32 bytes | C++ port of David Blackman and Sebastiano Vigna's [xoshiro256\*\* 1.0](https://prng.di.unimi.it/) generator. |
 
@@ -143,8 +143,8 @@ These engines return 8 or 16 bits at a time and use only 4–8 bytes of state. T
 | Engine | Output | State | Best fit and trade-off |
 |--------|-------:|------:|------------------------|
 | [`SmallFast8`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast8.hpp) | 8 bits | 4 bytes | The smallest Small Fast variant, intended for short streams where every byte of state matters. |
-| [`SmallFast16`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast16.hpp) | 16 bits | 8 bytes | A useful middle ground when an 8-bit result is too restrictive; uses O’Neill’s tested 16-bit constants. |
 | [`XorShift32Star8`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xorshift32star8.hpp) | 8 bits | 4 bytes | Keeps a 32-bit state cycle while returning one byte per call. |
+| [`SmallFast16`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast16.hpp) | 16 bits | 8 bytes | A useful middle ground when an 8-bit result is too restrictive; uses O’Neill’s tested 16-bit constants. |
 
 An engine's output width limits bounds, collection sizes, and total weights used by `Random<E>`. An 8-bit engine accepts bounds up to 255, `SmallFast16` up to 65,535, and a 32-bit engine up to roughly 4.29 billion. Methods such as `bits_as<T>()` can combine several engine outputs when you need a wider raw value. Debug builds alert you when a requested range is too large.
 
@@ -162,37 +162,70 @@ Want to use your own engine? If it satisfies `RandomBitEngine`, you can plug it 
 
 [`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) and [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp) both expose `rnd::Random<E>`. The generation API is shared; only the collection interface and a few platform details differ.
 
-| Method                              | Description                                                                                                                                                         |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Random<E>()`                       | Default-constructs the engine `E` with its default seed                                                                                                             |
-| `Random<E>(seed)`                   | Constructs by seeding the engine with `seed`                                                                                                                        |
-| `Random<E>(engine)`                 | Constructs by copying an existing engine instance                                                                                                                   |
-| `operator==(other)`                 | Returns `true` if two generators have identical state                                                                                                               |
-| `min()`                             | Returns the engine’s minimum possible value (typically 0)                                                                                                           |
-| `max()`                             | Returns the engine’s maximum possible value                                                                                                                         |
-| `next()` / `operator()()`           | Returns the next random number in `[min(), max()]`                                                                                                                  |
-| `next(bound)` / `operator()(bound)` | Random integer in `[0, bound)`, using [Lemire’s FastRange](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) without rejection (so: minimal bias, very fast) |
-| `next<N, T>()`                      | Compile-time bounded integer in `[0, N)`, optionally returned as type `T`; optimized for power-of-2 bounds[^1]                                                      |
-| `between(lo, hi)`                   | Random integer or float in `[lo, hi)` (integer if `lo, hi` are integral, else float)                                                                                |
-| `bits(n)`							  | Runtime: returns `n` random bits in the low `n` bits of `T` (`1 ≤ n ≤ digits(T)`), drawing from the high bits of one or more engine outputs; `T` defaults to `result_type`[^1] |
-| `bits<N, T>()`					  | Returns `N` random bits in the low `N` bits of `T`, drawing from the high bits of one or more engine outputs; constraints are checked at compile time[^1] |
-| `bits_as<T>()`                      | Convenience: returns an unsigned `T` filled with high-quality random bits                                                                               |
-| `normalized<F>()`                   | Returns float `F` in `[0.0, 1.0)`, using the [Inigo Quilez float hack](https://iquilezles.org/articles/sfrand/)                                                     |
-| `signed_norm<F>()`                  | Returns float `F` in `[-1.0, 1.0)`                                                                                                                                  |
-| `coin_flip()`                       | Fair coin flip (`true` ~50%)                                                                                                                                        |
-| `coin_flip(p)`                      | Weighted coin (`true` with probability `p`, where `p` is in `[0.0, 1.0]`)                                                                                           |
-| `index(range)`                      | Returns a random index into any sized range                                                                                                                         |
-| `iterator(range)`                   | Returns an iterator to a random element                                                                                                                             |
-| `element(range)`                    | Returns a reference to a random element                                                                                                                             |
-| `weighted_index(weights)`           | Returns an index selected proportionally to (unsigned) weights; zero-weight indices are excluded                                                            |
-| `weighted_iterator(range, projection)` | Returns an iterator selected proportionally to weights returned by `projection(element)`                                               |
-| `weighted_element(range, projection)` | Returns a reference selected proportionally to weights returned by `projection(element)`                                                |
-| `gaussian(mean, stddev)`            | Approximate normal sample via the Irwin–Hall sum-of-12 method                                                                                                       |
-| `discard(n)`                        | Advances the underlying engine by `n` steps                                                                                                                         |
-| `seed()`                            | Reseeds the engine back to its default state                                                                                                                        |
-| `seed(v)`                           | Reseeds the engine with value `v`                                                                                                                                   |
-| `split()`                           | Produces a decorrelated, forked engine (useful for parallel streams)                                                                                                |
-| `engine()` / `engine() const`       | Access the underlying engine instance (for manual serialization, debugging, etc.)                                                                                   |
+### Construction and engine state
+
+| Method | Description |
+|--------|-------------|
+| `Random<E>()` | Default-constructs the engine `E` with its default seed |
+| `Random<E>(seed)` | Constructs by seeding the engine with `seed` |
+| `Random<E>(engine)` | Constructs by copying an existing engine instance |
+| `operator==(other)` | Returns `true` if two generators have identical state |
+| `engine()` / `engine() const` | Accesses the underlying engine instance for manual serialization, debugging, etc. |
+| `seed()` | Reseeds the engine back to its default state |
+| `seed(v)` | Reseeds the engine with value `v` |
+| `discard(n)` | Advances the underlying engine by `n` steps |
+| `split()` | Produces a decorrelated, forked engine, useful for parallel streams |
+
+### Raw values and bits
+
+| Method | Description |
+|--------|-------------|
+| `min()` | Returns the engine’s minimum possible value, typically 0 |
+| `max()` | Returns the engine’s maximum possible value |
+| `next()` / `operator()()` | Returns the next random number in `[min(), max()]` |
+| `bits(n)` | Returns `n` random bits in the low bits of `T` at runtime (`1 ≤ n ≤ digits(T)`), drawing from the high bits of one or more engine outputs; `T` defaults to `result_type`[^1] |
+| `bits<N, T>()` | Returns `N` random bits in the low bits of `T`; constraints are checked at compile time[^1] |
+| `bits_as<T>()` | Returns an unsigned `T` filled with high-quality random bits |
+
+### Integers
+
+| Method | Description |
+|--------|-------------|
+| `next(bound)` / `operator()(bound)` | Returns an integer in `[0, bound)`, using [Lemire’s FastRange](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) without rejection |
+| `next<N, T>()` | Returns an integer in `[0, N)` with a compile-time bound and optional result type `T`; optimized for power-of-two bounds[^1] |
+| `between(I lo, I hi)` | Returns an integer in `[lo, hi)` |
+
+### Floating point
+
+| Method | Description |
+|--------|-------------|
+| `normalized<F>()` | Returns a floating-point value in `[0.0, 1.0)`; `F` defaults to `float` |
+| `signed_norm<F>()` | Returns a floating-point value in `[-1.0, 1.0)`; `F` defaults to `float` |
+| `between(F lo, F hi)` | Returns a floating-point value in `[lo, hi)` |
+
+### Probability and distributions
+
+| Method | Description |
+|--------|-------------|
+| `coin_flip()` | Fair coin flip (`true` approximately 50% of the time) |
+| `coin_flip(p)` | Weighted coin (`true` with probability `p`, where `p` is in `[0.0, 1.0]`) |
+| `gaussian(mean, stddev)` | Returns an approximate normal sample via the Irwin–Hall sum-of-12 method |
+
+### Collections
+
+| Method | Description |
+|--------|-------------|
+| `index(collection)` | Returns a random index into a collection |
+| `iterator(collection)` | Returns an iterator or pointer to a random element |
+| `element(collection)` | Returns a reference to a random element |
+
+### Weighted collections
+
+| Method | Description |
+|--------|-------------|
+| `weighted_index(weights)` | Returns an index selected proportionally to unsigned weights; zero-weight indices are excluded |
+| `weighted_iterator(collection, projection)` | Returns an iterator or pointer selected proportionally to weights returned by `projection(element)` |
+| `weighted_element(collection, projection)` | Returns a reference selected proportionally to weights returned by `projection(element)` |
 
 The weighted helpers let you pick items with different chances of being selected. Weights should be non-negative whole numbers, such as `{70u, 25u, 5u}`. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
 
@@ -202,7 +235,8 @@ The weighted helpers let you pick items with different chances of being selected
 
 * Collection methods accept C arrays directly and deduce their length, so `rng.element(values)` and `rng.weighted_index(weights)` work as written. They also accept a pointer and element count. Standard containers available in the Arduino toolchain, such as `std::array`, can be passed with `.data()` and `.size()`. The desktop frontend accepts standard sized ranges directly.
 * AVR `float` and `double` are both 32-bit IEEE 754 types. The floating-point methods therefore accept either spelling but produce binary32 precision.
-* Floating-point generation is `constexpr` by default. Defining `RND_AVR_FAST_FLOAT` consistently for the whole program selects the faster [Inigo Quilez representation-based implementation](https://iquilezles.org/articles/sfrand/) but makes the floating-point methods runtime-only.
+* Floating-point generation is `constexpr` by default. Defining `RND_AVR_FAST_FLOAT` consistently for the whole program selects the faster  but makes the floating-point methods runtime-only.
+* The library is designed to work thoroughly at compile time. On C++17, however, there is no std::bit_cast, so the very fast [Inigo Quilez technique](https://iquilezles.org/articles/sfrand/) cannot be implemented portably in constexpr! If your program does not need to generate floating-point values at compile time, define `RND_AVR_FAST_FLOAT`. This restores the fast IQ implementation but makes the floating-point methods runtime-only. The rest of the library remains constexpr.
 * Methods are templates or inline functions, so unused features do not add code to the final program.
 
 
