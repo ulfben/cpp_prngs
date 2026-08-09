@@ -298,6 +298,57 @@ return !(*this == rhs);
 }
 };
 #include <stdint.h>
+class SmallFast8 final{
+using u8 = uint8_t;
+u8 a;
+u8 b;
+u8 c;
+u8 d;
+public:
+using result_type = u8;
+using seed_type = u8;
+constexpr SmallFast8() noexcept
+: SmallFast8(0xDCu){}
+explicit constexpr SmallFast8(seed_type seed) noexcept
+: a(0xEDu), b(seed), c(seed), d(seed){
+discard(20);
+}
+constexpr void seed() noexcept{
+*this = SmallFast8{};
+}
+constexpr void seed(seed_type value) noexcept{
+*this = SmallFast8{value};
+}
+static constexpr result_type (min)() noexcept{
+return result_type{0};
+}
+static constexpr result_type (max)() noexcept{
+return static_cast<result_type>(~result_type{0});
+}
+constexpr result_type next() noexcept{
+const u8 e = static_cast<u8>(a - rnd::detail::rotl(b, 1));
+a = static_cast<u8>(b ^ rnd::detail::rotl(c, 4));
+b = static_cast<u8>(c + d);
+c = static_cast<u8>(d + e);
+d = static_cast<u8>(e + a);
+return d;
+}
+constexpr result_type operator()() noexcept{
+return next();
+}
+constexpr void discard(unsigned long long count) noexcept{
+while(count--){
+next();
+}
+}
+constexpr bool operator==(const SmallFast8& rhs) const noexcept{
+return a == rhs.a && b == rhs.b && c == rhs.c && d == rhs.d;
+}
+constexpr bool operator!=(const SmallFast8& rhs) const noexcept{
+return !(*this == rhs);
+}
+};
+#include <stdint.h>
 class SmallFast16 final{
 using u16 = uint16_t;
 u16 a;
@@ -554,6 +605,7 @@ benchmark::DoNotOptimize(sum);
 state.SetItemsProcessed(state.iterations() * values_per_iteration);
 }
 BENCHMARK_TEMPLATE(BM_EngineNext, PCG32);
+BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast8);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast16);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast32);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast64);

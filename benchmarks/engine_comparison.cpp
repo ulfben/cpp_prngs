@@ -8,6 +8,7 @@
 #include "../includes/engines/pcg32.hpp"
 #include "../includes/engines/quarkburst64.hpp"
 #include "../includes/engines/romuduojr.hpp"
+#include "../includes/engines/small_fast8.hpp"
 #include "../includes/engines/small_fast16.hpp"
 #include "../includes/engines/small_fast32.hpp"
 #include "../includes/engines/small_fast64.hpp"
@@ -40,6 +41,7 @@ void BM_EngineNext(benchmark::State& state){
 }
 
 BENCHMARK_TEMPLATE(BM_EngineNext, PCG32);
+BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast8);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast16);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast32);
 BENCHMARK_TEMPLATE(BM_EngineNext, SmallFast64);

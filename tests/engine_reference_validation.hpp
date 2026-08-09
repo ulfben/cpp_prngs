@@ -3,6 +3,7 @@
 #include "../includes/engines/pcg32.hpp"
 #include "../includes/engines/quarkburst64.hpp"
 #include "../includes/engines/romuduojr.hpp"
+#include "../includes/engines/small_fast8.hpp"
 #include "../includes/engines/small_fast16.hpp"
 #include "../includes/engines/small_fast32.hpp"
 #include "../includes/engines/small_fast64.hpp"
@@ -114,6 +115,18 @@ namespace rnd::detail::validation {
 	static_assert(
 		arrays_equal(prng_outputs(SmallFast32{uint32_t{123}}), jsf32_reference_outputs()),
 		"SmallFast32 output does not match Bob Jenkins' reference implementation"
+	);
+
+	// First outputs from Melissa O'Neill's jsf8 reference implementation
+	// after seeding with 123 and performing its 20 warm-up rounds.
+	// https://gist.github.com/imneme/85cff47d4bad8de6bdeb671f9c76c814
+	constexpr fixed_array<uint8_t, 6> jsf8_reference{{
+		0xca, 0xca, 0xdf, 0x62, 0xeb, 0x38
+	}};
+
+	static_assert(
+		arrays_equal(prng_outputs(SmallFast8{uint8_t{123}}), jsf8_reference),
+		"SmallFast8 output does not match Melissa O'Neill's reference implementation"
 	);
 
 	// First outputs from Melissa O'Neill's jsf16 reference implementation

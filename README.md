@@ -94,9 +94,11 @@ Weights should be non-negative whole numbers. A weight of 0 means the item will 
 ## [Engines](https://github.com/ulfben/cpp_prngs/tree/main/includes/engines)
 All the provided engines [are very fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks):
 
-They are also compact (8-32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions on desktop systems unless you have a measured performance reason not to; narrower engines are useful on constrained targets such as 8-bit microcontrollers.
+They are also compact (4-32 bytes), produce high-quality randomness, and can even run at compile time. I recommend using the 64-bit output versions on desktop systems unless you have a measured performance reason not to; narrower engines are useful on constrained targets such as 8-bit microcontrollers.
 
-`Random<E>` can only generate a bound that fits the engine's output type. SmallFast16 therefore supports ranges up to 65,535, while the 32-bit engines support ranges up to roughly 4.29 billion. In debug builds, the API alerts you if a requested range is too large for the chosen engine.
+`Random<E>` can only generate a bound that fits the engine's output type. SmallFast8 therefore supports ranges up to 255, SmallFast16 up to 65,535, and the 32-bit engines up to roughly 4.29 billion. In debug builds, the API alerts you if a requested range is too large for the chosen engine.
+
+SmallFast8 is deliberately specialized: its 4-byte state is useful where memory is scarce, but [O’Neill reports](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html) a PractRand failure at 2^28 bytes, so it is not intended for long streams.
 
 | File Name           | Output Width | Description                                                                                                                                |
 |---------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
@@ -105,6 +107,7 @@ They are also compact (8-32 bytes), produce high-quality randomness, and can eve
 | [`quarkburst64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/quarkburst64.hpp) | 64 bits | A C++ port of Eightomic’s quarkburst1x64, previously published as GhostScramble64. |
 | [`pcg32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/pcg32.hpp)         | 32 bits      | C++ port of [Melissa O’Neill’s minimal PCG32](https://www.pcg-random.org/download.html#minimal-c-implementation). Wikipedia: [Permuted congruential generator](https://en.wikipedia.org/wiki/Permuted_congruential_generator) |
 | [`xoshiro256ss.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xoshiro256ss.hpp)  | 64 bits      | C++ port of [David Blackman & Sebastiano Vigna's xoshiro256\*\* 1.0](https://prng.di.unimi.it/) generator. Wikipedia: [Xorshift](https://en.wikipedia.org/wiki/Xorshift). |
+| [`small_fast8.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast8.hpp)  | 8 bits       | C++ port of [Melissa O’Neill’s tested 8-bit Small Fast variant](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html), with 32 bits of state and two rotates (1, 4). |
 | [`small_fast16.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast16.hpp)  | 16 bits      | C++ port of [Melissa O’Neill’s tested 16-bit Small Fast variant](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html), with 64 bits of state and two rotates (13, 8). |
 | [`small_fast32.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast32.hpp)  | 32 bits      | C++ port of [Bob Jenkins’ 32-bit “Small Fast”](https://burtleburtle.net/bob/rand/smallprng.html) PRNG (two-rotate). |
 | [`small_fast64.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast64.hpp)  | 64 bits      | A 64-bit three-rotate implementation of the above. Three rotates (7, 13, 37) ensure stronger avalanche behavior than a naïve two-rotate 64-bit variant. |
@@ -274,7 +277,7 @@ This project includes, or is based on, the following PRNG engines and reference 
 
 - **QuarkBurst64**: Independent C++ implementation under MIT of William Stafford Parsons’ quarkburst1x64, created for [Eightomic](https://github.com/eightomic/quarkburst) and released under [BSD-3-Clause](https://github.com/eightomic/quarkburst/commit/2f754cf4e18e6ecdfec17c2bda72a1a1aa531db5). Previously published as [GhostScramble](https://web.archive.org/web/20260531035702/https://github.com/williamstaffordparsons/ghostscramble/blob/master/ghostscramble.c).
 - **RomuDuoJr**: Based on Rhet Butler’s C++ wrapper ([public domain](https://github.com/Almightygir/rhet_RNG/blob/main/xromu2jr.h)), itself inspired by Mark Overton’s [Romu family](https://romu-random.org/).
-- **SmallFast16**: Based on Bob Jenkins’ algorithm and M.E. O’Neill’s 16-bit constants and reference implementation ([MIT License](https://gist.github.com/imneme/85cff47d4bad8de6bdeb671f9c76c814)); see her excellent [PractRand analysis](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html).
+- **SmallFast8 / SmallFast16**: Based on Bob Jenkins’ algorithm and M.E. O’Neill’s narrow-width constants and reference implementation ([MIT License](https://gist.github.com/imneme/85cff47d4bad8de6bdeb671f9c76c814)); see her excellent [PractRand analysis](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html).
 - **SmallFast32 / SmallFast64**: Based on Bob Jenkins’ reference implementation ([public domain](https://burtleburtle.net/bob/rand/smallprng.html)).
 - **xoshiro256\*\***: Based on David Blackman & Sebastiano Vigna’s reference code ([public domain](https://prng.di.unimi.it/xoshiro256starstar.c)).
 - **splitmix64**: By Sebastiano Vigna ([public domain](https://prng.di.unimi.it/splitmix64.c)).

@@ -44,6 +44,9 @@
     <ClInclude Include="..\..\includes\engines\romuduojr.hpp">
       <Filter>includes\engines</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\includes\engines\small_fast8.hpp">
+      <Filter>includes\engines</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\includes\engines\small_fast16.hpp">
       <Filter>includes\engines</Filter>
     </ClInclude>
