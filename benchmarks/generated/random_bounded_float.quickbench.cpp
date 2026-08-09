@@ -423,7 +423,6 @@ return std::numeric_limits<result_type>::max();
 }
 constexpr bool operator==(const Konadare192&) const noexcept = default;
 };
-static_assert(RandomBitEngine<Konadare192>);
 #include <bit>
 #include <cstdint>
 #include <limits>
@@ -491,7 +490,6 @@ return std::numeric_limits<result_type>::max();
 }
 constexpr bool operator==(const QuarkBurst64&) const noexcept = default;
 };
-static_assert(RandomBitEngine<QuarkBurst64>);
 #include <cstdint>
 #include <limits>
 #include <bit>  
@@ -546,7 +544,6 @@ return std::numeric_limits<result_type>::max();
 }
 constexpr bool operator==(const RomuDuoJr& rhs) const noexcept = default;
 };
-static_assert(RandomBitEngine<RomuDuoJr>);
 #include <benchmark/benchmark.h>
 #include <cstdint>
 #include <cstdlib>

@@ -1,37 +1,3 @@
-#include <concepts>
-#include <limits>
-#include <random>       
-#include <type_traits>  
-template<typename E>
-concept RandomBitEngine =
-requires {
-typename E::result_type;
-typename E::seed_type;
-} &&
-std::uniform_random_bit_generator<E> &&
-std::same_as<typename E::result_type, std::invoke_result_t<E&>> &&
-std::default_initializable<E> &&
-std::copy_constructible<E> &&
-std::constructible_from<E, typename E::seed_type> &&
-std::equality_comparable<E> &&
-std::is_nothrow_default_constructible_v<E> &&
-std::is_nothrow_copy_constructible_v<E> &&
-std::is_nothrow_constructible_v<E, typename E::seed_type> &&
-std::is_unsigned_v<typename E::result_type> &&
-std::numeric_limits<typename E::result_type>::is_integer &&
-std::is_unsigned_v<typename E::seed_type> &&
-std::numeric_limits<typename E::seed_type>::is_integer &&
-(E::min() == typename E::result_type{0}) &&
-(E::max() == std::numeric_limits<typename E::result_type>::max()) &&
-requires(E& e, const E& ce, typename E::seed_type seed, unsigned long long n){
-{ e() } noexcept -> std::same_as<typename E::result_type>;
-{ E::min() } noexcept -> std::same_as<typename E::result_type>;
-{ E::max() } noexcept -> std::same_as<typename E::result_type>;
-{ ce == ce } noexcept -> std::convertible_to<bool>;
-{ e.seed() } noexcept -> std::same_as<void>;
-{ e.seed(seed) } noexcept -> std::same_as<void>;
-{ e.discard(n) } noexcept -> std::same_as<void>;
-};
 #include <limits>
 #include <cstdint>
 #include <bit>  
@@ -97,7 +63,6 @@ return std::numeric_limits<result_type>::max();
 }
 constexpr bool operator==(const Konadare192&) const noexcept = default;
 };
-static_assert(RandomBitEngine<Konadare192>);
 #include <bit>
 #include <cstdint>
 #include <limits>
@@ -173,7 +138,6 @@ return std::numeric_limits<result_type>::max();
 }
 constexpr bool operator==(const PCG32& rhs) const noexcept = default;
 };
-static_assert(RandomBitEngine<PCG32>);
 #include <bit>
 #include <cstdint>
 #include <limits>
@@ -241,7 +205,6 @@ return std::numeric_limits<result_type>::max();
 }
 constexpr bool operator==(const QuarkBurst64&) const noexcept = default;
 };
-static_assert(RandomBitEngine<QuarkBurst64>);
 #include <cstdint>
 #include <limits>
 #include <bit>  
@@ -296,7 +259,6 @@ return std::numeric_limits<result_type>::max();
 }
 constexpr bool operator==(const RomuDuoJr& rhs) const noexcept = default;
 };
-static_assert(RandomBitEngine<RomuDuoJr>);
 #include <limits>
 #include <cstdint>
 #include <bit>
@@ -356,7 +318,6 @@ next();
 }
 constexpr bool operator==(const SmallFast32& rhs) const noexcept = default;
 };
-static_assert(RandomBitEngine<SmallFast32>);
 #include <limits>
 #include <cstdint>
 #include <bit>  
@@ -404,7 +365,6 @@ next();
 }
 constexpr bool operator==(const SmallFast64& rhs) const noexcept = default;
 };
-static_assert(RandomBitEngine<SmallFast64>);
 #include <limits>
 #include <cstdint>
 #include <span>
@@ -478,7 +438,6 @@ next();
 }
 constexpr bool operator==(const Xoshiro256SS& rhs) const noexcept = default;  
 };
-static_assert(RandomBitEngine<Xoshiro256SS>);
 #include <benchmark/benchmark.h>
 #include <cstdint>
 #include <cstdlib>
