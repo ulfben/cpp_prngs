@@ -1,4 +1,5 @@
 #pragma once
+#include "detail/portable_wide_multiply.hpp"
 #include <assert.h>
 #include <limits.h>
 #include <stddef.h>
@@ -146,22 +147,6 @@ namespace rnd {
 			return static_cast<T>(result & low_bits_mask<T>(n));
 		}
 
-		static constexpr uint64_t multiply_high_64(uint64_t a, uint64_t b) noexcept{
-			const uint64_t a0 = static_cast<uint32_t>(a);
-			const uint64_t a1 = a >> 32;
-			const uint64_t b0 = static_cast<uint32_t>(b);
-			const uint64_t b1 = b >> 32;
-			const uint64_t p00 = a0 * b0;
-			const uint64_t p01 = a0 * b1;
-			const uint64_t p10 = a1 * b0;
-			const uint64_t p11 = a1 * b1;
-			const uint64_t mid = p01 + p10;
-			const uint64_t mid_carry = mid < p01 ? (uint64_t{1} << 32) : uint64_t{0};
-			const uint64_t mid_low = (mid & UINT32_MAX) << 32;
-			const uint64_t low = p00 + mid_low;
-			return p11 + (mid >> 32) + mid_carry + (low < p00 ? 1u : 0u);
-		}
-
 		static constexpr result_type scale_to_bound(result_type value, result_type bound) noexcept{
 			if constexpr(sizeof(result_type) == 1){
 				return static_cast<result_type>((uint16_t{value} * uint16_t{bound}) >> 8);
@@ -170,7 +155,7 @@ namespace rnd {
 			} else if constexpr(sizeof(result_type) == 4){
 				return static_cast<result_type>((uint64_t{value} * uint64_t{bound}) >> 32);
 			} else{
-				return static_cast<result_type>(multiply_high_64(value, bound));
+				return static_cast<result_type>(detail::mul64_to_128_parts(value, bound).hi);
 			}
 		}
 	};

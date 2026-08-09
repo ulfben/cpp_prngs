@@ -143,6 +143,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\includes\concepts.hpp" />
+    <ClInclude Include="..\..\includes\detail\portable_wide_multiply.hpp" />
     <ClInclude Include="..\..\includes\detail\wide_multiply.hpp" />
     <ClInclude Include="..\..\includes\engines\konadare192.hpp" />
     <ClInclude Include="..\..\includes\engines\pcg32.hpp" />

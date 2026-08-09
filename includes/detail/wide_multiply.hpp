@@ -1,4 +1,5 @@
 #pragma once
+#include "portable_wide_multiply.hpp"
 #include <cstdint>
 #ifdef _MSC_VER
 #include <intrin.h>    // for _umul128, 64x64 multiplication
@@ -10,38 +11,6 @@
 // This is used to implement Daniel Lemire's FastRange mapping (see Random<E> for usage).
 namespace rnd{
 	namespace detail {
-		// Helper for constexpr 128-bit multiply on MSVC, where _umul128 is not constexpr.
-		struct u128_parts final{
-			std::uint64_t lo;
-			std::uint64_t hi;
-		};
-
-		[[nodiscard]] constexpr u128_parts mul64_to_128_parts(std::uint64_t a, std::uint64_t b) noexcept{
-			// split 32-bit limbs
-			const std::uint64_t a0 = static_cast<std::uint32_t>(a);
-			const std::uint64_t a1 = a >> 32;
-			const std::uint64_t b0 = static_cast<std::uint32_t>(b);
-			const std::uint64_t b1 = b >> 32;
-
-			// partial products
-			const std::uint64_t p00 = a0 * b0;
-			const std::uint64_t p01 = a0 * b1;
-			const std::uint64_t p10 = a1 * b0;
-			const std::uint64_t p11 = a1 * b1;
-
-			// combine:			
-			constexpr std::uint64_t lo32_mask = 0xFFFF'FFFFull;
-			const std::uint64_t mid = p01 + p10;
-			const std::uint64_t mid_carry = (mid < p01) ? (1ull << 32) : 0ull;
-			const std::uint64_t mid_lo = (mid & lo32_mask) << 32;
-			const std::uint64_t mid_hi = mid >> 32;
-			const std::uint64_t lo = p00 + mid_lo;
-			const std::uint64_t lo_carry = (lo < p00) ? 1ull : 0ull;
-
-			const std::uint64_t hi = p11 + mid_hi + mid_carry + lo_carry;
-			return {lo, hi};
-		}
-
 		// Computes (hi:lo) >> digits for digits in [1, 64], returning the low 64 bits of the shifted result.
 		template <unsigned digits>
 		[[nodiscard]] constexpr std::uint64_t shr128_to_u64(std::uint64_t hi, std::uint64_t lo) noexcept{
