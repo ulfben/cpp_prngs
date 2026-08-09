@@ -1,5 +1,6 @@
 #pragma once
 #include "../detail/bit_operations.hpp"
+#include <assert.h>
 #include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 
 // pcg32.hpp - Minimal PCG32 implementation for C++
@@ -35,7 +36,9 @@ class PCG32 final{
 
 	//private constructor to allow factory function from_state() to bypass the seeding routines.
 	constexpr PCG32(u64 state_val, u64 inc_val, Direct) noexcept
-		: state(state_val), inc(inc_val){}
+		: state(state_val), inc(inc_val){
+		assert((inc & 1u) != 0 && "PCG32 state increment must be odd");
+	}
 
 public:
 	using result_type = u32;

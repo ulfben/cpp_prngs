@@ -92,6 +92,7 @@ constexpr bool operator!=(const Konadare192& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+#include <assert.h>
 #include <stdint.h>
 class PCG32 final{
 struct Direct{};
@@ -103,7 +104,9 @@ static constexpr u64 MULT = 6364136223846793005ULL;
 u64 state{0};
 u64 inc{1};
 constexpr PCG32(u64 state_val, u64 inc_val, Direct) noexcept
-: state(state_val), inc(inc_val){}
+: state(state_val), inc(inc_val){
+assert((inc & 1u) != 0 && "PCG32 state increment must be odd");
+}
 public:
 using result_type = u32;
 using seed_type = u64;
@@ -240,6 +243,7 @@ constexpr bool operator!=(const QuarkBurst64& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+#include <assert.h>
 #include <stdint.h>
 class RomuDuoJr final{
 using u64 = uint64_t;
@@ -248,7 +252,9 @@ state_type x;
 state_type y;
 struct Direct{};
 constexpr RomuDuoJr(state_type xstate, state_type ystate, Direct) noexcept
-: x(xstate), y(ystate){}
+: x(xstate), y(ystate){
+assert((x | y) != 0 && "RomuDuoJr all-zero state is invalid");
+}
 public:
 using result_type = u64;
 using seed_type = u64;

@@ -1,5 +1,6 @@
 #pragma once
 #include "../detail/bit_operations.hpp"
+#include <assert.h>
 #include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 /*
   RomuDuoJr - Modern C++ Port
@@ -30,7 +31,9 @@ class RomuDuoJr final{
    struct Direct{}; //tag for from_state()
    //private constructor to allow factory function from_state() to bypass the seeding routines.
    constexpr RomuDuoJr(state_type xstate, state_type ystate, Direct) noexcept
-      : x(xstate), y(ystate){}
+      : x(xstate), y(ystate){
+      assert((x | y) != 0 && "RomuDuoJr all-zero state is invalid");
+   }
 public:
    using result_type = u64;
    using seed_type = u64;   

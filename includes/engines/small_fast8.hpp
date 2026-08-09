@@ -59,7 +59,8 @@ public:
 	}
 
 	constexpr result_type next() noexcept{
-		// Explicit casts restore modulo-2^8 state updates after C++ integer promotion.
+		// C++ promotes u8 values to int during arithmetic.
+		// Casting back to u8 keeps only the low 8 bits, giving the 8-bit wraparound required by the algorithm.
 		const u8 e = static_cast<u8>(a - rnd::detail::rotl(b, 1));
 		a = static_cast<u8>(b ^ rnd::detail::rotl(c, 4));
 		b = static_cast<u8>(c + d);

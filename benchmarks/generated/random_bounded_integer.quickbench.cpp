@@ -524,6 +524,7 @@ constexpr bool operator!=(const QuarkBurst64& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+#include <assert.h>
 #include <stdint.h>
 class RomuDuoJr final{
 using u64 = uint64_t;
@@ -532,7 +533,9 @@ state_type x;
 state_type y;
 struct Direct{};
 constexpr RomuDuoJr(state_type xstate, state_type ystate, Direct) noexcept
-: x(xstate), y(ystate){}
+: x(xstate), y(ystate){
+assert((x | y) != 0 && "RomuDuoJr all-zero state is invalid");
+}
 public:
 using result_type = u64;
 using seed_type = u64;
