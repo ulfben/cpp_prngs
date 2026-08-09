@@ -16,7 +16,7 @@
 // It provides useful functions for generating values, including integers, floating-point numbers, weighted picks,
 // as well as methods for Gaussian distribution, coin flips (with odds), picking from collections (index or element), etc.
 // Source: https://github.com/ulfben/cpp_prngs/
-// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/zTh6nazxj
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/aPT6PxGPn
 // Benchmarks: https://github.com/ulfben/cpp_prngs/#performance-benchmarks
 
 namespace rnd {

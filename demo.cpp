@@ -1,4 +1,6 @@
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/concepts.hpp>
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/bit_operations.hpp> // shared C++17/20 bit-operation helpers used by the engines
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/portable_wide_multiply.hpp> // implementation used by wide_multiply.hpp
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/wide_multiply.hpp> //constexpr fallback for 128bit multiplication on msvc
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/engines/pcg32.hpp> //pcg32 engine
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/engines/romuduojr.hpp> // RomuDuoJr engine 
@@ -11,7 +13,7 @@
 #include <print>
 #include <string_view>
 #include <vector>
-
+https://compiler-explorer.com/z/aPT6PxGPn
 // Source:
 // https://github.com/ulfben/cpp_prngs/
 //

@@ -30,7 +30,7 @@ So, if you want a random-number generator that is:
 
 …go ahead and copy the complete `includes/` directory into your project, and go forth and prosper. Let me know if you find bugs or add any cool new features!
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/zTh6nazxj)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/aPT6PxGPn)
 
 ---
 
@@ -114,7 +114,7 @@ Weights should be non-negative whole numbers. A weight of 0 means the item will 
 
 On AVR, an ordinary C array works directly: `rng.weighted_index(weights)` deduces the array length automatically. `std::array` is available in the Arduino AVR toolchain too; pass it through the pointer-plus-length overload as `rng.weighted_index(weights.data(), weights.size())`.
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/zTh6nazxj)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/aPT6PxGPn)
 
 ---
 
