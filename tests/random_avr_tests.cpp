@@ -1,6 +1,28 @@
 #include <random_avr.hpp>
 #include <stdint.h>
 
+enum class UnsupportedInteger : uint8_t{};
+
+static_assert(rnd::detail::avr_supported_uint<uint8_t>);
+static_assert(rnd::detail::avr_supported_uint<uint16_t>);
+static_assert(rnd::detail::avr_supported_uint<uint32_t>);
+static_assert(rnd::detail::avr_supported_uint<const volatile uint64_t&>);
+static_assert(!rnd::detail::avr_supported_uint<int8_t>);
+static_assert(!rnd::detail::avr_supported_uint<bool>);
+
+static_assert(rnd::detail::avr_supported_integer<int8_t>);
+static_assert(rnd::detail::avr_supported_integer<int16_t>);
+static_assert(rnd::detail::avr_supported_integer<const volatile int32_t&>);
+static_assert(rnd::detail::avr_supported_integer<int64_t>);
+static_assert(rnd::detail::avr_supported_integer<uint64_t>);
+static_assert(!rnd::detail::avr_supported_integer<bool>);
+static_assert(!rnd::detail::avr_supported_integer<char>);
+static_assert(!rnd::detail::avr_supported_integer<UnsupportedInteger>);
+
+static_assert(rnd::detail::avr_supported_float<float>);
+static_assert(rnd::detail::avr_supported_float<const double&>);
+static_assert(!rnd::detail::avr_supported_float<long double>);
+
 template <class UInt>
 class CountingEngine final{
 public:

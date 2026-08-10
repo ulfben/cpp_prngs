@@ -35,14 +35,13 @@ namespace rnd {
 		using engine_result_type = typename E::result_type;
 		static constexpr unsigned value_bits = sizeof(engine_result_type) * CHAR_BIT;
 
-		static_assert(detail::avr_is_unsigned_integer<engine_result_type>::value, "Random<E> requires a non-boolean unsigned engine result_type");
-		static_assert(sizeof(engine_result_type) == 1 || sizeof(engine_result_type) == 2 || sizeof(engine_result_type) == 4 || sizeof(engine_result_type) == 8, "Random<E> supports 8-, 16-, 32-, and 64-bit engine results");
+		static_assert(detail::avr_supported_uint<engine_result_type>, "Random<E> requires a uint8_t, uint16_t, uint32_t, or uint64_t result_type");
 		static_assert((E::min)() == engine_result_type{0}, "Random<E> requires an engine whose minimum is zero");
 		static_assert((E::max)() == static_cast<engine_result_type>(~engine_result_type{0}), "Random<E> requires an engine spanning its complete result_type");
 
 		template <class T>
 		static constexpr bool valid_weight_type =
-			detail::avr_is_unsigned_integer<detail::avr_remove_cvref_t<T>>::value &&
+			detail::avr_supported_uint<T> &&
 			(sizeof(detail::avr_remove_cvref_t<T>) <= sizeof(engine_result_type));
 
 	public:
@@ -78,7 +77,7 @@ namespace rnd {
 
 		template <class T = result_type>
 		constexpr T bits(unsigned n) noexcept{
-			static_assert(detail::avr_is_unsigned_integer<T>::value, "Random::bits<T>() requires a non-boolean unsigned T");
+			static_assert(detail::avr_supported_uint<T>, "Random::bits<T>() requires uint8_t, uint16_t, uint32_t, or uint64_t");
 			assert(n > 0 && n <= bit_width<T>());
 			return n <= value_bits ? take_high_bits<T>(next(), n) : gather_bits<T>(n);
 		}
@@ -86,7 +85,7 @@ namespace rnd {
 		template <unsigned N, class T = result_type>
 		constexpr T bits() noexcept{
 			static_assert(N > 0, "Random::bits<N>() needs at least one bit");
-			static_assert(detail::avr_is_unsigned_integer<T>::value, "Random::bits<N, T>() requires a non-boolean unsigned T");
+			static_assert(detail::avr_supported_uint<T>, "Random::bits<N, T>() requires uint8_t, uint16_t, uint32_t, or uint64_t");
 			static_assert(N <= bit_width<T>(), "T cannot hold N bits");
 			return N <= value_bits ? take_high_bits<T>(next(), N) : gather_bits<T>(N);
 		}
@@ -112,7 +111,7 @@ namespace rnd {
 		template <result_type Bound, class T = result_type>
 		constexpr T next() noexcept{
 			static_assert(Bound > 0, "Random::next<Bound>(): bound must be positive");
-			static_assert(detail::avr_is_integral<T> && !detail::avr_is_same<typename detail::avr_remove_cv<T>::type, bool>::value, "Random::next<Bound, T>() requires a non-boolean integral T");
+			static_assert(detail::avr_supported_integer<T>, "Random::next<Bound, T>() requires a supported fixed-width integer type");
 			static_assert(uint64_t{Bound - 1} <= integral_max<T>(), "Bound is too large for return type T");
 			if constexpr(Bound == 1) return T{0};
 			if constexpr((Bound & (Bound - 1)) == 0){
@@ -122,9 +121,8 @@ namespace rnd {
 			return static_cast<T>(next(Bound));
 		}
 
-		template <class I, detail::avr_enable_if_t<detail::avr_is_integral<I>, int> = 0>
+		template <class I, detail::avr_enable_if_t<detail::avr_supported_integer<I>, int> = 0>
 		constexpr I between(I lo, I hi) noexcept{
-			static_assert(!detail::avr_is_same<typename detail::avr_remove_cv<I>::type, bool>::value, "Random::between<I>() does not support bool");
 			if(!(lo < hi)){
 				assert(false && "Random::between(lo, hi): inverted or empty range.");
 				return lo;
@@ -142,11 +140,12 @@ namespace rnd {
 			static_assert(detail::avr_is_binary32<F>, "random_avr.hpp supports only binary32 float and double");
 		#ifdef RND_AVR_FAST_FLOAT
 			//the IQ hack implemented without c++20 (constexpr-friendly) std::bit_cast
+			// eg. this is only available at runtime, but it is fast
 			const uint32_t representation = UINT32_C(0x3f800000) | bits<23, uint32_t>();
 			F value;
 			memcpy(&value, &representation, sizeof(value)); // C++17 bit cast; AVR GCC removes the copy.
 			return value - F{1};
-		#else
+		#else //a constexpr-friendly alternative.
 			constexpr F scale = F{1} / F{8388608}; // Exact 2^-23; the constexpr alternative to a bit cast.
 			return static_cast<F>(bits<23, uint32_t>()) * scale;
 		#endif
@@ -157,7 +156,7 @@ namespace rnd {
 			return F{2} * normalized<F>() - F{1};
 		}
 
-		template <class F, detail::avr_enable_if_t<detail::avr_is_float_type<F>, int> = 0>
+		template <class F, detail::avr_enable_if_t<detail::avr_supported_float<F>, int> = 0>
 		RND_DETAIL_AVR_FLOAT_CONSTEXPR F between(F lo, F hi) noexcept{
 			static_assert(detail::avr_is_binary32<F>, "random_avr.hpp supports only binary32 float and double");
 			assert(lo < hi && "Random::between(lo, hi): inverted or empty range.");

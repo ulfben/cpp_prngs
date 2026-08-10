@@ -22,37 +22,20 @@ namespace rnd::detail {
 	template <class T>
 	using avr_remove_cvref_t = typename avr_remove_cv<typename avr_remove_reference<T>::type>::type;
 
-	template <class T> struct avr_is_integral_base{ static constexpr bool value = false; };
-	#define RND_DETAIL_AVR_INTEGRAL(T) template <> struct avr_is_integral_base<T>{ static constexpr bool value = true; }
-	RND_DETAIL_AVR_INTEGRAL(bool);
-	RND_DETAIL_AVR_INTEGRAL(char);
-	RND_DETAIL_AVR_INTEGRAL(signed char);
-	RND_DETAIL_AVR_INTEGRAL(unsigned char);
-	RND_DETAIL_AVR_INTEGRAL(wchar_t);
-	RND_DETAIL_AVR_INTEGRAL(char16_t);
-	RND_DETAIL_AVR_INTEGRAL(char32_t);
-	RND_DETAIL_AVR_INTEGRAL(short);
-	RND_DETAIL_AVR_INTEGRAL(unsigned short);
-	RND_DETAIL_AVR_INTEGRAL(int);
-	RND_DETAIL_AVR_INTEGRAL(unsigned int);
-	RND_DETAIL_AVR_INTEGRAL(long);
-	RND_DETAIL_AVR_INTEGRAL(unsigned long);
-	RND_DETAIL_AVR_INTEGRAL(long long);
-	RND_DETAIL_AVR_INTEGRAL(unsigned long long);
-	#undef RND_DETAIL_AVR_INTEGRAL
+	template <class T>
+	static constexpr bool avr_supported_uint =
+		avr_is_same<avr_remove_cvref_t<T>, uint8_t>::value ||
+		avr_is_same<avr_remove_cvref_t<T>, uint16_t>::value ||
+		avr_is_same<avr_remove_cvref_t<T>, uint32_t>::value ||
+		avr_is_same<avr_remove_cvref_t<T>, uint64_t>::value;
 
 	template <class T>
-	static constexpr bool avr_is_integral = avr_is_integral_base<typename avr_remove_cv<T>::type>::value;
-
-	template <class T, bool = avr_is_integral<avr_remove_cvref_t<T>>>
-	struct avr_is_unsigned_integer{ static constexpr bool value = false; };
-
-	template <class T>
-	struct avr_is_unsigned_integer<T, true>{
-		using value_type = avr_remove_cvref_t<T>;
-		static constexpr bool value =
-			!avr_is_same<value_type, bool>::value && value_type(-1) > value_type(0);
-	};
+	static constexpr bool avr_supported_integer =
+		avr_supported_uint<T> ||
+		avr_is_same<avr_remove_cvref_t<T>, int8_t>::value ||
+		avr_is_same<avr_remove_cvref_t<T>, int16_t>::value ||
+		avr_is_same<avr_remove_cvref_t<T>, int32_t>::value ||
+		avr_is_same<avr_remove_cvref_t<T>, int64_t>::value;
 
 	template <bool Condition, class T = void> struct avr_enable_if{};
 	template <class T> struct avr_enable_if<true, T>{ using type = T; };
@@ -66,11 +49,10 @@ namespace rnd::detail {
 	template <> struct avr_uint_of_size<8>{ using type = uint64_t; };
 	template <class T> using avr_unsigned_t = typename avr_uint_of_size<sizeof(T)>::type;
 
-	template <class F> struct avr_is_float_type_base{ static constexpr bool value = false; };
-	template <> struct avr_is_float_type_base<float>{ static constexpr bool value = true; };
-	template <> struct avr_is_float_type_base<double>{ static constexpr bool value = true; };
 	template <class F>
-	static constexpr bool avr_is_float_type = avr_is_float_type_base<typename avr_remove_cv<F>::type>::value;
+	static constexpr bool avr_supported_float =
+		avr_is_same<avr_remove_cvref_t<F>, float>::value ||
+		avr_is_same<avr_remove_cvref_t<F>, double>::value;
 
 	template <class F> struct avr_is_binary32_base{ static constexpr bool value = false; };
 	template <> struct avr_is_binary32_base<float>{

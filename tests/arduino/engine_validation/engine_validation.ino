@@ -12,6 +12,17 @@ struct LootDrop{
 	constexpr uint8_t get_weight() const noexcept{ return weight; }
 };
 
+static_assert(rnd::detail::avr_supported_uint<uint8_t>);
+static_assert(rnd::detail::avr_supported_uint<uint16_t>);
+static_assert(rnd::detail::avr_supported_uint<uint32_t>);
+static_assert(rnd::detail::avr_supported_uint<uint64_t>);
+static_assert(rnd::detail::avr_supported_integer<int8_t>);
+static_assert(rnd::detail::avr_supported_integer<int16_t>);
+static_assert(rnd::detail::avr_supported_integer<int32_t>);
+static_assert(rnd::detail::avr_supported_integer<int64_t>);
+static_assert(!rnd::detail::avr_supported_integer<bool>);
+static_assert(!rnd::detail::avr_supported_integer<char>);
+
 #ifndef RND_AVR_FAST_FLOAT
 constexpr bool validate_constexpr_avr_double(){
 	rnd::Random<SmallFast8> random;
