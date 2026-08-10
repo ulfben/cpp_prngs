@@ -1,5 +1,5 @@
 #include "engine_reference_validation.hpp"
-#include <random_avr.hpp>
+#include <random.hpp>
 
 volatile uint64_t output;
 volatile uint16_t input = 0x8000;
@@ -22,25 +22,25 @@ struct TinyArray{
 	constexpr const T* begin() const noexcept{ return values; }
 };
 
-static_assert(rnd::detail::avr_supported_uint<uint8_t>);
-static_assert(rnd::detail::avr_supported_uint<uint16_t>);
-static_assert(rnd::detail::avr_supported_uint<uint32_t>);
-static_assert(rnd::detail::avr_supported_uint<uint64_t>);
-static_assert(rnd::detail::avr_supported_integer<int8_t>);
-static_assert(rnd::detail::avr_supported_integer<int16_t>);
-static_assert(rnd::detail::avr_supported_integer<int32_t>);
-static_assert(rnd::detail::avr_supported_integer<int64_t>);
-static_assert(!rnd::detail::avr_supported_integer<bool>);
-static_assert(!rnd::detail::avr_supported_integer<char>);
+static_assert(rnd::detail::supported_uint<uint8_t>);
+static_assert(rnd::detail::supported_uint<uint16_t>);
+static_assert(rnd::detail::supported_uint<uint32_t>);
+static_assert(rnd::detail::supported_uint<uint64_t>);
+static_assert(rnd::detail::supported_integer<int8_t>);
+static_assert(rnd::detail::supported_integer<int16_t>);
+static_assert(rnd::detail::supported_integer<int32_t>);
+static_assert(rnd::detail::supported_integer<int64_t>);
+static_assert(!rnd::detail::supported_integer<bool>);
+static_assert(!rnd::detail::supported_integer<char>);
 
-#ifndef RND_AVR_FAST_FLOAT
-constexpr bool validate_constexpr_avr_double(){
+#ifndef RND_FAST_FLOAT
+constexpr bool validate_constexpr_double(){
 	rnd::Random<SmallFast8> random;
 	const double value = random.normalized<double>();
 	return value >= 0.0 && value < 1.0;
 }
 
-static_assert(validate_constexpr_avr_double(), "AVR double must support constexpr binary32 generation");
+static_assert(validate_constexpr_double(), "binary32 double must support constexpr generation");
 #endif
 
 void setup(){
@@ -59,7 +59,7 @@ void setup(){
 		small_fast_8() ^ small_fast_16() ^ small_fast_32() ^ small_fast_64() ^
 		xorshift_32_star_8() ^ xoshiro();
 
-	// Exercise the reduced Random<E> frontend across all supported result widths.
+	// Exercise the shared Random<E> frontend across all supported result widths.
 	rnd::Random<PCG32> random_32;
 	rnd::Random<RomuDuoJr> random_64;
 	rnd::Random<SmallFast8> random_8{static_cast<uint8_t>(input)};

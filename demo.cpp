@@ -1,5 +1,6 @@
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/concepts.hpp>
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/bit_operations.hpp> // shared C++17/20 bit-operation helpers used by the engines
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/compat.hpp> // portable standard-library compatibility helpers used by Random
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/portable_wide_multiply.hpp> // implementation used by wide_multiply.hpp
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/wide_multiply.hpp> //constexpr fallback for 128bit multiplication on msvc
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/engines/pcg32.hpp> //pcg32 engine
@@ -37,8 +38,7 @@ https://compiler-explorer.com/z/aPT6PxGPn
 // engine outputs to produce wider random values. Bounds, collection sizes, and
 // total weights must still fit in the engine's result_type.
 // 
-// AVR-libc targets can instead include random_avr.hpp, a C++17 frontend that
-// uses C arrays and pointer-plus-length buffers rather than C++20 ranges.
+// The same random.hpp frontend also supports AVR-libc targets under C++17.
 //
 // The library operations are constexpr where their inputs permit constant evaluation.
 //

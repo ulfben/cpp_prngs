@@ -26,10 +26,7 @@
     <ClInclude Include="..\..\includes\random.hpp">
       <Filter>includes</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\includes\random_avr.hpp">
-      <Filter>includes</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\includes\detail\avr_compat.hpp">
+    <ClInclude Include="..\..\includes\detail\compat.hpp">
       <Filter>includes\detail</Filter>
     </ClInclude>
     <ClInclude Include="..\..\includes\detail\wide_multiply.hpp">

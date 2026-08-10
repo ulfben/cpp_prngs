@@ -8,7 +8,7 @@ add_library(cpp_prngs::cpp_prngs ALIAS cpp_prngs)
 target_include_directories(cpp_prngs INTERFACE
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/includes>
 )
-target_compile_features(cpp_prngs INTERFACE cxx_std_23)
+target_compile_features(cpp_prngs INTERFACE cxx_std_17)
 
 option(CPP_PRNGS_BUILD_TESTS "Build the cpp_prngs test suite" ${PROJECT_IS_TOP_LEVEL})
 
@@ -32,19 +32,20 @@ if(CPP_PRNGS_BUILD_TESTS)
 	target_compile_features(cpp_prngs_engine_cxx17_tests PRIVATE cxx_std_17)
 	add_test(NAME EngineCxx17Compatibility COMMAND cpp_prngs_engine_cxx17_tests)
 
-	add_executable(cpp_prngs_random_avr_tests tests/random_avr_tests.cpp)
-	target_include_directories(cpp_prngs_random_avr_tests PRIVATE includes)
-	target_compile_features(cpp_prngs_random_avr_tests PRIVATE cxx_std_17)
-	add_test(NAME RandomAvrCompatibility COMMAND cpp_prngs_random_avr_tests)
+	add_executable(cpp_prngs_random_cxx17_tests tests/random_cxx17_tests.cpp)
+	target_include_directories(cpp_prngs_random_cxx17_tests PRIVATE includes)
+	target_compile_features(cpp_prngs_random_cxx17_tests PRIVATE cxx_std_17)
+	add_test(NAME RandomCxx17Compatibility COMMAND cpp_prngs_random_cxx17_tests)
 
-	add_executable(cpp_prngs_random_avr_fast_float_tests tests/random_avr_tests.cpp)
-	target_include_directories(cpp_prngs_random_avr_fast_float_tests PRIVATE includes)
-	target_compile_features(cpp_prngs_random_avr_fast_float_tests PRIVATE cxx_std_17)
-	target_compile_definitions(cpp_prngs_random_avr_fast_float_tests PRIVATE RND_AVR_FAST_FLOAT)
-	add_test(NAME RandomAvrFastFloatCompatibility COMMAND cpp_prngs_random_avr_fast_float_tests)
+	add_executable(cpp_prngs_random_cxx17_fast_float_tests tests/random_cxx17_tests.cpp)
+	target_include_directories(cpp_prngs_random_cxx17_fast_float_tests PRIVATE includes)
+	target_compile_features(cpp_prngs_random_cxx17_fast_float_tests PRIVATE cxx_std_17)
+	target_compile_definitions(cpp_prngs_random_cxx17_fast_float_tests PRIVATE RND_FAST_FLOAT)
+	add_test(NAME RandomCxx17FastFloatCompatibility COMMAND cpp_prngs_random_cxx17_fast_float_tests)
 
 	add_executable(cpp_prngs_tests tests/random_tests.cpp)
 	target_link_libraries(cpp_prngs_tests PRIVATE cpp_prngs::cpp_prngs GTest::gtest)
+	target_compile_features(cpp_prngs_tests PRIVATE cxx_std_23)
 
 	include(GoogleTest)
 	gtest_discover_tests(cpp_prngs_tests)

@@ -36,14 +36,7 @@ So, if you want a random-number generator that is:
 
 ## Getting Started
 
-cpp_prngs is header-only. Copy the complete `includes/` directory into your project and add it to your compiler's include path. Choose the frontend that matches your target:
-
-| Target | Header | C++ version |
-|--------|--------|-------------|
-| Desktop and other full standard-library targets | [`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) | C++23 |
-| Classic AVR-based Arduino boards | [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp) | C++17 |
-
-Both frontends expose `rnd::Random<E>` and provide the same generation features: bounded integers, floats, coin flips, Gaussian samples, random element selection, weighted draws and raw bits. The included engines themselves are C++17-compatible.
+cpp_prngs is header-only. Copy the complete `includes/` directory into your project, add it to your compiler's include path, and include [`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp). The same C++17 implementation is used on desktop and classic AVR-based Arduino targets; a private compatibility layer selects standard-library facilities or small fallbacks according to what the toolchain provides.
 
 ### Desktop and full standard-library targets
 
@@ -51,7 +44,7 @@ Choose an engine and wrap it in `Random<E>`:
 
 ```cpp
 #include "engines/romuduojr.hpp" // The engine; choose another from includes/engines if you prefer.
-#include "random.hpp"            // The full C++23 Random<E> frontend.
+#include "random.hpp"            // The portable C++17 Random<E> frontend.
 
 using rnd::Random;
 
@@ -63,11 +56,11 @@ Use `Random<E>` to access [convenient utilities](https://github.com/ulfben/cpp_p
 
 ### Arduino AVR
 
-On a classic AVR-based Arduino, include the C++17 frontend and consider one of the small-output engines:
+On a classic AVR-based Arduino, include the same header and consider one of the small-output engines:
 
 ```cpp
 #include "engines/small_fast16.hpp"
-#include "random_avr.hpp" //note: _avr is for embedded targets
+#include "random.hpp"
 
 rnd::Random<SmallFast16> rng{1234};
 
@@ -151,15 +144,15 @@ Each included engine is a small, self-contained random number generator. You can
 
 For everyday use, wrap an engine in `Random<E>`. It adds bounded numbers, floats, coin flips, random elements, weighted selection, Gaussian samples, and more while letting you swap the underlying engine without changing the rest of your code.
 
-All included engines satisfy the [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp) concept and can therefore be used with `Random<E>`. They are also compatible with standard C++ facilities such as `std::shuffle` and `std::sample`.
+All included engines satisfy the optional C++20 [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp) concept and are compatible with standard C++ facilities such as `std::shuffle` and `std::sample`. The C++17 `Random<E>` implementation checks its essential engine assumptions with focused `static_assert` diagnostics instead of requiring concepts.
 
-Want to use your own engine? If it satisfies `RandomBitEngine`, you can plug it into `Random<E>` too.
+Want to use your own engine? It must provide the interface described by `RandomBitEngine`, use an 8-, 16-, 32-, or 64-bit unsigned `result_type`, and span that type from zero through its maximum value.
 
 ---
 
 ## Random API
 
-[`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) and [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp) both expose `rnd::Random<E>`. Their public APIs are closely aligned; the implementations differ where AVR-libc lacks standard-library facilities used by the desktop frontend.
+[`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) exposes `rnd::Random<E>` on every supported target.
 
 ### Construction and engine state
 
@@ -230,12 +223,12 @@ iterator(container) returns the container's native iterator. iterator(pointer, c
 
 The weighted helpers let you pick items with different chances of being selected. Weights should be non-negative whole numbers, such as `{70u, 25u, 5u}`. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
 
-### AVR frontend details
+### Portability and floating-point details
 
-`random_avr.hpp` provides the same generation features without relying on the standard-library facilities unavailable in AVR-libc:
+`random.hpp` uses `std::invoke`, standard type traits, collection access helpers, and constexpr `std::bit_cast` when the toolchain provides them. AVR-libc receives small private fallbacks for the same operations. The RNG algorithms and public overloads are shared.
 
-* AVR `float` and `double` are both 32-bit IEEE 754 types. The floating-point methods therefore accept either spelling but produce binary32 precision.
-* The library is designed to work thoroughly at compile time. On C++17, however, there is no std::bit_cast, so the very fast [Inigo Quilez technique](https://iquilezles.org/articles/sfrand/) cannot be implemented portably in constexpr! If your program does not need to generate floating-point values at compile time, define `RND_AVR_FAST_FLOAT`. This restores the fast IQ implementation but makes the floating-point methods runtime-only. The rest of the library remains constexpr.
+* Desktop binary64 `double` and AVR's binary32 `double` are both supported according to the target's actual representation.
+* In C++20 and later, normalized floating-point generation uses constexpr `std::bit_cast`. In C++17 it uses a constexpr arithmetic implementation by default. Define `RND_FAST_FLOAT` to select a runtime `memcpy` bit cast instead; only the floating-point methods lose constexpr evaluation in that mode.
 * Methods are templates or inline functions, so unused features do not add code to the final program.
 
 [^1]: Although `bits(n)` and `bits<N>()` *can* be used for power-of-two integer ranges, this is not their intended purpose. Prefer `next<N,T>()` instead. It chooses the same fast, unbiased bit-shift specialization, but makes your code clearer and safer.
@@ -321,7 +314,7 @@ These utilities help you seed your random number generators appropriately - whet
 
 ### CMake
 
-The CMake build requires CMake 3.21 or newer. The repository provides a header-only target named `cpp_prngs::cpp_prngs` for the full desktop frontend. When using cpp_prngs as a subdirectory, link that target to inherit its include path and C++23 requirement:
+The CMake build requires CMake 3.21 or newer. The repository provides a header-only target named `cpp_prngs::cpp_prngs`. When using cpp_prngs as a subdirectory, link that target to inherit its include path and C++17 requirement:
 
 ```cmake
 add_subdirectory(path/to/cpp_prngs)
@@ -344,11 +337,11 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-The test suite also builds the engines and both `random_avr.hpp` floating-point modes as C++17 targets.
+The test suite also builds the engines and both `random.hpp` floating-point modes as C++17 targets.
 
 ### Building for Arduino AVR
 
-The Arduino AVR core defaults to C++11, while the engines and `random_avr.hpp` require C++17. The repository's CI validates an ATmega32U4 target with Arduino AVR core 1.8.8.
+The Arduino AVR core defaults to C++11, while the engines and `random.hpp` require C++17. The repository's CI validates an ATmega32U4 target with Arduino AVR core 1.8.8.
 
 #### Arduino CLI
 You can compile a sketch with C++17 through Arduino CLI:
@@ -363,7 +356,7 @@ arduino-cli compile \
   /path/to/your/sketch
 ```
 
-Replace `/path/to/cpp_prngs/includes` with the repository's `includes` directory and `/path/to/your/sketch` with your sketch directory. To enable the optional runtime-optimized floating-point path, add `-DRND_AVR_FAST_FLOAT` to `compiler.cpp.extra_flags`. CI compiles both modes.
+Replace `/path/to/cpp_prngs/includes` with the repository's `includes` directory and `/path/to/your/sketch` with your sketch directory. To enable the optional runtime-optimized floating-point path, add `-DRND_FAST_FLOAT` to `compiler.cpp.extra_flags`. CI compiles both modes.
 
 #### Arduino IDE 2 on Windows
 With Arduino IDE 2 on Windows, locate the installed AVR core under:

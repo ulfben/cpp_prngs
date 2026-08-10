@@ -1,451 +1,527 @@
 #pragma once
-#include "concepts.hpp" //for RandomBitEngine concept
-#include "detail/wide_multiply.hpp" //for constexpr and portable 128-bit multiplication
-#include <algorithm>
-#include <bit> // for std::bit_cast
-#include <cassert>
-#include <concepts>
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <iterator>
-#include <limits>
-#include <type_traits>
-#include <utility>
+
+#include "detail/compat.hpp"
+#include "detail/portable_wide_multiply.hpp" //for constexpr and portable 128-bit multiplication
+#include <assert.h>
+#include <limits.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 // This is an RNG interface that wraps around any engine that meets the RandomBitEngine concept.
 // It provides useful functions for generating values, including integers, floating-point numbers, weighted picks,
 // as well as methods for Gaussian distribution, coin flips (with odds), picking from collections (index or element), etc.
+//
+// detail::compat isolates the small portability differences needed to keep this
+// implementation shared between full standard-library environments and more
+// constrained C++17 environments such as Arduino AVR. Where the standard library
+// provides the required facilities, the compatibility layer simply forwards to
+// them; otherwise it supplies the minimal equivalents needed by Random.
+//
 // Source: https://github.com/ulfben/cpp_prngs/
 // Demo is available on Compiler Explorer: https://compiler-explorer.com/z/aPT6PxGPn
 // Benchmarks: https://github.com/ulfben/cpp_prngs/#performance-benchmarks
 
+// Keep the C++20 RandomBitEngine concept available on toolchains that support it,
+// without making the C++17-compatible Random implementation depend on concepts.
+#if defined(__cpp_concepts) && __cpp_concepts >= 201907L
+#include "concepts.hpp"
+#endif
+
 namespace rnd {
 
-	template <class F>
-	concept supported_float =
-		(std::same_as<F, float> || std::same_as<F, double>) &&
-		(sizeof(F) == sizeof(std::uint32_t) || sizeof(F) == sizeof(std::uint64_t)) && //this is ... a bit belt-and-suspenders, but it's cool that we *can* constrain our types with such specificity. :) 
-		std::numeric_limits<F>::is_iec559 &&  //the IQ hack in normalized() requires IEEE 754 (IEC 559) floating point types.
-		std::numeric_limits<F>::radix == 2; //the IQ hack assumes digits - 1 is the number of *binary* mantissa bits.
-
-	template <RandomBitEngine E>
+	template <class E>
 	class Random final{
-		static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;	
+		using engine_result_type = typename E::result_type;
+		static constexpr unsigned value_bits = sizeof(engine_result_type) * CHAR_BIT; //same as:  std::numeric_limits<typename E::result_type>::digits;
+
+		// The fast range reduction below assumes that every bit pattern is a possible
+		// engine result. These assertions say that contract directly and, unlike a
+		// C++20 concept, still give a useful message when this header is used as C++17.
+		static_assert(detail::supported_uint<engine_result_type>, "Random<E> requires an 8-, 16-, 32-, or 64-bit unsigned result_type");
+		static_assert((E::min)() == engine_result_type{0},
+			"Random<E> requires an engine whose minimum is zero");
+		static_assert((E::max)() == static_cast<engine_result_type>(~engine_result_type{0}), // Set every bit to 1, equivalent to std::numeric_limits<engine_result_type>::max().
+			"Random<E> requires an engine spanning its complete result_type");
 
 		template <class T>
 		static constexpr bool valid_weight_type =
-			std::unsigned_integral<std::remove_cv_t<T>> &&
-			!std::same_as<std::remove_cv_t<T>, bool> &&
-			(std::numeric_limits<std::remove_cv_t<T>>::digits <= value_bits);
-
-		// The collection API deliberately supports contiguous, random-access containers
-		// through the small set of operations it actually uses.
-		template <class C>
-		static constexpr bool contiguous_collection = requires(C& collection){
-			std::data(collection);
-			std::size(collection);
-			std::begin(collection);
-		};
-
-		template <class T, class Projection>
-		static constexpr bool valid_projection =
-			requires(Projection & projection, T & value){
-				{ std::invoke(projection, value) } noexcept;
-
-				requires valid_weight_type<
-					std::remove_cvref_t<
-						decltype(std::invoke(projection, value))>>;
-		};
+			detail::supported_uint<T> &&
+			(sizeof(detail::remove_cvref_t<T>) <= sizeof(engine_result_type));
 
 	public:
 		using engine_type = E;
 		using result_type = typename E::result_type;
-		using seed_type = typename E::seed_type;		
+		using seed_type = typename E::seed_type;
 
-		constexpr Random() noexcept = default; //the engine will default initialize
-		explicit constexpr Random(seed_type seed_val) noexcept : _e(seed_val){}
-		explicit constexpr Random(engine_type engine) noexcept : _e(engine){}
-		constexpr bool operator==(const Random& rhs) const noexcept = default;
+		constexpr Random() noexcept = default; //the engine supplies its own sensible default seed.
+		explicit constexpr Random(seed_type seed_value) noexcept : _engine(seed_value){}
+		explicit constexpr Random(engine_type engine) noexcept : _engine(engine){}
 
-		//access to the underlying engine for manual serialization, etc.
-		constexpr const E& engine() const noexcept{
-			return _e;
+		constexpr bool operator==(const Random& rhs) const noexcept{ return _engine == rhs._engine; }
+		constexpr bool operator!=(const Random& rhs) const noexcept{ return !(*this == rhs); }
+
+		// Direct engine access is useful for manual serialization, debugging, or any
+		// engine-specific operation that the friendly Random wrapper does not expose.
+		constexpr const engine_type& engine() const noexcept{ return _engine; }
+		constexpr engine_type& engine() noexcept{ return _engine; }
+
+		constexpr void seed() noexcept{ _engine.seed(); } //restore the default-constructed state.
+		constexpr void seed(seed_type value) noexcept{ _engine.seed(value); }
+
+		// Advance the random engine n steps.
+		// Some engines (like PCG32) can do this faster than linear time
+		constexpr void discard(unsigned long long count) noexcept{ _engine.discard(count); }
+
+		// Parentheses prevent expansion of Arduino's unfortunately common min/max macros... :/
+		static constexpr result_type (min)() noexcept{
+			return result_type{0};
 		}
 
-		constexpr E& engine() noexcept{
-			return _e;
-		}
-
-		constexpr void seed() noexcept{
-			_e.seed(); //reseed to default state
-		}
-
-		constexpr void seed(seed_type v) noexcept{
-			_e.seed(v); //reseed with custom seed
-		}
-
-		//advance the random engine n steps.
-		//some engines (like PCG32) can do this faster than linear time
-		constexpr void discard(unsigned long long n) noexcept{
-			_e.discard(n);
-		}				
-	
-		// Returns a child generator derived from the parent.		
-		// Suitable for deriving task- or thread-local random streams when strict non-overlap is not required. 
-		[[nodiscard]] constexpr Random split() noexcept{
-			return Random{bits_as<seed_type>()}; //consume enough engine outputs to fill one seed_type value.		
-		}
-
-		static constexpr result_type  min() noexcept{
-			return 0; 
-		}
-
-		static constexpr result_type  max() noexcept{
-			return E::max();
+		static constexpr result_type (max)() noexcept{
+			return (E::max)();
 		}
 
 		// --- raw values/bits ---
 
-		// Produces a random value in the range [min(), max()], inclusive.
-		constexpr result_type next() noexcept{
-			return _e();
-		}
+		// Produce one raw engine value in [min(), max()], inclusive.
+		constexpr result_type next() noexcept{ return _engine(); }
+		constexpr result_type operator()() noexcept{ return next(); }
 
-		// Produces a random value in the range [min(), max()], inclusive.
-		constexpr result_type operator()() noexcept{
-			return next();
-		}
-						
-		// Runtime: returns n random bits in the low n bits of T.
-		// Works for n > value_bits by concatenating successive outputs (high bits from each draw).
+		// Runtime bit extraction. Returns n random bits in the low end of T.
+		// We take high bits from the engine because those are the bits most
+		// small PRNGs are designed to make strongest. If T is wider than one engine
+		// result, gather_bits() stitches together as many draws as are needed.
 		template <class T = result_type>
 		constexpr T bits(unsigned n) noexcept{
-			static_assert(std::is_unsigned_v<T>, "bits<T>(n) requires an unsigned T");
-			assert(n > 0);
-			assert(n <= std::numeric_limits<T>::digits);
+			static_assert(detail::supported_uint<T>, "Random::bits<T>() requires an 8-, 16-, 32-, or 64-bit unsigned type");
+			assert(n > 0 && n <= bit_width<T>());
 			if(n <= value_bits){
 				return take_high_bits<T>(next(), n);
 			}
 			return gather_bits_runtime<T>(n);
 		}
 
-		// Compile-time: returns N random bits in the low N bits of T.
+		// Bit extraction with a compile-time bit count.
+		// Returns N random bits in the low end of T, with N known at compile time.
+		// This can be more efficient than bits(unsigned), because the compiler can
+		// specialize the code for the exact bit count and eliminate unused branches.
 		template <unsigned N, class T = result_type>
 		constexpr T bits() noexcept{
-			static_assert(N > 0, "Need at least 1 bit");
-			static_assert(std::is_unsigned_v<T>, "bits<N,T> requires an unsigned T");
-			static_assert(N <= std::numeric_limits<T>::digits, "T cannot hold N bits");
-
+			static_assert(N > 0, "Random::bits<N>() needs at least one bit");
+			static_assert(detail::supported_uint<T>, "Random::bits<N, T>() requires an 8-, 16-, 32-, or 64-bit unsigned type");
+			static_assert(N <= bit_width<T>(), "T cannot hold N bits");
 			if constexpr(N <= value_bits){
 				return take_high_bits<T>(next(), N);
-			} else{
-				return gather_bits_runtime<T>(N); // reuse runtime gather (the loop count is deterministic anyway).
+			}else{
+				return gather_bits<T>(N);
 			}
 		}
 
-		// Convenience: fill T with random bits.
+		// Convenience spelling for "fill a T with random bits".
 		template <class T>
 		constexpr T bits_as() noexcept{
-			static_assert(std::is_unsigned_v<T>, "bits_as<T>() requires an unsigned T");
-			return bits<std::numeric_limits<T>::digits, T>();
+			return bits<bit_width<T>(), T>();
+		}
+
+		// Derive a child generator by consuming enough parent output to fill one seed.
+		// This is handy when you need multiple generators for different purposes, or
+		// running in different threads.
+		[[nodiscard]] constexpr Random split() noexcept{
+			return Random{bits_as<seed_type>()};
 		}
 
 		// --- integers ---
 
-		// Produces a random value in [0, bound) (exclusive) via multiply-high range reduction (Lemire-style).
-		// This much faster than naive modulo and has very small bias for non power-of-two bounds, and no bias for powers of two bounds.
+		// Produce [0, bound) using multiply-high range reduction (often called
+		// Lemire's FastRange). It is much faster than a division-based reduction,
+		// perfectly unbiased for power-of-two bounds, and has only tiny bias otherwise.
 		// See: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
 		constexpr result_type next(result_type bound) noexcept{
-			assert(bound > 0 && "bound must be non-zero and positive");
-			result_type raw_value = next(); // raw_value is [0, 2^value_bits - 1] (i.e. min()..max(), inclusive)
-			if constexpr(value_bits <= 32){ // for small engines, multiply into a 64-bit product
-				auto product = std::uint64_t(raw_value) * std::uint64_t(bound);	// product < bound * 2^value_bits   (since raw_value < 2^value_bits)
-				auto result = result_type(product >> value_bits); // equivalent to floor(product / 2^value_bits)
-				return result;                    // result is now in range [0, bound)
-			} else if constexpr(value_bits <= 64){
-				// same logic, but use helper for 128-bit math, since __uint128_t isn't universally available
-				return detail::mul_shift_u64<value_bits>(raw_value, bound);
-			} else{ // fallback for hypothetical >64-bit engines. Naive modulo (slower, more bias)
-				return bound > 0 ? raw_value % bound : bound; // avoid division by zero in release builds
-			}
+			assert(bound > 0 && "Random::next(bound): bound must be positive.");
+			return scale_to_bound(next(), bound);
 		}
 
-		// Produces a random value in [0, bound) (exclusive) 
-		constexpr result_type operator()(result_type bound) noexcept{
-			return next(bound);
-		}
+		constexpr result_type operator()(result_type bound) noexcept{ return next(bound); }
 
-		// compile time overload: next<Bound, Type>()
-		// gets random value in [0, Bound)
-		// returns value in type T (default: result_type)
-		template <result_type Bound, std::integral T = result_type>
+		// Bounded generation with a bound known at compile time and an optional result type.
+		// This lets the compiler specialize for Bound: 1 needs no random draw, powers of two
+		// can use exact bit extraction, and other constant bounds can be optimized aggressively.
+		template <result_type Bound, class T = result_type>
 		constexpr T next() noexcept{
-			static_assert(Bound > 0, "Bound must be positive");
-			static_assert(Bound - 1 <= static_cast<result_type>(std::numeric_limits<T>::max()),
-				"Bound is too large for return type T");			
+			static_assert(Bound > 0, "Random::next<Bound>(): bound must be positive");
+			static_assert(detail::supported_integer<T>, "Random::next<Bound, T>() requires a supported fixed-width integer type");
+			static_assert(uint64_t{Bound - 1} <= integral_max<T>(), "Bound is too large for return type T");
 			if constexpr(Bound == 1){
-				return T{0};
+				return T{0}; // The only possible result is 0, so no random draw is needed.
 			}else if constexpr((Bound & (Bound - 1)) == 0){ // if Bound is a power of two, we can use a mask / bit-extract.
-				constexpr unsigned bits_needed = std::countr_zero(Bound);				
-				return bits<bits_needed, T>();
-			} else{
-				// Otherwise just call the runtime version.
-				// Bound is a compile-time constant here, so the compiler can constant-fold the multiply/shift.
-				return static_cast<T>(next(Bound));
+				using U = detail::unsigned_t<T>;
+				return static_cast<T>(bits<power_of_two_exponent(Bound), U>());
+			}else{ // Otherwise just call the runtime version.
+				return static_cast<T>(next(Bound)); // Bound is a compile-time constant here, so the compiler can constant-fold the multiply/shift.
 			}
 		}
 
-		// integer in [lo, hi)
-		template <std::integral I>
+		// Integer in [lo, hi).
+		template <class I, detail::enable_if_t<detail::supported_integer<I>, int> = 0>
 		constexpr I between(I lo, I hi) noexcept{
 			if(!(lo < hi)){
-				assert(false && "between(lo, hi): inverted or empty range");
+				assert(false && "Random::between(lo, hi): inverted or empty range.");
 				return lo;
 			}
-			using U = std::make_unsigned_t<I>;
-			U bound = U(hi) - U(lo);
-			assert(bound <= E::max() &&
-				"between(lo, hi): range too large for this engine. Consider a 64-bit engine "
-				"(xoshiro256ss, SmallFast64) or ensure hi–lo <= max()");
-			auto safe_bound = static_cast<result_type>(bound);
-			return static_cast<I>(U(lo) + static_cast<U>(next(safe_bound)));
+			using U = detail::unsigned_t<I>; // (portable but) equivalent to std::make_unsigned_t<I>;
+			const U bound = static_cast<U>(hi) - static_cast<U>(lo);
+			assert(uint64_t{bound} <= uint64_t{(max)()} && "Random::between(lo, hi): range is too large for this engine.");
+			return static_cast<I>(static_cast<U>(lo) +
+				static_cast<U>(next(static_cast<result_type>(bound))));
 		}
 
+		// --- floating point ---
 
-		// --- floating point ---				
+		// Real in [0.0,1.0) using the "IQ float hack"
+		//
+		//
+		// With C++20 we use Iñigo Quilez's lovely representation trick: start with
+		// the bit pattern for 1.0, fill its mantissa, bit-cast back, and subtract 1.
+		//		For details: see "sfrand": https://iquilezles.org/articles/sfrand/
+		//
+		// C++17 cannot bit-cast during constant evaluation, so its default path does
+		// the equivalent exact power-of-two scaling. If constexpr generation is not
+		// important to you, define RND_FAST_FLOAT. It opts into a runtime memcpy
+		// bit cast, giving you the fast IQ hack even on more limited targets.
+		//
+		// Note: we generate exactly the number of random bits that fit in F's mantissa,
+		// so desktop (binary64) double keeps its full precision while AVR's 32-bit double
+		// naturally follows the binary32 path.
+		template <class F = float>
+		RND_DETAIL_FLOAT_CONSTEXPR F normalized() noexcept{
+			static_assert(detail::supported_float<F>,
+				"Random floating-point functions require IEEE-754 binary32 float or binary32/binary64 double");
+			using real_type = detail::remove_cvref_t<F>; // What type of float are we really dealing with?
+			using UInt = detail::unsigned_t<real_type>; // Pick wide enough unsigned int type for F
+			constexpr unsigned mantissa_bits = detail::float_traits<real_type>::mantissa_bits; // Number of mantissa bits for F (e.g., 23 for float)
+			const UInt mantissa = bits<mantissa_bits, UInt>();  // get random bits to fill the mantissa field
+		#if RND_DETAIL_HAS_CONSTEXPR_BIT_CAST
+			// F{1} gives us exactly the exponent bits we need, without hard-coding a representation in the modern path.
+			constexpr UInt base = detail::bit_cast<UInt>(real_type{1}); // Bit pattern for F{1}, i.e., exponent set, mantissa 0
+			const UInt as_int = static_cast<UInt>(base | mantissa); // Combine base (1.0) with the random mantissa bits
+			return detail::bit_cast<real_type>(as_int) - real_type{1};  // Convert bits to float/double, then subtract 1.0 to get [0,1)
+		#elif defined(RND_FAST_FLOAT)
+			// memcpy is the C++17-safe runtime bit cast. Compilers reduce this tiny,
+			// fixed-size copy to a register move; there is no actual library call here.
+			const UInt representation = static_cast<UInt>(detail::floating_one_bits<real_type>() | mantissa);
+			real_type value;
+			memcpy(&value, &representation, sizeof(value));
+			return value - real_type{1};
+		#else
+			// 2^-mantissa_bits is exact in a radix-2 floating-point type, so this keeps
+			// the same evenly spaced set of values while remaining constexpr in C++17.
+			constexpr real_type scale = real_type{1} / static_cast<real_type>(UInt{1} << mantissa_bits);
+			return static_cast<real_type>(mantissa) * scale;
+		#endif
+		}
 
-		// real in [0.0,1.0) using the "IQ float hack"
-		//   see Iñigo Quilez, "sfrand": https://iquilezles.org/articles/sfrand/
-		// Fast, branchless and, now, portable.
-		template <supported_float F = float>
-		constexpr F normalized() noexcept{			
-			using UInt = std::conditional_t<sizeof(F) == sizeof(std::uint32_t), std::uint32_t, std::uint64_t>;  // Pick wide enough unsigned int type for F
-			constexpr int mantissa_bits = std::numeric_limits<F>::digits - 1; // Number of mantissa bits for F (e.g., 23 for float)
-			constexpr UInt base = std::bit_cast<UInt>(F{1}); // Bit pattern for F{1}, i.e., exponent set, mantissa 0
-			const UInt mantissa = this->template bits<mantissa_bits, UInt>();      // Get random bits to fill the mantissa field
-			const UInt as_int = base | mantissa; // Combine base (1.0) with random mantissa bits
-			return std::bit_cast<F>(as_int) - F{1}; // Convert bits to float/double, then subtract 1.0 to get [0,1)
-		}			
-
-		// real in [-1.0,1.0) using the IQ float hack.
-		template <supported_float F = float>
-		constexpr F signed_norm() noexcept{
+		// Real in [-1.0, 1.0).
+		template <class F = float>
+		RND_DETAIL_FLOAT_CONSTEXPR F signed_norm() noexcept{
+			static_assert(detail::supported_float<F>,
+				"Random::signed_norm() requires a supported floating-point type");
 			return F{2} * normalized<F>() - F{1}; // scale to [0.0, 2.0), then shift to [-1.0, 1.0)
 		}
 
-		// real in [lo, hi)
-		template <supported_float F = float>
-		constexpr F between(F lo, F hi) noexcept{
-			assert(lo < hi && "between(lo, hi): inverted or empty range");
+		// Real in [lo, hi).
+		template <class F, detail::enable_if_t<detail::supported_float<F>, int> = 0>
+		RND_DETAIL_FLOAT_CONSTEXPR F between(F lo, F hi) noexcept{
+			assert(lo < hi && "Random::between(lo, hi): inverted or empty range.");
 			return lo + (hi - lo) * normalized<F>();
 		}
 
 		// --- probability/distributions ---
 
-		// boolean
+		// A fair coin from the high bit of one engine result.
 		constexpr bool coin_flip() noexcept{
 			return bits<1, unsigned>() != 0;
 		}
 
-		// boolean with probability
-		template <supported_float F = float>
-		constexpr bool coin_flip(F probability) noexcept{
-			assert(F{0} <= probability && probability <= F{1} && "coin_flip(probability): probability must be in [0, 1]");
+		// A weighted coin: true with probability in [0, 1].
+		template <class F = float>
+		RND_DETAIL_FLOAT_CONSTEXPR bool coin_flip(F probability) noexcept{
+			static_assert(detail::supported_float<F>, "Random::coin_flip(probability) requires a supported floating-point type");
+			assert(F{0} <= probability && probability <= F{1} && "Random::coin_flip(probability): probability must be in [0, 1].");
 			return normalized<F>() < probability;
 		}
 
-		template <supported_float F = float>
-		constexpr F gaussian(F mean, F stddev) noexcept{
-			// Based on the Central Limit Theorem; https://en.wikipedia.org/wiki/Central_limit_theorem
-			// the Irwin–Hall distribution (sum of 12 U(0,1) has mean = 6, variance = 1).
-			// Subtract 6 and multiply by stddev to get an approximate N(mean, stddev) sample.
-			assert(stddev >= F{0} && "gaussian(mean, stddev): standard deviation must be non-negative");
+		template <class F = float>
+		RND_DETAIL_FLOAT_CONSTEXPR F gaussian(F mean, F stddev) noexcept{
+			static_assert(detail::supported_float<F>, "Random::gaussian() requires a supported floating-point type");
+			assert(stddev >= F{0} && "Random::gaussian(mean, stddev): standard deviation must be non-negative.");
+			// This is the pleasantly simple Irwin-Hall approximation to a normal
+			// distribution. The sum of twelve U(0,1) samples has mean 6 and variance
+			// 1, so subtracting 6 and applying mean/stddev gives an approximate normal.
+			// See: https://en.wikipedia.org/wiki/Irwin-Hall_distribution
 			F sum{};
-			for(auto i = 0; i < 12; ++i){
+			for(unsigned i = 0; i < 12; ++i){
 				sum += normalized<F>();
 			}
 			return mean + (sum - F{6}) * stddev;
 		}
 
 		// --- collections ---
-		// data() and size() define the supported storage model. begin() is used only
-		// when iterator() or weighted_iterator() must return the container's native iterator.
-		// std::span looks like the natural parameter type for these functions, but a
-		// function template such as element(std::span<T>) cannot deduce T when it is
-		// called with a vector or array. T matters here because it is the element type
-		// that element() must return by reference. Function-template deduction does not
-		// consider the conversion from that container to span, so callers would have to
-		// write element(std::span{items}) themselves. The overloads below keep the convenient
-		// element(items) spelling while pointer-and-size remains the primitive API.
+		//
+		// data() and size() define the supported contiguous storage model. begin()
+		// is used only when iterator() must return the collection's native iterator.
+		//
+		// std::span looks like the natural parameter type here, but a function such
+		// as element(std::span<T>) cannot deduce T from a vector or array: template
+		// deduction does not consider the conversion to span. Callers would have to
+		// write rng.element(std::span{items}) themselves. These overloads preserve
+		// the friendly element(items) spelling, while pointer-and-size remains the
+		// baseline API.
 
-		// pick an index in [0, size)
-		[[nodiscard]] constexpr std::size_t index(std::size_t size) noexcept{
+		// Pick an index in [0, size).
+		[[nodiscard]] constexpr size_t index(size_t size) noexcept{
 			assert(size != 0 && "Random::index(): empty collection.");
-			assert(size <= max() &&
-				"Random::index(): collection is too large for this engine.");
-			return static_cast<std::size_t>(next(static_cast<result_type>(size)));
+			assert(size <= static_cast<size_t>((max)()) && "Random::index(): collection is too large for this engine.");
+			return static_cast<size_t>(next(static_cast<result_type>(size)));
 		}
 
-		template <class C>
-			requires contiguous_collection<const C>
-		[[nodiscard]] constexpr std::size_t index(const C& collection) noexcept{
-			return index(static_cast<std::size_t>(std::size(collection)));
+		template <class C,
+			detail::enable_if_t<detail::contiguous_collection<const C>::value, int> = 0> // equivalent to 'requires contiguous_collection<const C>' in C++20
+		[[nodiscard]] constexpr size_t index(const C& collection) noexcept{
+			return index(static_cast<size_t>(detail::collection_size(collection)));
 		}
 
-		// get an iterator to a random element. Accepts const and non-const collections
+		// Get an iterator to a random element. Const collections naturally return a
+		// const iterator; pointer-defined ranges naturally return a pointer.
 		template <class T>
-		[[nodiscard]] constexpr T* iterator(T* collection, std::size_t size) noexcept{
+		[[nodiscard]] constexpr T* iterator(T* collection, size_t size) noexcept{
 			assert(collection != nullptr && "Random::iterator(): null collection.");
 			return collection + index(size);
 		}
 
-		template <class C>
-			requires contiguous_collection<C>
+		template <class C,
+			detail::enable_if_t<detail::contiguous_collection<C>::value, int> = 0> // equivalent to 'requires contiguous_collection<C>' in C++20
 		[[nodiscard]] constexpr auto iterator(C& collection) noexcept{
-			const auto offset = static_cast<std::ptrdiff_t>(
-				index(static_cast<std::size_t>(std::size(collection))));
-			return std::next(std::begin(collection), offset);
+			return detail::collection_begin(collection) +
+				index(static_cast<size_t>(detail::collection_size(collection)));
 		}
 
-		//return a reference to a random element in a collection
-		//accepts both const and non-const collections
+		// Return the selected element by reference, preserving constness.
 		template <class T>
-		[[nodiscard]] constexpr T& element(T* collection, std::size_t size) noexcept{
+		[[nodiscard]] constexpr T& element(T* collection, size_t size) noexcept{
 			return *iterator(collection, size);
 		}
 
-		template <class C>
-			requires contiguous_collection<C>
+		template <class C,
+			detail::enable_if_t<detail::contiguous_collection<C>::value, int> = 0> // equivalent to 'requires contiguous_collection<C>' in C++20
 		[[nodiscard]] constexpr decltype(auto) element(C& collection) noexcept{
 			return *iterator(collection);
 		}
 
-		// Pick an index proportionally to unsigned integral weights.
-		// A zero weight excludes the corresponding index from selection.
-		// At least one weight must be positive and the sum must fit in result_type.
-		template <class W>
-			requires valid_weight_type<W>
-		[[nodiscard]] constexpr std::size_t weighted_index(const W* weights, std::size_t size) noexcept{
-			assert(weights != nullptr && "Random::weighted_index(): null weight collection.");
-			auto weight_at = [weights](std::size_t i) constexpr -> decltype(auto){
-				return weights[i];
-			};
+		// --- weighted collections ---
+		//
+		// Zero weights exclude an item. At least one weight must be positive, and the
+		// sum must fit in the engine's result_type. The latter keeps the bounded draw
+		// exact and is why an 8-bit engine intentionally accepts smaller totals.
+
+		// Pick an index proportionally to a simple array of unsigned weights.
+		template <class W, detail::enable_if_t<valid_weight_type<W>, int> = 0>
+		[[nodiscard]] constexpr size_t weighted_index(const W* weights, size_t size) noexcept{
+			if(weights == nullptr){
+				assert(false && "Random::weighted_index(): null weight collection.");
+				abort();
+			}
+			auto weight_at = [weights](size_t i) constexpr -> decltype(auto){ return weights[i]; };
 			return weighted_offset(size, weight_at);
 		}
 
-		template <class C>
-			requires contiguous_collection<const C>
-		[[nodiscard]] constexpr std::size_t weighted_index(const C& weights) noexcept{
-			return weighted_index(std::data(weights), static_cast<std::size_t>(std::size(weights)));
+		template <class C,
+			detail::enable_if_t<detail::valid_weight_collection<C, result_type>::value, int> = 0>
+		[[nodiscard]] constexpr size_t weighted_index(const C& weights) noexcept{
+			return weighted_index(
+				detail::collection_data(weights),
+				static_cast<size_t>(detail::collection_size(weights)));
 		}
 
-		// Get an iterator to an element selected proportionally to its projected weight.
-		// A zero weight excludes the corresponding element from selection.
-		// At least one projected weight must be positive, the sum must fit in
-		// result_type, and the projection must return stable weights across both passes.
-		template <class T, class Projection>
-			requires valid_projection<T, Projection>
+		// Select from objects by projecting each object to its weight. A projection
+		// may be a lambda, a pointer to a member function, or a pointer to a data
+		// member. It must be noexcept and return a supported unsigned weight type.
+		// See README.md and demo.cpp for examples
+		template <class T, class Projection,
+			detail::enable_if_t<detail::valid_projection<T, Projection, result_type>::value, int> = 0>
 		[[nodiscard]] constexpr T* weighted_iterator(
-			T* collection, std::size_t size, Projection projection) noexcept{
+			T* collection, size_t size, Projection projection) noexcept{
 			return collection + projected_weighted_offset(collection, size, projection);
 		}
 
-		template <class C, class Projection>
-			requires contiguous_collection<C>
+		template <class C, class Projection,
+			detail::enable_if_t<detail::valid_projected_collection<C, Projection, result_type>::value, int> = 0>
 		[[nodiscard]] constexpr auto weighted_iterator(C& collection, Projection projection) noexcept{
-			const auto offset = static_cast<std::ptrdiff_t>(projected_weighted_offset(
-				std::data(collection),
-				static_cast<std::size_t>(std::size(collection)),
-				projection));
-			return std::next(std::begin(collection), offset);
+			const size_t offset = projected_weighted_offset(
+				detail::collection_data(collection),
+				static_cast<size_t>(detail::collection_size(collection)),
+				projection);
+			return detail::collection_begin(collection) + offset;
 		}
 
-		// Return a reference to an element selected proportionally to its projected weight.
-		// Projections must be noexcept.
-		template <class T, class Projection>
-			requires valid_projection<T, Projection>
+		template <class T, class Projection,
+			detail::enable_if_t<detail::valid_projection<T, Projection, result_type>::value, int> = 0>
 		[[nodiscard]] constexpr T& weighted_element(
-			T* collection, std::size_t size, Projection projection) noexcept{
-			return *weighted_iterator(collection, size, std::move(projection));
+			T* collection, size_t size, Projection projection) noexcept{
+			return *weighted_iterator(collection, size, projection);
 		}
 
-		template <class C, class Projection>
-			requires contiguous_collection<C>
+		template <class C, class Projection,
+			detail::enable_if_t<detail::valid_projected_collection<C, Projection, result_type>::value, int> = 0>
 		[[nodiscard]] constexpr decltype(auto) weighted_element(C& collection, Projection projection) noexcept{
-			return *weighted_iterator(collection, std::move(projection));
-		}			
+			return *weighted_iterator(collection, projection);
+		}
 
 	private:
-		E _e{}; //the underlying engine providing random bits. This class will turn those into useful values.
+		engine_type _engine{}; //the small engine that supplies all of our random bits.
 
+		// Convert sizeof(T), which is measured in bytes, to a size in bits.
+		// <limits> is unavailable on the AVR side, so std::numeric_limits<T>::digits isn't an option.
+		template <class T>
+		static constexpr unsigned bit_width() noexcept{ return sizeof(T) * CHAR_BIT; }
+
+		// Mask the low n bits without ever shifting by the full width of T (which
+		// would be undefined behavior). n == width therefore gets the all-ones path.
+		template <class T>
+		static constexpr T low_bits_mask(unsigned n) noexcept{
+			return n >= bit_width<T>()
+				? static_cast<T>(~T{0})
+				: static_cast<T>((T{1} << n) - T{1});
+		}
+
+		// Move the strongest n bits down to the low end of the requested result type.
+		template <class T>
+		static constexpr T take_high_bits(result_type value, unsigned n) noexcept{
+			assert(n > 0 && n <= value_bits && n <= bit_width<T>());
+			return static_cast<T>(value >> (value_bits - n)) & low_bits_mask<T>(n);
+		}
+
+		// Fill T one engine-width chunk at a time.
+		template <class T>
+		constexpr T gather_bits(unsigned n) noexcept{
+			assert(value_bits < n && n <= bit_width<T>());
+
+			T result{};
+			unsigned filled{};
+			while(filled < n){
+				const unsigned remaining = n - filled;
+				const unsigned take = remaining < value_bits ? remaining : value_bits;
+				const T chunk = take_high_bits<T>(next(), take);
+
+				// filled is always less than bit_width<T>, so this shift is safe.
+				result = static_cast<T>(result | static_cast<T>(chunk << filled));
+				filled += take;
+			}
+
+			// When n == bit_width<T>(), low_bits_mask() returns all ones.
+			return static_cast<T>(result & low_bits_mask<T>(n));
+		}
+
+		// We need numeric_limits<T>::max() in one compile-time assertion, but AVR-libc
+		// does not provide <limits>. Fixed-width two's-complement integers let us
+		// compute it directly and portably for the types this API accepts.
+		template <class I>
+		static constexpr uint64_t integral_max() noexcept{
+			using value_type = detail::remove_cv_t<I>;
+			using U = detail::unsigned_t<value_type>;
+			if constexpr(value_type(-1) < value_type(0)){
+				return uint64_t{static_cast<U>(~U{0}) >> 1};
+			}
+			return uint64_t{static_cast<U>(~U{0})};
+		}
+
+		// A tiny constexpr replacement for std::countr_zero. It is called only for a
+		// known power of two, where the exponent is exactly the number of bits needed.
+		static constexpr unsigned power_of_two_exponent(result_type bound) noexcept{
+			unsigned exponent{};
+			while(bound > 1){
+				bound >>= 1;
+				++exponent;
+			}
+			return exponent;
+		}
+
+		// First pass of weighted selection: validate and add the weights without ever
+		// allowing the sum to wrap. Assertions explain mistakes in debug builds;
+		// abort() keeps a violated precondition from turning into undefined behavior
+		// when assertions are compiled out.
+		template <class WeightAt>
+		constexpr result_type total_weight(size_t size, WeightAt& weight_at) noexcept{
+			using weight_type = detail::remove_cvref_t<decltype(weight_at(size_t{}))>;
+			static_assert(valid_weight_type<weight_type>, "Weights must be non-boolean unsigned integers no wider than result_type");
+			result_type total{};
+			for(size_t i = 0; i < size; ++i){
+				const result_type weight = static_cast<result_type>(weight_at(i));
+				if(weight > (max)() - total){
+					assert(false && "Random::weighted_index(): total weight is too large for this engine.");
+					abort();
+				}
+				total += weight;
+			}
+			return total;
+		}
+
+		// Turn a projection into the same index-based callable used by plain weights.
 		template <class T, class Projection>
-		[[nodiscard]] constexpr std::size_t projected_weighted_offset(
-			T* collection, std::size_t size, Projection& projection) noexcept{
-			static_assert(valid_projection<T, Projection>,
-				"Projection must be noexcept and return a valid unsigned weight type");
-			assert(collection != nullptr && "Random::weighted_iterator(): null collection.");
-			auto weight_at = [collection, &projection](std::size_t i) constexpr noexcept -> decltype(auto){
-				return std::invoke(projection, collection[i]);
+		constexpr size_t projected_weighted_offset(T* collection, size_t size, Projection& projection) noexcept{
+			if(collection == nullptr){
+				assert(false && "Random::weighted_iterator(): null collection.");
+				abort();
+			}
+			static_assert(detail::valid_projection<T, Projection, result_type>::value, "Projection must be noexcept and return a valid unsigned weight type");
+			auto weight_at = [collection, &projection](size_t i) constexpr noexcept -> decltype(auto){
+				return detail::invoke(projection, collection[i]);
 			};
 			return weighted_offset(size, weight_at);
 		}
 
+		// Weighted selection is deliberately two-pass: one pass computes total, one
+		// random draw chooses a target in [0,total), and the second pass locates it.
+		// Projections must therefore return stable weights during both passes.
 		template <class WeightAt>
-		[[nodiscard]] constexpr std::size_t weighted_offset(
-			std::size_t size, WeightAt& weight_at) noexcept{
-			using weight_type = std::remove_cvref_t<decltype(weight_at(std::size_t{}))>;
-			static_assert(valid_weight_type<weight_type>,
-				"Weights must be non-boolean unsigned integers no wider than result_type");
-			assert(size != 0 && "Random::weighted_index(): empty weight collection.");
-
-			result_type total{};
-			for(std::size_t i = 0; i < size; ++i){
-				const result_type weight = static_cast<result_type>(weight_at(i));
-				assert(weight <= max() - total &&
-					"Random::weighted_index(): total weight is too large for this engine.");
-				total += weight;
+		constexpr size_t weighted_offset(size_t size, WeightAt& weight_at) noexcept{
+			if(size == 0){
+				assert(false && "Random::weighted_index(): empty weight collection.");
+				abort();
 			}
-			assert(total != 0 && "Random::weighted_index(): at least one weight must be positive.");
-
+			result_type total = total_weight(size, weight_at);
+			if(total == 0){
+				assert(false && "Random::weighted_index(): at least one weight must be positive.");
+				abort();
+			}
 			result_type target = next(total);
-			for(std::size_t i = 0; i < size; ++i){
+			for(size_t i = 0; i < size; ++i){
 				const result_type weight = static_cast<result_type>(weight_at(i));
-				if(target < weight) return i;
+				if(target < weight){
+					return i;
+				}
 				target -= weight;
 			}
-			std::unreachable(); // Stable weights and target < total guarantee that the loop returns.
+			assert(false && "Random::weighted_index(): weights changed during selection.");
+			abort();
 		}
 
-		template <class T>
-		static constexpr T low_bits_mask(unsigned n) noexcept{
-			assert(n <= std::numeric_limits<T>::digits); // n in [0, digits(T)]
-			constexpr unsigned W = std::numeric_limits<T>::digits;
-			if(n == 0) return T{0};
-			if(n >= W) return std::numeric_limits<T>::max(); // avoid UB on (1<<W)
-			return static_cast<T>((T{1} << n) - T{1});
-		}
-
-		template <class T>
-		constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
-			assert(1 <= n && n <= value_bits && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= value_bits, and n <= digits(T)
-			const unsigned shift = value_bits - n;    // shift in [0, value_bits-1]
-			return static_cast<T>(x >> shift) & low_bits_mask<T>(n);
-		}
-
-		template <class T>
-		constexpr T gather_bits_runtime(unsigned n) noexcept{
-			assert(1 <= n && n <= std::numeric_limits<T>::digits); // Preconditions: 1 <= n <= digits(T)
-			T acc = 0;
-			unsigned filled = 0;
-			while(filled < n){
-				const unsigned take = std::min<unsigned>(value_bits, n - filled);
-				const T chunk = take_high_bits<T>(next(), take);
-				acc |= (chunk << filled);             // filled < digits(T) always holds here
-				filled += take;
+		// Multiply in the next wider integer type and keep the high half. A 64-bit
+		// engine needs the portable 64x64->128 helper because __uint128_t is not
+		// available on every desktop compiler (notably MSVC) or on AVR.
+		static constexpr result_type scale_to_bound(result_type value, result_type bound) noexcept{
+			if constexpr(sizeof(result_type) == 1){
+				return static_cast<result_type>((uint16_t{value} * uint16_t{bound}) >> 8);
+			}else if constexpr(sizeof(result_type) == 2){
+				return static_cast<result_type>((uint32_t{value} * uint32_t{bound}) >> 16);
+			}else if constexpr(sizeof(result_type) == 4){
+				return static_cast<result_type>((uint64_t{value} * uint64_t{bound}) >> 32);
+			}else{
+				return static_cast<result_type>(detail::mul64_to_128_parts(value, bound).hi);
 			}
-			// If n == digits(T), low_bits_mask returns all-ones, so this is cheap and safe.
-			return acc & low_bits_mask<T>(n);
 		}
 	};
-} //namespace rnd
+
+} // namespace rnd
+
+#undef RND_DETAIL_FLOAT_CONSTEXPR
