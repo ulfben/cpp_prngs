@@ -7,7 +7,7 @@
 
 // This is the small portability seam behind random.hpp. On a normal desktop it
 // mostly gives our implementation short, uniform names for standard facilities.
-// On AVR-libc, where headers such as <type_traits> and <functional> are missing,
+// On AVR-libc, where headers such as <type_traits> and <iterator> are missing,
 // it supplies only the handful of operations Random actually needs.
 //
 // Keeping these details here is what lets the interesting RNG code live in one
@@ -18,7 +18,7 @@
 // rather than the AVR platform name, so another constrained C++17 library can
 // use the same fallback path without pretending to be AVR.
 #if defined(__has_include)
-	#if __has_include(<functional>) && __has_include(<iterator>) && __has_include(<limits>) && __has_include(<type_traits>) && __has_include(<utility>)
+	#if __has_include(<iterator>) && __has_include(<limits>) && __has_include(<type_traits>) && __has_include(<utility>)
 		#define RND_DETAIL_HAS_STANDARD_COMPAT 1
 	#endif
 #endif
@@ -28,7 +28,6 @@
 #endif
 
 #if RND_DETAIL_HAS_STANDARD_COMPAT
-	#include <functional>
 	#include <iterator>
 	#include <limits>
 	#include <type_traits>
@@ -387,9 +386,8 @@ namespace rnd::detail {
 	// -----------------------------------------------------------------------------
 	//
 	// std::data/std::size/std::begin handle both containers and built-in arrays.
-	// std::invoke gives projections one spelling whether they are lambdas, member
-	// functions, or data members. Wrapping them here keeps random.hpp identical on
-	// both paths and makes the feature-dependent code very easy to spot.
+	// Wrapping them here keeps random.hpp identical on both paths and makes the
+	// feature-dependent code very easy to spot.
 
 	template <class C>
 	constexpr auto collection_data(C& collection) noexcept(noexcept(std::data(collection)))
@@ -407,12 +405,6 @@ namespace rnd::detail {
 	constexpr auto collection_begin(C& collection) noexcept(noexcept(std::begin(collection)))
 		-> decltype(std::begin(collection)){
 		return std::begin(collection);
-	}
-
-	template <class Projection, class T>
-	constexpr decltype(auto) invoke(Projection& projection, T& value)
-		noexcept(noexcept(std::invoke(projection, value))){
-		return std::invoke(projection, value);
 	}
 
 #else
@@ -455,8 +447,10 @@ namespace rnd::detail {
 		return collection;
 	}
 
+#endif
+
 	// -----------------------------------------------------------------------------
-	// Projection invocation without <functional>
+	// Projection invocation
 	// -----------------------------------------------------------------------------
 	//
 	// A projection accepted by weighted_element() can take three useful forms:
@@ -465,10 +459,11 @@ namespace rnd::detail {
 	//     (value.*projection)()    // pointer to a member function
 	//     value.*projection        // pointer to a data member
 	//
-	// std::invoke normally hides those syntax differences. AVR-libc does not give
-	// us <functional>, so the overload set below implements just these three forms.
-	// It is deliberately not a complete replacement for std::invoke; direct objects
-	// and references are all this API needs.
+	// The overload set below implements exactly those three forms on every target.
+	// It is deliberately narrower than std::invoke; direct objects and references
+	// are all this API needs. Keeping this implementation local also preserves
+	// constexpr projection calls with C++17 standard libraries whose std::invoke is
+	// not constexpr.
 	//
 	// The priority tags are a small SFINAE trick. We try the ordinary call first.
 	// If that expression is ill-formed, overload resolution falls back to the
@@ -502,8 +497,6 @@ namespace rnd::detail {
 		-> decltype(invoke_impl(projection, value, priority_2{})){
 		return invoke_impl(projection, value, priority_2{});
 	}
-
-#endif
 
 	// -----------------------------------------------------------------------------
 	// C++17 API constraints

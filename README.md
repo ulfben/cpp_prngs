@@ -22,7 +22,7 @@ For a deep, game-focused comparison of 47 PRNGs across nine platforms, see Rhet 
 So, if you want a random-number generator that is:
 
 * compact (**4–32 bytes of state**) and [fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks)
-* deterministic across platforms
+* deterministic across platforms (for equivalent integer and floating-point representations)
 * [easy to seed](https://github.com/ulfben/cpp_prngs#seeding)
 * [feature-rich](https://github.com/ulfben/cpp_prngs#random-api), with integers, floats, coin flips, weighted draws, random element selection, Gaussian samples, raw bits
 * usable at compile time with `constexpr`
@@ -30,7 +30,7 @@ So, if you want a random-number generator that is:
 
 …go ahead and copy the complete `includes/` directory into your project, and go forth and prosper. Let me know if you find bugs or add any cool new features!
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/aPT6PxGPn)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/PrjqfrP5z)
 
 ---
 
@@ -106,7 +106,7 @@ const LootDrop& drop = rng.weighted_element(loot_table, &LootDrop::weight);
 Weights should be non-negative whole numbers. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
 
 
-[Try it on Compiler Explorer!](https://compiler-explorer.com/z/aPT6PxGPn)
+[Try it on Compiler Explorer!](https://compiler-explorer.com/z/PrjqfrP5z)
 
 ---
 
@@ -166,7 +166,7 @@ Want to use your own engine? It must provide the interface described by `RandomB
 | `seed()` | Reseeds the engine back to its default state |
 | `seed(v)` | Reseeds the engine with value `v` |
 | `discard(n)` | Advances the underlying engine by `n` steps |
-| `split()` | Produces a decorrelated, forked engine, useful for parallel streams |
+| `split()` | Derives a child generator from the parent, useful for task- or thread-local generators when strict stream separation is not required |
 
 ### Raw values and bits
 
@@ -225,7 +225,7 @@ The weighted helpers let you pick items with different chances of being selected
 
 ### Portability and floating-point details
 
-`random.hpp` uses `std::invoke`, standard type traits, collection access helpers, and constexpr `std::bit_cast` when the toolchain provides them. To support AVR-libc the library provides small private fallbacks for the same operations.
+`random.hpp` uses standard type traits, collection access helpers, and constexpr `std::bit_cast` when the toolchain provides them. Its private compatibility layer also provides a narrow constexpr projection helper for callables, member functions, and data members. On AVR-libc, the layer supplies small fallbacks for the unavailable standard-library facilities.
 
 In C++20 and later, normalized floating-point generation uses constexpr `std::bit_cast`. In C++17 it uses a constexpr arithmetic implementation by default. If you don't need constexpr execution you can define `RND_FAST_FLOAT` to select a runtime `memcpy` bit cast instead; only the floating-point methods lose constexpr evaluation in that mode.
 

@@ -1,20 +1,19 @@
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/concepts.hpp>
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/bit_operations.hpp> // shared C++17/20 bit-operation helpers used by the engines
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/compat.hpp> // portable standard-library compatibility helpers used by Random
-#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/portable_wide_multiply.hpp> // implementation used by wide_multiply.hpp
-#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/wide_multiply.hpp> //constexpr fallback for 128bit multiplication on msvc
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/portable_wide_multiply.hpp> // implementation used by random.hpp
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/engines/pcg32.hpp> //pcg32 engine
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/engines/romuduojr.hpp> // RomuDuoJr engine 
 #include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/random.hpp> // the Random interface, which wraps any engine to provide a rich set of random generation features
 #include <algorithm>
 #include <array>
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <print>
+#include <random>
 #include <string_view>
 #include <vector>
-https://compiler-explorer.com/z/aPT6PxGPn
+
 // Source:
 // https://github.com/ulfben/cpp_prngs/
 //
@@ -42,7 +41,7 @@ https://compiler-explorer.com/z/aPT6PxGPn
 //
 // The library operations are constexpr where their inputs permit constant evaluation.
 //
-// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/zTh6nazxj
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/PrjqfrP5z
 // Benchmarks: https://github.com/ulfben/cpp_prngs#performance-benchmarks
 
 int main(){

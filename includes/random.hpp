@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// This is an RNG interface that wraps around any engine that meets the RandomBitEngine concept.
+// This is an RNG interface that wraps around any engine that meets the RandomBitEngine requirements.
 // It provides useful functions for generating values, including integers, floating-point numbers, weighted picks,
 // as well as methods for Gaussian distribution, coin flips (with odds), picking from collections (index or element), etc.
 //
@@ -18,7 +18,7 @@
 // them; otherwise it supplies the minimal equivalents needed by Random.
 //
 // Source: https://github.com/ulfben/cpp_prngs/
-// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/aPT6PxGPn
+// Demo is available on Compiler Explorer: https://compiler-explorer.com/z/PrjqfrP5z
 // Benchmarks: https://github.com/ulfben/cpp_prngs/#performance-benchmarks
 
 // Keep the C++20 RandomBitEngine concept available on toolchains that support it,
