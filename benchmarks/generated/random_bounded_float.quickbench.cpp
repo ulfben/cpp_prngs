@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #if defined(__has_include)
-#if __has_include(<functional>) && __has_include(<iterator>) && __has_include(<limits>) && __has_include(<type_traits>) && __has_include(<utility>)
+#if __has_include(<iterator>) && __has_include(<limits>) && __has_include(<type_traits>) && __has_include(<utility>)
 #define RND_DETAIL_HAS_STANDARD_COMPAT 1
 #endif
 #endif
@@ -11,7 +11,6 @@
 #define RND_DETAIL_HAS_STANDARD_COMPAT 0
 #endif
 #if RND_DETAIL_HAS_STANDARD_COMPAT
-#include <functional>
 #include <iterator>
 #include <limits>
 #include <type_traits>
@@ -235,11 +234,6 @@ constexpr auto collection_begin(C& collection) noexcept(noexcept(std::begin(coll
 -> decltype(std::begin(collection)){
 return std::begin(collection);
 }
-template <class Projection, class T>
-constexpr decltype(auto) invoke(Projection& projection, T& value)
-noexcept(noexcept(std::invoke(projection, value))){
-return std::invoke(projection, value);
-}
 #else
 template <class C>
 constexpr auto collection_data(C& collection) noexcept -> decltype(collection.data()){
@@ -265,6 +259,7 @@ template <class T, size_t N>
 constexpr T* collection_begin(T (&collection)[N]) noexcept{
 return collection;
 }
+#endif
 struct priority_0{};
 struct priority_1 : priority_0{};
 struct priority_2 : priority_1{};
@@ -289,7 +284,6 @@ noexcept(noexcept(invoke_impl(projection, value, priority_2{})))
 -> decltype(invoke_impl(projection, value, priority_2{})){
 return invoke_impl(projection, value, priority_2{});
 }
-#endif
 template <class C, class = void>
 struct contiguous_collection{
 static constexpr bool value = false;
