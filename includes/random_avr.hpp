@@ -44,6 +44,39 @@ namespace rnd {
 			detail::avr_supported_uint<T> &&
 			(sizeof(detail::avr_remove_cvref_t<T>) <= sizeof(engine_result_type));
 
+		template <class C>
+		static constexpr auto collection_data(C& collection) noexcept
+			-> decltype(collection.data()){
+			return collection.data();
+		}
+
+		template <class T, size_t N>
+		static constexpr T* collection_data(T (&collection)[N]) noexcept{
+			return collection;
+		}
+
+		template <class C>
+		static constexpr auto collection_size(const C& collection) noexcept
+			-> decltype(collection.size()){
+			return collection.size();
+		}
+
+		template <class T, size_t N>
+		static constexpr size_t collection_size(const T (&)[N]) noexcept{
+			return N;
+		}
+
+		template <class C>
+		static constexpr auto collection_begin(C& collection) noexcept
+			-> decltype(collection.begin()){
+			return collection.begin();
+		}
+
+		template <class T, size_t N>
+		static constexpr T* collection_begin(T (&collection)[N]) noexcept{
+			return collection;
+		}
+
 	public:
 		using engine_type = E;
 		using result_type = typename E::result_type;
@@ -195,14 +228,10 @@ namespace rnd {
 			return static_cast<size_t>(next(static_cast<result_type>(size)));
 		}
 
-		template <class T>
-		[[nodiscard]] constexpr size_t index(const T* collection, size_t size) noexcept{
-			assert(collection != nullptr && "Random::index(): null collection.");
-			return index(size);
+		template <class C>
+		[[nodiscard]] constexpr size_t index(const C& collection) noexcept{
+			return index(static_cast<size_t>(collection_size(collection)));
 		}
-
-		template <class T, size_t N>
-		[[nodiscard]] constexpr size_t index(const T (&)[N]) noexcept{ return index(N); }
 
 		template <class T>
 		[[nodiscard]] constexpr T* iterator(T* collection, size_t size) noexcept{
@@ -210,16 +239,21 @@ namespace rnd {
 			return collection + index(size);
 		}
 
-		template <class T, size_t N>
-		[[nodiscard]] constexpr T* iterator(T (&collection)[N]) noexcept{ return iterator(collection, N); }
+		template <class C>
+		[[nodiscard]] constexpr auto iterator(C& collection) noexcept{
+			return collection_begin(collection) +
+				index(static_cast<size_t>(collection_size(collection)));
+		}
 
 		template <class T>
 		[[nodiscard]] constexpr T& element(T* collection, size_t size) noexcept{
 			return *iterator(collection, size);
 		}
 
-		template <class T, size_t N>
-		[[nodiscard]] constexpr T& element(T (&collection)[N]) noexcept{ return *iterator(collection, N); }
+		template <class C>
+		[[nodiscard]] constexpr decltype(auto) element(C& collection) noexcept{
+			return *iterator(collection);
+		}
 
 		// --- weighted collections ---
 
@@ -233,26 +267,25 @@ namespace rnd {
 			return weighted_offset(size, weight_at);
 		}
 
-		template <class W, size_t N>
-		[[nodiscard]] constexpr size_t weighted_index(const W (&weights)[N]) noexcept{
-			return weighted_index(weights, N);
+		template <class C>
+		[[nodiscard]] constexpr size_t weighted_index(const C& weights) noexcept{
+			return weighted_index(
+				collection_data(weights),
+				static_cast<size_t>(collection_size(weights)));
 		}
 
 		template <class T, class Projection>
 		[[nodiscard]] constexpr T* weighted_iterator(T* collection, size_t size, Projection projection) noexcept{
-			if(collection == nullptr){
-				assert(false && "Random::weighted_iterator(): null collection.");
-				abort();
-			}
-			auto weight_at = [collection, &projection](size_t i) constexpr -> decltype(auto){
-				return detail::avr_invoke(projection, collection[i], detail::avr_priority_2{});
-			};
-			return collection + weighted_offset(size, weight_at);
+			return collection + projected_weighted_offset(collection, size, projection);
 		}
 
-		template <class T, size_t N, class Projection>
-		[[nodiscard]] constexpr T* weighted_iterator(T (&collection)[N], Projection projection) noexcept{
-			return weighted_iterator(collection, N, projection);
+		template <class C, class Projection>
+		[[nodiscard]] constexpr auto weighted_iterator(C& collection, Projection projection) noexcept{
+			const size_t offset = projected_weighted_offset(
+				collection_data(collection),
+				static_cast<size_t>(collection_size(collection)),
+				projection);
+			return collection_begin(collection) + offset;
 		}
 
 		template <class T, class Projection>
@@ -260,9 +293,9 @@ namespace rnd {
 			return *weighted_iterator(collection, size, projection);
 		}
 
-		template <class T, size_t N, class Projection>
-		[[nodiscard]] constexpr T& weighted_element(T (&collection)[N], Projection projection) noexcept{
-			return *weighted_iterator(collection, N, projection);
+		template <class C, class Projection>
+		[[nodiscard]] constexpr decltype(auto) weighted_element(C& collection, Projection projection) noexcept{
+			return *weighted_iterator(collection, projection);
 		}
 
 	private:
@@ -331,8 +364,24 @@ namespace rnd {
 			return total;
 		}
 
+		template <class T, class Projection>
+		constexpr size_t projected_weighted_offset(
+			T* collection, size_t size, Projection& projection) noexcept{
+			if(collection == nullptr){
+				assert(false && "Random::weighted_iterator(): null collection.");
+				abort();
+			}
+			static_assert(
+				noexcept(detail::avr_invoke(projection, collection[size_t{}], detail::avr_priority_2{})),
+				"Projection must be noexcept");
+			auto weight_at = [collection, &projection](size_t i) constexpr noexcept -> decltype(auto){
+				return detail::avr_invoke(projection, collection[i], detail::avr_priority_2{});
+			};
+			return weighted_offset(size, weight_at);
+		}
+
 		template <class WeightAt>
-		constexpr size_t weighted_offset(size_t size, WeightAt weight_at) noexcept{
+		constexpr size_t weighted_offset(size_t size, WeightAt& weight_at) noexcept{
 			if(size == 0){
 				assert(false && "Random::weighted_index(): empty weight collection.");
 				abort();

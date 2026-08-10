@@ -270,7 +270,7 @@ namespace rnd::detail {
 		Projection& projection,
 		T& value,
 		avr_priority_2
-	) noexcept -> decltype(projection(value)){
+	) noexcept(noexcept(projection(value))) -> decltype(projection(value)){
 		return projection(value);
 	}
 
@@ -279,7 +279,7 @@ namespace rnd::detail {
 		Projection& projection,
 		T& value,
 		avr_priority_1
-	) noexcept -> decltype((value.*projection)()){
+	) noexcept(noexcept((value.*projection)())) -> decltype((value.*projection)()){
 		return (value.*projection)();
 	}
 
@@ -288,7 +288,7 @@ namespace rnd::detail {
 		Projection& projection,
 		T& value,
 		avr_priority_0
-	) noexcept -> decltype(value.*projection){
+	) noexcept(noexcept(value.*projection)) -> decltype(value.*projection){
 		return value.*projection;
 	}
 

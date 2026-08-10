@@ -1,4 +1,5 @@
 #include <random_avr.hpp>
+#include <array>
 #include <stdint.h>
 
 enum class UnsupportedInteger : uint8_t{};
@@ -68,6 +69,19 @@ struct WeightProjection{
 	constexpr uint8_t operator()(const LootDrop& drop) const noexcept{ return drop.weight; }
 };
 
+struct ThrowingWeightProjection{
+	uint8_t operator()(const LootDrop& drop) const{ return drop.weight; }
+};
+
+static_assert(noexcept(rnd::detail::avr_invoke(
+	*static_cast<WeightProjection*>(nullptr),
+	*static_cast<LootDrop*>(nullptr),
+	rnd::detail::avr_priority_2{})));
+static_assert(!noexcept(rnd::detail::avr_invoke(
+	*static_cast<ThrowingWeightProjection*>(nullptr),
+	*static_cast<LootDrop*>(nullptr),
+	rnd::detail::avr_priority_2{})));
+
 constexpr bool validate_integer_api(){
 	rnd::Random<Engine8> bounded{uint8_t{128}};
 	if(bounded.next(uint8_t{100}) != uint8_t{50} || bounded.engine().draws != 1) return false;
@@ -104,7 +118,7 @@ constexpr bool validate_collections(){
 	if(random.index(values) != 3) return false;
 
 	random.seed(uint8_t{192});
-	if(random.index(values, 4) != 3) return false;
+	if(random.index(size_t{4}) != 3) return false;
 
 	random.seed(uint8_t{192});
 	if(random.iterator(values) != values + 3) return false;
@@ -115,7 +129,15 @@ constexpr bool validate_collections(){
 	const int constants[]{1, 2, 3, 4};
 	random.seed(uint8_t{64});
 	const int* selected = random.iterator(constants);
-	return selected == constants + 1;
+	if(selected != constants + 1) return false;
+
+	std::array<int, 4> array_values{{10, 20, 30, 40}};
+	random.seed(uint8_t{192});
+	if(random.iterator(array_values) != array_values.begin() + 3) return false;
+
+	const std::array<int, 4> const_array_values{{10, 20, 30, 40}};
+	random.seed(uint8_t{64});
+	return &random.element(const_array_values) == const_array_values.data() + 1;
 }
 
 constexpr bool validate_weighted_collections(){
@@ -125,6 +147,10 @@ constexpr bool validate_weighted_collections(){
 
 	random.seed(uint8_t{64});
 	if(random.weighted_index(weights, 4) != 3) return false;
+
+	const std::array<uint8_t, 4> array_weights{{0, 2, 0, 6}};
+	random.seed(uint8_t{64});
+	if(random.weighted_index(array_weights) != 3) return false;
 
 	LootDrop loot[]{
 		{10, 0},
@@ -148,7 +174,16 @@ constexpr bool validate_weighted_collections(){
 	};
 	random.seed(uint8_t{0});
 	const LootDrop* selected = random.weighted_iterator(constant_loot, &LootDrop::weight);
-	return selected == constant_loot + 1;
+	if(selected != constant_loot + 1) return false;
+
+	std::array<LootDrop, 4> array_loot{{
+		{10, 0},
+		{20, 2},
+		{30, 0},
+		{40, 6}
+	}};
+	random.seed(uint8_t{0});
+	return random.weighted_iterator(array_loot, WeightProjection{}) == array_loot.begin() + 1;
 }
 
 #ifndef RND_AVR_FAST_FLOAT

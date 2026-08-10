@@ -12,6 +12,16 @@ struct LootDrop{
 	constexpr uint8_t get_weight() const noexcept{ return weight; }
 };
 
+template <class T, size_t N>
+struct TinyArray{
+	T values[N];
+	constexpr T* data() noexcept{ return values; }
+	constexpr const T* data() const noexcept{ return values; }
+	constexpr size_t size() const noexcept{ return N; }
+	constexpr T* begin() noexcept{ return values; }
+	constexpr const T* begin() const noexcept{ return values; }
+};
+
 static_assert(rnd::detail::avr_supported_uint<uint8_t>);
 static_assert(rnd::detail::avr_supported_uint<uint16_t>);
 static_assert(rnd::detail::avr_supported_uint<uint32_t>);
@@ -56,6 +66,8 @@ void setup(){
 	rnd::Random<SmallFast16> random_16{static_cast<uint16_t>(input)};
 	uint8_t values[]{1, 2, 3, 4};
 	const uint8_t weights[]{0, 2, 0, 6};
+	TinyArray<uint8_t, 4> fixed_values{{1, 2, 3, 4}};
+	const TinyArray<uint8_t, 4> fixed_weights{{0, 2, 0, 6}};
 	LootDrop loot[]{
 		{1, 0},
 		{2, 2},
@@ -71,7 +83,9 @@ void setup(){
 	output ^= random_32.coin_flip();
 	output ^= *random_32.iterator(values, 4);
 	output ^= random_32.element(values);
+	output ^= random_32.element(fixed_values);
 	output ^= random_32.weighted_index(weights);
+	output ^= random_32.weighted_index(fixed_weights);
 	output ^= random_32.weighted_element(loot, &LootDrop::weight).id;
 	output ^= random_32.weighted_element(loot, 4, &LootDrop::get_weight).id;
 	output ^= random_64.next(uint64_t{1000});

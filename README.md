@@ -38,10 +38,10 @@ So, if you want a random-number generator that is:
 
 cpp_prngs is header-only. Copy the complete `includes/` directory into your project and add it to your compiler's include path. Choose the frontend that matches your target:
 
-| Target | Header | C++ version | Collection interface |
-|--------|--------|-------------|----------------------|
-| Desktop and other full standard-library targets | [`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) | C++23 | Contiguous collections and native iterators |
-| Classic AVR-based Arduino boards | [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp) | C++17 | C arrays and pointer-plus-length buffers |
+| Target | Header | C++ version |
+|--------|--------|-------------|
+| Desktop and other full standard-library targets | [`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) | C++23 |
+| Classic AVR-based Arduino boards | [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp) | C++17 |
 
 Both frontends expose `rnd::Random<E>` and provide the same generation features: bounded integers, floats, coin flips, Gaussian samples, random element selection, weighted draws and raw bits. The included engines themselves are C++17-compatible.
 
@@ -112,7 +112,6 @@ const LootDrop& drop = rng.weighted_element(loot_table, &LootDrop::weight);
 
 Weights should be non-negative whole numbers. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
 
-On AVR, an ordinary C array works directly: `rng.weighted_index(weights)` deduces the array length automatically. `std::array` is available in the Arduino AVR toolchain too; pass it through the pointer-plus-length overload as `rng.weighted_index(weights.data(), weights.size())`.
 
 [Try it on Compiler Explorer!](https://compiler-explorer.com/z/aPT6PxGPn)
 
@@ -131,20 +130,20 @@ These are the normal choices for desktop applications and other targets with eff
 | [`PCG32`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/pcg32.hpp) | 32 bits | 16 bytes | C++ port of [Melissa O’Neill’s minimal PCG32](https://www.pcg-random.org/download.html#minimal-c-implementation). |
 | [`SmallFast32`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast32.hpp) | 32 bits | 16 bytes | C++ port of [Bob Jenkins’ 32-bit Small Fast](https://burtleburtle.net/bob/rand/smallprng.html) generator. |
 | [`RomuDuoJr`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/romuduojr.hpp) | 64 bits | 16 bytes | C++ port of [Mark Overton’s RomuDuoJr](https://romu-random.org/). Winner of Rhet Butler’s [RNG Battle Royale (2020)](https://web.archive.org/web/20220704174727/https://rhet.dev/wheel/rng-battle-royale-47-prngs-9-consoles/) and second fastest engine in the lineup! |
+| [`QuarkBurst64`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/quarkburst64.hpp) | 64 bits | 24 bytes | C++ port of [Eightomic’s quarkburst1x64](https://github.com/eightomic/quarkburst), previously published as [GhostScramble](https://web.archive.org/web/20260531035702/https://github.com/williamstaffordparsons/ghostscramble/blob/master/ghostscramble.c). The fastest engine in the current benchmarks. |
 | [`Konadare192`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/konadare192.hpp) | 64 bits | 24 bytes | C++ port of [Pelle Evensen's konadare192px++](https://github.com/pellevensen/PReenactiNG); the third-fastest 64-bit engine in the current benchmarks. |
-| [`QuarkBurst64`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/quarkburst64.hpp) | 64 bits | 24 bytes | C++ port of Eightomic’s quarkburst1x64, previously published as GhostScramble64. The fastest engine in the current benchmarks. |
-| [`SmallFast64`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast64.hpp) | 64 bits | 32 bytes | A 64-bit three-rotate Small Fast implementation, using rotates (7, 13, 37). |
+| [`SmallFast64`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast64.hpp) | 64 bits | 32 bytes | A 64-bit three-rotate [Small Fast](https://burtleburtle.net/bob/rand/smallprng.html) implementation, using rotates (7, 13, 37). |
 | [`Xoshiro256SS`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xoshiro256ss.hpp) | 64 bits | 32 bytes | C++ port of David Blackman and Sebastiano Vigna's [xoshiro256\*\* 1.0](https://prng.di.unimi.it/) generator. |
 
 ### Small-output engines for microcontrollers
 
 These engines return 8 or 16 bits at a time and use only 4–8 bytes of state. Their narrow arithmetic can be a better fit for small microcontrollers such as AVR-based Arduino boards.
 
-| Engine | Output | State | Best fit and trade-off |
+| Engine | Output | State | Description |
 |--------|-------:|------:|------------------------|
-| [`SmallFast8`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast8.hpp) | 8 bits | 4 bytes | The smallest Small Fast variant, intended for short streams where every byte of state matters. |
-| [`XorShift32Star8`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xorshift32star8.hpp) | 8 bits | 4 bytes | Keeps a 32-bit state cycle while returning one byte per call. |
-| [`SmallFast16`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast16.hpp) | 16 bits | 8 bytes | A useful middle ground when an 8-bit result is too restrictive; uses O’Neill’s tested 16-bit constants. |
+| [`SmallFast8`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast8.hpp) | 8 bits | 4 bytes | The smallest Small Fast variant, when every byte of state matters. |
+| [`XorShift32Star8`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/xorshift32star8.hpp) | 8 bits | 4 bytes | A [tiny](https://excamera.com/sphinx/article-xorshift.html) [xorshift\* variant](https://arxiv.org/abs/1402.6246): Marsaglia's full-period 32-bit xorshift recurrence with Vigna-style multiplicative scrambling, returning the high 8 bits. |
+| [`SmallFast16`](https://github.com/ulfben/cpp_prngs/blob/main/includes/engines/small_fast16.hpp) | 16 bits | 8 bytes | A useful middle ground when an 8-bit result is too restrictive; uses [O’Neill’s tested 16-bit constants](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html). |
 
 An engine's output width limits bounds, collection sizes, and total weights used by `Random<E>`. An 8-bit engine accepts bounds up to 255, `SmallFast16` up to 65,535, and a 32-bit engine up to roughly 4.29 billion. Methods such as `bits_as<T>()` can combine several engine outputs when you need a wider raw value. Debug builds alert you when a requested range is too large.
 
@@ -160,7 +159,7 @@ Want to use your own engine? If it satisfies `RandomBitEngine`, you can plug it 
 
 ## Random API
 
-[`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) and [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp) both expose `rnd::Random<E>`. The generation API is shared; only the collection interface and a few platform details differ.
+[`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) and [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp) both expose `rnd::Random<E>`. Their public APIs are closely aligned; the implementations differ where AVR-libc lacks standard-library facilities used by the desktop frontend.
 
 ### Construction and engine state
 
@@ -235,12 +234,9 @@ The weighted helpers let you pick items with different chances of being selected
 
 `random_avr.hpp` provides the same generation features without relying on the standard-library facilities unavailable in AVR-libc:
 
-* Collection methods accept C arrays directly and deduce their length, so `rng.element(values)` and `rng.weighted_index(weights)` work as written. They also accept a pointer and element count. Standard containers available in the Arduino toolchain, such as `std::array`, can be passed with `.data()` and `.size()`. The desktop frontend accepts contiguous containers such as `std::array`, `std::vector`, `std::string`, and `std::span` directly.
 * AVR `float` and `double` are both 32-bit IEEE 754 types. The floating-point methods therefore accept either spelling but produce binary32 precision.
-* Floating-point generation is `constexpr` by default. Defining `RND_AVR_FAST_FLOAT` consistently for the whole program selects the faster  but makes the floating-point methods runtime-only.
 * The library is designed to work thoroughly at compile time. On C++17, however, there is no std::bit_cast, so the very fast [Inigo Quilez technique](https://iquilezles.org/articles/sfrand/) cannot be implemented portably in constexpr! If your program does not need to generate floating-point values at compile time, define `RND_AVR_FAST_FLOAT`. This restores the fast IQ implementation but makes the floating-point methods runtime-only. The rest of the library remains constexpr.
 * Methods are templates or inline functions, so unused features do not add code to the final program.
-
 
 [^1]: Although `bits(n)` and `bits<N>()` *can* be used for power-of-two integer ranges, this is not their intended purpose. Prefer `next<N,T>()` instead. It chooses the same fast, unbiased bit-shift specialization, but makes your code clearer and safer.
 
@@ -352,7 +348,10 @@ The test suite also builds the engines and both `random_avr.hpp` floating-point 
 
 ### Building for Arduino AVR
 
-The Arduino AVR core defaults to C++11, while the engines and `random_avr.hpp` require C++17. The repository's CI validates an ATmega32U4 target with Arduino AVR core 1.8.8. You can compile a sketch with the same language setting through Arduino CLI:
+The Arduino AVR core defaults to C++11, while the engines and `random_avr.hpp` require C++17. The repository's CI validates an ATmega32U4 target with Arduino AVR core 1.8.8.
+
+#### Arduino CLI
+You can compile a sketch with C++17 through Arduino CLI:
 
 ```sh
 arduino-cli core update-index
@@ -364,7 +363,22 @@ arduino-cli compile \
   /path/to/your/sketch
 ```
 
-Replace the two example paths with the location of this repository and your sketch. To enable the optional runtime-optimized floating-point path, add `-DRND_AVR_FAST_FLOAT` to `compiler.cpp.extra_flags`. CI compiles both modes.
+Replace `/path/to/cpp_prngs/includes` with the repository's `includes` directory and `/path/to/your/sketch` with your sketch directory. To enable the optional runtime-optimized floating-point path, add `-DRND_AVR_FAST_FLOAT` to `compiler.cpp.extra_flags`. CI compiles both modes.
+
+#### Arduino IDE 2 on Windows
+With Arduino IDE 2 on Windows, locate the installed AVR core under:
+
+```text
+C:\Users\<username>\AppData\Local\Arduino15\packages\arduino\hardware\avr\<version>\
+```
+
+Create a `platform.local.txt` file next to `platform.txt` containing:
+
+```text
+compiler.cpp.extra_flags=-std=gnu++17
+```
+
+Then restart the Arduino IDE.
 
 ---
 
