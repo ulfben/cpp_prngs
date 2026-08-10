@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #ifdef RND_AVR_FAST_FLOAT
-	#include <string.h>
+	#include <string.h> //for memcpy in the IQ hack
 #endif
 
 // A C++17 Random<E> frontend for AVR-libc, which does not provide the standard
