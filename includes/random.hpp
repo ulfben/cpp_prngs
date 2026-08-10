@@ -3,7 +3,6 @@
 #include "detail/compat.hpp"
 #include "detail/portable_wide_multiply.hpp" //for constexpr and portable 128-bit multiplication
 #include <assert.h>
-#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -33,7 +32,7 @@ namespace rnd {
 	template <class E>
 	class Random final{
 		using engine_result_type = typename E::result_type;
-		static constexpr unsigned value_bits = sizeof(engine_result_type) * CHAR_BIT; //same as:  std::numeric_limits<typename E::result_type>::digits;
+		static constexpr unsigned value_bits = detail::bit_width<engine_result_type>(); //same as: std::numeric_limits<typename E::result_type>::digits;
 
 		// The fast range reduction below assumes that every bit pattern is a possible
 		// engine result. These assertions say that contract directly and, unlike a
@@ -95,11 +94,11 @@ namespace rnd {
 		template <class T = result_type>
 		constexpr T bits(unsigned n) noexcept{
 			static_assert(detail::supported_uint<T>, "Random::bits<T>() requires an 8-, 16-, 32-, or 64-bit unsigned type");
-			assert(n > 0 && n <= bit_width<T>());
+			assert(n > 0 && n <= detail::bit_width<T>());
 			if(n <= value_bits){
 				return take_high_bits<T>(next(), n);
 			}
-			return gather_bits_runtime<T>(n);
+			return gather_bits<T>(n);
 		}
 
 		// Bit extraction with a compile-time bit count.
@@ -110,7 +109,7 @@ namespace rnd {
 		constexpr T bits() noexcept{
 			static_assert(N > 0, "Random::bits<N>() needs at least one bit");
 			static_assert(detail::supported_uint<T>, "Random::bits<N, T>() requires an 8-, 16-, 32-, or 64-bit unsigned type");
-			static_assert(N <= bit_width<T>(), "T cannot hold N bits");
+			static_assert(N <= detail::bit_width<T>(), "T cannot hold N bits");
 			if constexpr(N <= value_bits){
 				return take_high_bits<T>(next(), N);
 			}else{
@@ -121,7 +120,7 @@ namespace rnd {
 		// Convenience spelling for "fill a T with random bits".
 		template <class T>
 		constexpr T bits_as() noexcept{
-			return bits<bit_width<T>(), T>();
+			return bits<detail::bit_width<T>(), T>();
 		}
 
 		// Derive a child generator by consuming enough parent output to fill one seed.
@@ -151,12 +150,12 @@ namespace rnd {
 		constexpr T next() noexcept{
 			static_assert(Bound > 0, "Random::next<Bound>(): bound must be positive");
 			static_assert(detail::supported_integer<T>, "Random::next<Bound, T>() requires a supported fixed-width integer type");
-			static_assert(uint64_t{Bound - 1} <= integral_max<T>(), "Bound is too large for return type T");
+			static_assert(uint64_t{Bound - 1} <= detail::integral_max<T>(), "Bound is too large for return type T");
 			if constexpr(Bound == 1){
 				return T{0}; // The only possible result is 0, so no random draw is needed.
 			}else if constexpr((Bound & (Bound - 1)) == 0){ // if Bound is a power of two, we can use a mask / bit-extract.
 				using U = detail::unsigned_t<T>;
-				return static_cast<T>(bits<power_of_two_exponent(Bound), U>());
+				return static_cast<T>(bits<detail::power_of_two_exponent(Bound), U>());
 			}else{ // Otherwise just call the runtime version.
 				return static_cast<T>(next(Bound)); // Bound is a compile-time constant here, so the compiler can constant-fold the multiply/shift.
 			}
@@ -178,21 +177,14 @@ namespace rnd {
 
 		// --- floating point ---
 
-		// Real in [0.0,1.0) using the "IQ float hack"
+		// Real in [0.0,1.0). We generate exactly the number of random bits that fit in
+		// F's mantissa, so desktop binary64 double keeps its full precision while AVR's
+		// 32-bit double naturally follows the binary32 path.
 		//
-		//
-		// With C++20 we use Iñigo Quilez's lovely representation trick: start with
-		// the bit pattern for 1.0, fill its mantissa, bit-cast back, and subtract 1.
-		//		For details: see "sfrand": https://iquilezles.org/articles/sfrand/
-		//
-		// C++17 cannot bit-cast during constant evaluation, so its default path does
-		// the equivalent exact power-of-two scaling. If constexpr generation is not
-		// important to you, define RND_FAST_FLOAT. It opts into a runtime memcpy
-		// bit cast, giving you the fast IQ hack even on more limited targets.
-		//
-		// Note: we generate exactly the number of random bits that fit in F's mantissa,
-		// so desktop (binary64) double keeps its full precision while AVR's 32-bit double
-		// naturally follows the binary32 path.
+		// Turning those bits into a real number is the platform-sensitive part. The
+		// compatibility layer documents and selects among constexpr std::bit_cast,
+		// runtime memcpy, and exact power-of-two scaling. Random only has to supply the
+		// right bits—which keeps the actual RNG algorithm pleasantly easy to follow.
 		template <class F = float>
 		RND_DETAIL_FLOAT_CONSTEXPR F normalized() noexcept{
 			static_assert(detail::supported_float<F>,
@@ -201,24 +193,7 @@ namespace rnd {
 			using UInt = detail::unsigned_t<real_type>; // Pick wide enough unsigned int type for F
 			constexpr unsigned mantissa_bits = detail::float_traits<real_type>::mantissa_bits; // Number of mantissa bits for F (e.g., 23 for float)
 			const UInt mantissa = bits<mantissa_bits, UInt>();  // get random bits to fill the mantissa field
-		#if RND_DETAIL_HAS_CONSTEXPR_BIT_CAST
-			// F{1} gives us exactly the exponent bits we need, without hard-coding a representation in the modern path.
-			constexpr UInt base = detail::bit_cast<UInt>(real_type{1}); // Bit pattern for F{1}, i.e., exponent set, mantissa 0
-			const UInt as_int = static_cast<UInt>(base | mantissa); // Combine base (1.0) with the random mantissa bits
-			return detail::bit_cast<real_type>(as_int) - real_type{1};  // Convert bits to float/double, then subtract 1.0 to get [0,1)
-		#elif defined(RND_FAST_FLOAT)
-			// memcpy is the C++17-safe runtime bit cast. Compilers reduce this tiny,
-			// fixed-size copy to a register move; there is no actual library call here.
-			const UInt representation = static_cast<UInt>(detail::floating_one_bits<real_type>() | mantissa);
-			real_type value;
-			memcpy(&value, &representation, sizeof(value));
-			return value - real_type{1};
-		#else
-			// 2^-mantissa_bits is exact in a radix-2 floating-point type, so this keeps
-			// the same evenly spaced set of values while remaining constexpr in C++17.
-			constexpr real_type scale = real_type{1} / static_cast<real_type>(UInt{1} << mantissa_bits);
-			return static_cast<real_type>(mantissa) * scale;
-		#endif
+			return detail::unit_float_from_mantissa<real_type>(mantissa);
 		}
 
 		// Real in [-1.0, 1.0).
@@ -380,16 +355,11 @@ namespace rnd {
 	private:
 		engine_type _engine{}; //the small engine that supplies all of our random bits.
 
-		// Convert sizeof(T), which is measured in bytes, to a size in bits.
-		// <limits> is unavailable on the AVR side, so std::numeric_limits<T>::digits isn't an option.
-		template <class T>
-		static constexpr unsigned bit_width() noexcept{ return sizeof(T) * CHAR_BIT; }
-
 		// Mask the low n bits without ever shifting by the full width of T (which
 		// would be undefined behavior). n == width therefore gets the all-ones path.
 		template <class T>
 		static constexpr T low_bits_mask(unsigned n) noexcept{
-			return n >= bit_width<T>()
+			return n >= detail::bit_width<T>()
 				? static_cast<T>(~T{0})
 				: static_cast<T>((T{1} << n) - T{1});
 		}
@@ -397,14 +367,14 @@ namespace rnd {
 		// Move the strongest n bits down to the low end of the requested result type.
 		template <class T>
 		static constexpr T take_high_bits(result_type value, unsigned n) noexcept{
-			assert(n > 0 && n <= value_bits && n <= bit_width<T>());
+			assert(n > 0 && n <= value_bits && n <= detail::bit_width<T>());
 			return static_cast<T>(value >> (value_bits - n)) & low_bits_mask<T>(n);
 		}
 
 		// Fill T one engine-width chunk at a time.
 		template <class T>
 		constexpr T gather_bits(unsigned n) noexcept{
-			assert(value_bits < n && n <= bit_width<T>());
+			assert(value_bits < n && n <= detail::bit_width<T>());
 
 			T result{};
 			unsigned filled{};
@@ -413,37 +383,13 @@ namespace rnd {
 				const unsigned take = remaining < value_bits ? remaining : value_bits;
 				const T chunk = take_high_bits<T>(next(), take);
 
-				// filled is always less than bit_width<T>, so this shift is safe.
+				// filled is always less than detail::bit_width<T>(), so this shift is safe.
 				result = static_cast<T>(result | static_cast<T>(chunk << filled));
 				filled += take;
 			}
 
-			// When n == bit_width<T>(), low_bits_mask() returns all ones.
+			// When n == detail::bit_width<T>(), low_bits_mask() returns all ones.
 			return static_cast<T>(result & low_bits_mask<T>(n));
-		}
-
-		// We need numeric_limits<T>::max() in one compile-time assertion, but AVR-libc
-		// does not provide <limits>. Fixed-width two's-complement integers let us
-		// compute it directly and portably for the types this API accepts.
-		template <class I>
-		static constexpr uint64_t integral_max() noexcept{
-			using value_type = detail::remove_cv_t<I>;
-			using U = detail::unsigned_t<value_type>;
-			if constexpr(value_type(-1) < value_type(0)){
-				return uint64_t{static_cast<U>(~U{0}) >> 1};
-			}
-			return uint64_t{static_cast<U>(~U{0})};
-		}
-
-		// A tiny constexpr replacement for std::countr_zero. It is called only for a
-		// known power of two, where the exponent is exactly the number of bits needed.
-		static constexpr unsigned power_of_two_exponent(result_type bound) noexcept{
-			unsigned exponent{};
-			while(bound > 1){
-				bound >>= 1;
-				++exponent;
-			}
-			return exponent;
 		}
 
 		// First pass of weighted selection: validate and add the weights without ever

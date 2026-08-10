@@ -32,6 +32,10 @@ static_assert(rnd::detail::supported_integer<int32_t>);
 static_assert(rnd::detail::supported_integer<int64_t>);
 static_assert(!rnd::detail::supported_integer<bool>);
 static_assert(!rnd::detail::supported_integer<char>);
+static_assert(rnd::detail::bit_width<uint8_t>() == 8);
+static_assert(rnd::detail::bit_width<uint64_t>() == 64);
+static_assert(rnd::detail::integral_max<int16_t>() == INT16_MAX);
+static_assert(rnd::detail::power_of_two_exponent(uint16_t{1024}) == 10);
 
 #ifndef RND_FAST_FLOAT
 constexpr bool validate_constexpr_double(){

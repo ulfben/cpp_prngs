@@ -1,6 +1,7 @@
 #pragma once
 
 #include <float.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h> // AVR-libc reliably provides the C headers, but not every C++ wrapper.
 
@@ -17,7 +18,7 @@
 // rather than the AVR platform name, so another constrained C++17 library can
 // use the same fallback path without pretending to be AVR.
 #if defined(__has_include)
-	#if __has_include(<functional>) && __has_include(<iterator>) && __has_include(<type_traits>) && __has_include(<utility>)
+	#if __has_include(<functional>) && __has_include(<iterator>) && __has_include(<limits>) && __has_include(<type_traits>) && __has_include(<utility>)
 		#define RND_DETAIL_HAS_STANDARD_COMPAT 1
 	#endif
 #endif
@@ -29,6 +30,7 @@
 #if RND_DETAIL_HAS_STANDARD_COMPAT
 	#include <functional>
 	#include <iterator>
+	#include <limits>
 	#include <type_traits>
 	#include <utility>
 	#if defined(__cpp_consteval) && defined(__has_include)
@@ -47,7 +49,9 @@
 #endif
 
 // RND_FAST_FLOAT selects a runtime memcpy-based bit cast when constexpr
-// std::bit_cast is unavailable.
+// std::bit_cast is unavailable. C++ has no syntax for “make this declaration
+// constexpr only when a feature exists”, so RND_DETAIL_FLOAT_CONSTEXPR is the
+// one small preprocessor detail that the public floating-point declarations use.
 #if defined(RND_FAST_FLOAT) && !RND_DETAIL_HAS_CONSTEXPR_BIT_CAST
 	#include <string.h>
 	#define RND_DETAIL_FLOAT_CONSTEXPR
@@ -227,6 +231,69 @@ namespace rnd::detail {
 	using unsigned_t = typename uint_of_size<sizeof(remove_cvref_t<T>)>::type;
 
 	// -----------------------------------------------------------------------------
+	// Numeric helpers missing from constrained standard libraries
+	// -----------------------------------------------------------------------------
+	//
+	// These three helpers correspond to facilities that a full standard library
+	// already provides:
+	//
+	//     bit_width<T>()                 -> std::numeric_limits<T>::digits
+	//     integral_max<T>()              -> std::numeric_limits<T>::max()
+	//     power_of_two_exponent(value)   -> std::countr_zero(value)
+	//
+	// Desktop builds simply use those facilities when they are available. The
+	// fallback implementations are deliberately small and readable so random.hpp
+	// does not need to know which standard-library surface its target provides.
+
+	template <class T>
+	constexpr unsigned bit_width() noexcept{
+	#if RND_DETAIL_HAS_STANDARD_COMPAT
+		return std::numeric_limits<remove_cvref_t<T>>::digits;
+	#else
+		// sizeof is measured in bytes, so CHAR_BIT converts it to bits. Random calls
+		// this only for the unsigned fixed-width types accepted above.
+		return sizeof(remove_cvref_t<T>) * CHAR_BIT;
+	#endif
+	}
+
+	template <class I>
+	constexpr uint64_t integral_max() noexcept{
+		using value_type = remove_cvref_t<I>;
+	#if RND_DETAIL_HAS_STANDARD_COMPAT
+		// Parentheses protect max from the macro commonly provided by Windows headers.
+		return static_cast<uint64_t>((std::numeric_limits<value_type>::max)());
+	#else
+		// AVR-libc has no <limits>. For our fixed-width integers, all-one bits give
+		// the unsigned maximum; shifting that once gives the signed maximum.
+		using U = unsigned_t<value_type>;
+		if constexpr(value_type(-1) < value_type(0)){
+			return uint64_t{static_cast<U>(~U{0}) >> 1};
+		}else{
+			return uint64_t{static_cast<U>(~U{0})};
+		}
+	#endif
+	}
+
+	template <class UInt>
+	constexpr unsigned power_of_two_exponent(UInt value) noexcept{
+		static_assert(supported_uint<UInt>,
+			"power_of_two_exponent() requires a supported unsigned integer type");
+	#if defined(__cpp_lib_bitops) && __cpp_lib_bitops >= 201907L
+		return static_cast<unsigned>(std::countr_zero(value));
+	#else
+		// This helper is called only for a known power of two. Repeatedly dividing
+		// by two therefore counts exactly how many bits are needed to represent its
+		// range: 1 -> 0, 2 -> 1, 4 -> 2, 8 -> 3, and so on.
+		unsigned exponent{};
+		while(value > 1){
+			value >>= 1;
+			++exponent;
+		}
+		return exponent;
+	#endif
+	}
+
+	// -----------------------------------------------------------------------------
 	// Floating-point representation
 	// -----------------------------------------------------------------------------
 	//
@@ -274,6 +341,45 @@ namespace rnd::detail {
 		}
 	}
 
+	// Convert random mantissa bits into a real number in [0, 1). Keeping the three
+	// techniques behind this one function is the main floating-point portability
+	// boundary: Random supplies good bits; this layer decides how to interpret them.
+	template <class F>
+	RND_DETAIL_FLOAT_CONSTEXPR remove_cvref_t<F>
+	unit_float_from_mantissa(unsigned_t<F> mantissa) noexcept{
+		static_assert(supported_float<F>,
+			"unit_float_from_mantissa() requires a supported floating-point type");
+		using real_type = remove_cvref_t<F>;
+		using UInt = unsigned_t<real_type>;
+
+	#if RND_DETAIL_HAS_CONSTEXPR_BIT_CAST
+		// Modern C++ can use Iñigo Quilez's wonderfully direct representation trick.
+		// F{1} supplies the exponent bits for 1.0 without hard-coding them. We fill
+		// its mantissa, bit-cast back to F, then subtract 1 to move [1,2) to [0,1).
+		// See “sfrand”: https://iquilezles.org/articles/sfrand/
+		constexpr UInt base = std::bit_cast<UInt>(real_type{1});
+		const UInt representation = static_cast<UInt>(base | mantissa);
+		return std::bit_cast<real_type>(representation) - real_type{1};
+	#elif defined(RND_FAST_FLOAT)
+		// C++17 cannot bit-cast during constant evaluation, but memcpy is its safe
+		// runtime equivalent. Compilers reduce this fixed-size copy to register moves;
+		// the tradeoff is simply that the floating-point API is no longer constexpr.
+		const UInt representation =
+			static_cast<UInt>(floating_one_bits<real_type>() | mantissa);
+		real_type value;
+		memcpy(&value, &representation, sizeof(value));
+		return value - real_type{1};
+	#else
+		// The constexpr C++17 path uses arithmetic instead. 2^-mantissa_bits is exact
+		// in a radix-2 type, so scaling the integer mantissa produces the same evenly
+		// spaced set of values without inspecting the floating-point representation.
+		constexpr unsigned mantissa_bits = float_traits<real_type>::mantissa_bits;
+		constexpr real_type scale = real_type{1} /
+			static_cast<real_type>(UInt{1} << mantissa_bits);
+		return static_cast<real_type>(mantissa) * scale;
+	#endif
+	}
+
 #if RND_DETAIL_HAS_STANDARD_COMPAT
 
 	// -----------------------------------------------------------------------------
@@ -308,13 +414,6 @@ namespace rnd::detail {
 		noexcept(noexcept(std::invoke(projection, value))){
 		return std::invoke(projection, value);
 	}
-
-	#if RND_DETAIL_HAS_CONSTEXPR_BIT_CAST
-		template <class To, class From>
-		constexpr To bit_cast(const From& value) noexcept{
-			return std::bit_cast<To>(value);
-		}
-	#endif
 
 #else
 

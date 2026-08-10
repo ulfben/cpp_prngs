@@ -24,6 +24,14 @@ static_assert(rnd::detail::supported_float<float>);
 static_assert(rnd::detail::supported_float<const double&>);
 static_assert(!rnd::detail::supported_float<long double>);
 
+// These are the tiny standard-library substitutes used by the shared header.
+static_assert(rnd::detail::bit_width<uint8_t>() == 8);
+static_assert(rnd::detail::bit_width<uint64_t>() == 64);
+static_assert(rnd::detail::integral_max<int8_t>() == INT8_MAX);
+static_assert(rnd::detail::integral_max<uint64_t>() == UINT64_MAX);
+static_assert(rnd::detail::power_of_two_exponent(uint8_t{1}) == 0);
+static_assert(rnd::detail::power_of_two_exponent(uint16_t{1024}) == 10);
+
 template <class UInt>
 class CountingEngine final{
 public:
