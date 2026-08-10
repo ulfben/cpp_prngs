@@ -191,7 +191,7 @@ Want to use your own engine? It must provide the interface described by `RandomB
 
 | Method | Description |
 |--------|-------------|
-| `normalized<F>()` | Returns a floating-point value in `[0.0, 1.0)`; `F` defaults to `float` |
+| `normalized<F>()` | Returns a floating-point value in `[0.0, 1.0)` using the [IQ float hack](https://iquilezles.org/articles/sfrand/); `F` defaults to `float` |
 | `signed_norm<F>()` | Returns a floating-point value in `[-1.0, 1.0)`; `F` defaults to `float` |
 | `between(F lo, F hi)` | Returns a floating-point value in `[lo, hi)` |
 
@@ -225,11 +225,11 @@ The weighted helpers let you pick items with different chances of being selected
 
 ### Portability and floating-point details
 
-`random.hpp` uses `std::invoke`, standard type traits, collection access helpers, and constexpr `std::bit_cast` when the toolchain provides them. AVR-libc receives small private fallbacks for the same operations. The RNG algorithms and public overloads are shared.
+`random.hpp` uses `std::invoke`, standard type traits, collection access helpers, and constexpr `std::bit_cast` when the toolchain provides them. To support AVR-libc the library provides small private fallbacks for the same operations.
 
-* Desktop binary64 `double` and AVR's binary32 `double` are both supported according to the target's actual representation.
-* In C++20 and later, normalized floating-point generation uses constexpr `std::bit_cast`. In C++17 it uses a constexpr arithmetic implementation by default. Define `RND_FAST_FLOAT` to select a runtime `memcpy` bit cast instead; only the floating-point methods lose constexpr evaluation in that mode.
-* Methods are templates or inline functions, so unused features do not add code to the final program.
+In C++20 and later, normalized floating-point generation uses constexpr `std::bit_cast`. In C++17 it uses a constexpr arithmetic implementation by default. If you don't need constexpr execution you can define `RND_FAST_FLOAT` to select a runtime `memcpy` bit cast instead; only the floating-point methods lose constexpr evaluation in that mode.
+
+Methods are templates or inline functions, so unused features do not add code to the final program.
 
 [^1]: Although `bits(n)` and `bits<N>()` *can* be used for power-of-two integer ranges, this is not their intended purpose. Prefer `next<N,T>()` instead. It chooses the same fast, unbiased bit-shift specialization, but makes your code clearer and safer.
 
