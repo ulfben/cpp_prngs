@@ -1,3 +1,376 @@
+#include <float.h>
+#include <limits.h>
+#include <stddef.h>
+#include <stdint.h>
+#if defined(__has_include)
+#if __has_include(<functional>) && __has_include(<iterator>) && __has_include(<limits>) && __has_include(<type_traits>) && __has_include(<utility>)
+#define RND_DETAIL_HAS_STANDARD_COMPAT 1
+#endif
+#endif
+#ifndef RND_DETAIL_HAS_STANDARD_COMPAT
+#define RND_DETAIL_HAS_STANDARD_COMPAT 0
+#endif
+#if RND_DETAIL_HAS_STANDARD_COMPAT
+#include <functional>
+#include <iterator>
+#include <limits>
+#include <type_traits>
+#include <utility>
+#if defined(__cpp_consteval) && defined(__has_include)
+#if __has_include(<bit>)
+#include <bit>
+#endif
+#endif
+#endif
+#if defined(__cpp_lib_bit_cast) && __cpp_lib_bit_cast >= 201806L
+#define RND_DETAIL_HAS_CONSTEXPR_BIT_CAST 1
+#else
+#define RND_DETAIL_HAS_CONSTEXPR_BIT_CAST 0
+#endif
+#if defined(RND_FAST_FLOAT) && !RND_DETAIL_HAS_CONSTEXPR_BIT_CAST
+#include <string.h>
+#define RND_DETAIL_FLOAT_CONSTEXPR
+#else
+#define RND_DETAIL_FLOAT_CONSTEXPR constexpr
+#endif
+namespace rnd::detail {
+#if RND_DETAIL_HAS_STANDARD_COMPAT
+template <class T>
+using remove_cv_t = typename std::remove_cv<T>::type;
+template <class T>
+using remove_cvref_t = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
+template <bool Condition, class T = void>
+using enable_if_t = typename std::enable_if<Condition, T>::type;
+template <class... T>
+using void_t = std::void_t<T...>;
+template <class T, class U>
+static constexpr bool is_same = std::is_same<T, U>::value;
+template <class T>
+T&& declval() noexcept;
+#else
+template <class T, class U>
+struct is_same_impl{
+static constexpr bool value = false;
+};
+template <class T>
+struct is_same_impl<T, T>{
+static constexpr bool value = true;
+};
+template <class T, class U>
+static constexpr bool is_same = is_same_impl<T, U>::value;
+template <class T>
+struct remove_cv{
+using type = T;
+};
+template <class T>
+struct remove_cv<const T>{
+using type = T;
+};
+template <class T>
+struct remove_cv<volatile T>{
+using type = T;
+};
+template <class T>
+struct remove_cv<const volatile T>{
+using type = T;
+};
+template <class T>
+using remove_cv_t = typename remove_cv<T>::type;
+template <class T>
+struct remove_reference{
+using type = T;
+};
+template <class T>
+struct remove_reference<T&>{
+using type = T;
+};
+template <class T>
+struct remove_reference<T&&>{
+using type = T;
+};
+template <class T>
+using remove_cvref_t = remove_cv_t<typename remove_reference<T>::type>;
+template <bool Condition, class T = void>
+struct enable_if{};
+template <class T>
+struct enable_if<true, T>{
+using type = T;
+};
+template <bool Condition, class T = void>
+using enable_if_t = typename enable_if<Condition, T>::type;
+template <class...>
+using void_t = void;
+template <class T>
+T&& declval() noexcept;
+#endif
+template <class T>
+static constexpr bool supported_uint =
+is_same<remove_cvref_t<T>, uint8_t> ||
+is_same<remove_cvref_t<T>, uint16_t> ||
+is_same<remove_cvref_t<T>, uint32_t> ||
+is_same<remove_cvref_t<T>, uint64_t>;
+template <class T>
+static constexpr bool supported_integer =
+supported_uint<T> ||
+is_same<remove_cvref_t<T>, int8_t> ||
+is_same<remove_cvref_t<T>, int16_t> ||
+is_same<remove_cvref_t<T>, int32_t> ||
+is_same<remove_cvref_t<T>, int64_t>;
+template <size_t Size>
+struct uint_of_size;
+template <>
+struct uint_of_size<1>{ using type = uint8_t; };
+template <>
+struct uint_of_size<2>{ using type = uint16_t; };
+template <>
+struct uint_of_size<4>{ using type = uint32_t; };
+template <>
+struct uint_of_size<8>{ using type = uint64_t; };
+template <class T>
+using unsigned_t = typename uint_of_size<sizeof(remove_cvref_t<T>)>::type;
+template <class T>
+constexpr unsigned bit_width() noexcept{
+#if RND_DETAIL_HAS_STANDARD_COMPAT
+return std::numeric_limits<remove_cvref_t<T>>::digits;
+#else
+return sizeof(remove_cvref_t<T>) * CHAR_BIT;
+#endif
+}
+template <class I>
+constexpr uint64_t integral_max() noexcept{
+using value_type = remove_cvref_t<I>;
+#if RND_DETAIL_HAS_STANDARD_COMPAT
+return static_cast<uint64_t>((std::numeric_limits<value_type>::max)());
+#else
+using U = unsigned_t<value_type>;
+if constexpr(value_type(-1) < value_type(0)){
+return uint64_t{static_cast<U>(~U{0}) >> 1};
+}else{
+return uint64_t{static_cast<U>(~U{0})};
+}
+#endif
+}
+template <class UInt>
+constexpr unsigned power_of_two_exponent(UInt value) noexcept{
+static_assert(supported_uint<UInt>,
+"power_of_two_exponent() requires a supported unsigned integer type");
+#if defined(__cpp_lib_bitops) && __cpp_lib_bitops >= 201907L
+return static_cast<unsigned>(std::countr_zero(value));
+#else
+unsigned exponent{};
+while(value > 1){
+value >>= 1;
+++exponent;
+}
+return exponent;
+#endif
+}
+template <class F>
+struct float_traits{
+static constexpr bool supported = false;
+static constexpr unsigned mantissa_bits = 0;
+};
+template <>
+struct float_traits<float>{
+static constexpr bool supported =
+sizeof(float) == 4 && FLT_RADIX == 2 &&
+FLT_MANT_DIG == 24 && FLT_MAX_EXP == 128;
+static constexpr unsigned mantissa_bits = FLT_MANT_DIG - 1;
+};
+template <>
+struct float_traits<double>{
+static constexpr bool supported =
+FLT_RADIX == 2 &&
+((sizeof(double) == 4 && DBL_MANT_DIG == 24 && DBL_MAX_EXP == 128) ||
+(sizeof(double) == 8 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024));
+static constexpr unsigned mantissa_bits = DBL_MANT_DIG - 1;
+};
+template <class F>
+static constexpr bool supported_float = float_traits<remove_cvref_t<F>>::supported;
+template <class F>
+constexpr unsigned_t<F> floating_one_bits() noexcept{
+if constexpr(sizeof(remove_cvref_t<F>) == 4){
+return UINT32_C(0x3f800000);
+}else{
+return UINT64_C(0x3ff0000000000000);
+}
+}
+template <class F>
+RND_DETAIL_FLOAT_CONSTEXPR remove_cvref_t<F>
+unit_float_from_mantissa(unsigned_t<F> mantissa) noexcept{
+static_assert(supported_float<F>,
+"unit_float_from_mantissa() requires a supported floating-point type");
+using real_type = remove_cvref_t<F>;
+using UInt = unsigned_t<real_type>;
+#if RND_DETAIL_HAS_CONSTEXPR_BIT_CAST
+constexpr UInt base = std::bit_cast<UInt>(real_type{1});
+const UInt representation = static_cast<UInt>(base | mantissa);
+return std::bit_cast<real_type>(representation) - real_type{1};
+#elif defined(RND_FAST_FLOAT)
+const UInt representation =
+static_cast<UInt>(floating_one_bits<real_type>() | mantissa);
+real_type value;
+memcpy(&value, &representation, sizeof(value));
+return value - real_type{1};
+#else
+constexpr unsigned mantissa_bits = float_traits<real_type>::mantissa_bits;
+constexpr real_type scale = real_type{1} /
+static_cast<real_type>(UInt{1} << mantissa_bits);
+return static_cast<real_type>(mantissa) * scale;
+#endif
+}
+#if RND_DETAIL_HAS_STANDARD_COMPAT
+template <class C>
+constexpr auto collection_data(C& collection) noexcept(noexcept(std::data(collection)))
+-> decltype(std::data(collection)){
+return std::data(collection);
+}
+template <class C>
+constexpr auto collection_size(const C& collection) noexcept(noexcept(std::size(collection)))
+-> decltype(std::size(collection)){
+return std::size(collection);
+}
+template <class C>
+constexpr auto collection_begin(C& collection) noexcept(noexcept(std::begin(collection)))
+-> decltype(std::begin(collection)){
+return std::begin(collection);
+}
+template <class Projection, class T>
+constexpr decltype(auto) invoke(Projection& projection, T& value)
+noexcept(noexcept(std::invoke(projection, value))){
+return std::invoke(projection, value);
+}
+#else
+template <class C>
+constexpr auto collection_data(C& collection) noexcept -> decltype(collection.data()){
+return collection.data();
+}
+template <class T, size_t N>
+constexpr T* collection_data(T (&collection)[N]) noexcept{
+return collection;
+}
+template <class C>
+constexpr auto collection_size(const C& collection) noexcept -> decltype(collection.size()){
+return collection.size();
+}
+template <class T, size_t N>
+constexpr size_t collection_size(const T (&)[N]) noexcept{
+return N;
+}
+template <class C>
+constexpr auto collection_begin(C& collection) noexcept -> decltype(collection.begin()){
+return collection.begin();
+}
+template <class T, size_t N>
+constexpr T* collection_begin(T (&collection)[N]) noexcept{
+return collection;
+}
+struct priority_0{};
+struct priority_1 : priority_0{};
+struct priority_2 : priority_1{};
+template <class Projection, class T>
+constexpr auto invoke_impl(Projection& projection, T& value, priority_2)
+noexcept(noexcept(projection(value))) -> decltype(projection(value)){
+return projection(value);
+}
+template <class Projection, class T>
+constexpr auto invoke_impl(Projection& projection, T& value, priority_1)
+noexcept(noexcept((value.*projection)())) -> decltype((value.*projection)()){
+return (value.*projection)();
+}
+template <class Projection, class T>
+constexpr auto invoke_impl(Projection& projection, T& value, priority_0)
+noexcept(noexcept(value.*projection)) -> decltype(value.*projection){
+return value.*projection;
+}
+template <class Projection, class T>
+constexpr auto invoke(Projection& projection, T& value)
+noexcept(noexcept(invoke_impl(projection, value, priority_2{})))
+-> decltype(invoke_impl(projection, value, priority_2{})){
+return invoke_impl(projection, value, priority_2{});
+}
+#endif
+template <class C, class = void>
+struct contiguous_collection{
+static constexpr bool value = false;
+};
+template <class C>
+struct contiguous_collection<C, void_t<
+decltype(collection_data(declval<C&>())),
+decltype(collection_size(declval<const C&>())),
+decltype(collection_begin(declval<C&>()))>>{
+static constexpr bool value = true;
+};
+template <class T, class Projection, class Result, class = void>
+struct valid_projection{
+static constexpr bool value = false;
+};
+template <class T, class Projection, class Result>
+struct valid_projection<T, Projection, Result, void_t<
+decltype(invoke(declval<Projection&>(), declval<T&>()))>>{
+using weight_type = remove_cvref_t<decltype(invoke(
+declval<Projection&>(), declval<T&>()))>;
+static constexpr bool value =
+noexcept(invoke(declval<Projection&>(), declval<T&>())) &&
+supported_uint<weight_type> &&
+(sizeof(weight_type) <= sizeof(Result));
+};
+template <class C, class Result, class = void>
+struct valid_weight_collection{
+static constexpr bool value = false;
+};
+template <class C, class Result>
+struct valid_weight_collection<C, Result, void_t<
+decltype(*collection_data(declval<const C&>()))>>{
+using weight_type = remove_cvref_t<decltype(*collection_data(declval<const C&>()))>;
+static constexpr bool value =
+contiguous_collection<const C>::value &&
+supported_uint<weight_type> &&
+(sizeof(weight_type) <= sizeof(Result));
+};
+template <class C, class Projection, class Result, class = void>
+struct valid_projected_collection{
+static constexpr bool value = false;
+};
+template <class C, class Projection, class Result>
+struct valid_projected_collection<C, Projection, Result, void_t<
+decltype(*collection_data(declval<C&>()))>>{
+using element_type = decltype(*collection_data(declval<C&>()));
+static constexpr bool value =
+contiguous_collection<C>::value &&
+valid_projection<element_type, Projection, Result>::value;
+};
+}
+#include <stdint.h>
+namespace rnd{
+namespace detail{
+struct u128_parts final{
+uint64_t lo;
+uint64_t hi;
+};
+[[nodiscard]] constexpr u128_parts mul64_to_128_parts(uint64_t a, uint64_t b) noexcept{
+const uint64_t a0 = static_cast<uint32_t>(a);
+const uint64_t a1 = a >> 32;
+const uint64_t b0 = static_cast<uint32_t>(b);
+const uint64_t b1 = b >> 32;
+const uint64_t p00 = a0 * b0;
+const uint64_t p01 = a0 * b1;
+const uint64_t p10 = a1 * b0;
+const uint64_t p11 = a1 * b1;
+const uint64_t mid = p01 + p10;
+const uint64_t mid_carry = mid < p01 ? (uint64_t{1} << 32) : uint64_t{0};
+const uint64_t mid_low = (mid & UINT32_MAX) << 32;
+const uint64_t low = p00 + mid_low;
+const uint64_t high = p11 + (mid >> 32) + mid_carry + (low < p00 ? 1u : 0u);
+return {low, high};
+}
+}
+}
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#if defined(__cpp_concepts) && __cpp_concepts >= 201907L
 #include <concepts>
 #include <limits>
 #include <random>
@@ -32,390 +405,303 @@ requires(E& e, const E& ce, typename E::seed_type seed, unsigned long long n){
 { e.seed(seed) } noexcept -> std::same_as<void>;
 { e.discard(n) } noexcept -> std::same_as<void>;
 };
-#include <stdint.h>
-namespace rnd{
-namespace detail{
-struct u128_parts final{
-uint64_t lo;
-uint64_t hi;
-};
-[[nodiscard]] constexpr u128_parts mul64_to_128_parts(uint64_t a, uint64_t b) noexcept{
-const uint64_t a0 = static_cast<uint32_t>(a);
-const uint64_t a1 = a >> 32;
-const uint64_t b0 = static_cast<uint32_t>(b);
-const uint64_t b1 = b >> 32;
-const uint64_t p00 = a0 * b0;
-const uint64_t p01 = a0 * b1;
-const uint64_t p10 = a1 * b0;
-const uint64_t p11 = a1 * b1;
-const uint64_t mid = p01 + p10;
-const uint64_t mid_carry = mid < p01 ? (uint64_t{1} << 32) : uint64_t{0};
-const uint64_t mid_low = (mid & UINT32_MAX) << 32;
-const uint64_t low = p00 + mid_low;
-const uint64_t high = p11 + (mid >> 32) + mid_carry + (low < p00 ? 1u : 0u);
-return {low, high};
-}
-}
-}
-#include <cstdint>
-#ifdef _MSC_VER
-#include <intrin.h>
 #endif
-namespace rnd{
-namespace detail {
-template <unsigned digits>
-[[nodiscard]] constexpr std::uint64_t shr128_to_u64(std::uint64_t hi, std::uint64_t lo) noexcept{
-static_assert(digits > 0 && digits <= 64);
-if constexpr(digits == 64){
-return hi;
-} else{
-return (lo >> digits) | (hi << (64u - digits));
-}
-}
-template <unsigned digits>
-[[nodiscard]] constexpr std::uint64_t mul_shift_u64(std::uint64_t x, std::uint64_t bound) noexcept{
-static_assert(digits >= 1 && digits <= 64, "digits must be in [1, 64]");
-#if defined(__SIZEOF_INT128__)
-return static_cast<std::uint64_t>(
-(static_cast<__uint128_t>(x) * static_cast<__uint128_t>(bound)) >> digits
-);
-#elif defined(_MSC_VER)
-std::uint64_t hi = 0;
-std::uint64_t lo = 0;
-if consteval{
-const auto p = mul64_to_128_parts(x, bound);
-lo = p.lo;
-hi = p.hi;
-} else{
-lo = _umul128(x, bound, &hi);
-}
-return shr128_to_u64<digits>(hi, lo);
-#else
-static_assert(false, "mul_shift_high64 requires either __uint128_t or MSVC _umul128");
-#endif
-}
-}
-}
-#include <algorithm>
-#include <bit>
-#include <cassert>
-#include <concepts>
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <iterator>
-#include <limits>
-#include <type_traits>
-#include <utility>
 namespace rnd {
-template <class F>
-concept supported_float =
-(std::same_as<F, float> || std::same_as<F, double>) &&
-(sizeof(F) == sizeof(std::uint32_t) || sizeof(F) == sizeof(std::uint64_t)) &&
-std::numeric_limits<F>::is_iec559 &&
-std::numeric_limits<F>::radix == 2;
-template <RandomBitEngine E>
+template <class E>
 class Random final{
-static constexpr unsigned value_bits = std::numeric_limits<typename E::result_type>::digits;
+using engine_result_type = typename E::result_type;
+static constexpr unsigned value_bits = detail::bit_width<engine_result_type>();
+static_assert(detail::supported_uint<engine_result_type>, "Random<E> requires an 8-, 16-, 32-, or 64-bit unsigned result_type");
+static_assert((E::min)() == engine_result_type{0},
+"Random<E> requires an engine whose minimum is zero");
+static_assert((E::max)() == static_cast<engine_result_type>(~engine_result_type{0}),
+"Random<E> requires an engine spanning its complete result_type");
 template <class T>
 static constexpr bool valid_weight_type =
-std::unsigned_integral<std::remove_cv_t<T>> &&
-!std::same_as<std::remove_cv_t<T>, bool> &&
-(std::numeric_limits<std::remove_cv_t<T>>::digits <= value_bits);
-template <class C>
-static constexpr bool contiguous_collection = requires(C& collection){
-std::data(collection);
-std::size(collection);
-std::begin(collection);
-};
-template <class T, class Projection>
-static constexpr bool valid_projection =
-requires(Projection & projection, T & value){
-{ std::invoke(projection, value) } noexcept;
-requires valid_weight_type<
-std::remove_cvref_t<
-decltype(std::invoke(projection, value))>>;
-};
+detail::supported_uint<T> &&
+(sizeof(detail::remove_cvref_t<T>) <= sizeof(engine_result_type));
 public:
 using engine_type = E;
 using result_type = typename E::result_type;
 using seed_type = typename E::seed_type;
 constexpr Random() noexcept = default;
-explicit constexpr Random(seed_type seed_val) noexcept : _e(seed_val){}
-explicit constexpr Random(engine_type engine) noexcept : _e(engine){}
-constexpr bool operator==(const Random& rhs) const noexcept = default;
-constexpr const E& engine() const noexcept{
-return _e;
+explicit constexpr Random(seed_type seed_value) noexcept : _engine(seed_value){}
+explicit constexpr Random(engine_type engine) noexcept : _engine(engine){}
+constexpr bool operator==(const Random& rhs) const noexcept{ return _engine == rhs._engine; }
+constexpr bool operator!=(const Random& rhs) const noexcept{ return !(*this == rhs); }
+constexpr const engine_type& engine() const noexcept{ return _engine; }
+constexpr engine_type& engine() noexcept{ return _engine; }
+constexpr void seed() noexcept{ _engine.seed(); }
+constexpr void seed(seed_type value) noexcept{ _engine.seed(value); }
+constexpr void discard(unsigned long long count) noexcept{ _engine.discard(count); }
+static constexpr result_type (min)() noexcept{
+return result_type{0};
 }
-constexpr E& engine() noexcept{
-return _e;
+static constexpr result_type (max)() noexcept{
+return (E::max)();
 }
-constexpr void seed() noexcept{
-_e.seed();
-}
-constexpr void seed(seed_type v) noexcept{
-_e.seed(v);
-}
-constexpr void discard(unsigned long long n) noexcept{
-_e.discard(n);
-}
-[[nodiscard]] constexpr Random split() noexcept{
-return Random{bits_as<seed_type>()};
-}
-static constexpr result_type  min() noexcept{
-return 0;
-}
-static constexpr result_type  max() noexcept{
-return E::max();
-}
-constexpr result_type next() noexcept{
-return _e();
-}
-constexpr result_type operator()() noexcept{
-return next();
-}
+constexpr result_type next() noexcept{ return _engine(); }
+constexpr result_type operator()() noexcept{ return next(); }
 template <class T = result_type>
 constexpr T bits(unsigned n) noexcept{
-static_assert(std::is_unsigned_v<T>, "bits<T>(n) requires an unsigned T");
-assert(n > 0);
-assert(n <= std::numeric_limits<T>::digits);
+static_assert(detail::supported_uint<T>, "Random::bits<T>() requires an 8-, 16-, 32-, or 64-bit unsigned type");
+assert(n > 0 && n <= detail::bit_width<T>());
 if(n <= value_bits){
 return take_high_bits<T>(next(), n);
 }
-return gather_bits_runtime<T>(n);
+return gather_bits<T>(n);
 }
 template <unsigned N, class T = result_type>
 constexpr T bits() noexcept{
-static_assert(N > 0, "Need at least 1 bit");
-static_assert(std::is_unsigned_v<T>, "bits<N,T> requires an unsigned T");
-static_assert(N <= std::numeric_limits<T>::digits, "T cannot hold N bits");
+static_assert(N > 0, "Random::bits<N>() needs at least one bit");
+static_assert(detail::supported_uint<T>, "Random::bits<N, T>() requires an 8-, 16-, 32-, or 64-bit unsigned type");
+static_assert(N <= detail::bit_width<T>(), "T cannot hold N bits");
 if constexpr(N <= value_bits){
 return take_high_bits<T>(next(), N);
-} else{
-return gather_bits_runtime<T>(N);
+}else{
+return gather_bits<T>(N);
 }
 }
 template <class T>
 constexpr T bits_as() noexcept{
-static_assert(std::is_unsigned_v<T>, "bits_as<T>() requires an unsigned T");
-return bits<std::numeric_limits<T>::digits, T>();
+return bits<detail::bit_width<T>(), T>();
+}
+[[nodiscard]] constexpr Random split() noexcept{
+return Random{bits_as<seed_type>()};
 }
 constexpr result_type next(result_type bound) noexcept{
-assert(bound > 0 && "bound must be non-zero and positive");
-result_type raw_value = next();
-if constexpr(value_bits <= 32){
-auto product = std::uint64_t(raw_value) * std::uint64_t(bound);
-auto result = result_type(product >> value_bits);
-return result;
-} else if constexpr(value_bits <= 64){
-return detail::mul_shift_u64<value_bits>(raw_value, bound);
-} else{
-return bound > 0 ? raw_value % bound : bound;
+assert(bound > 0 && "Random::next(bound): bound must be positive.");
+return scale_to_bound(next(), bound);
 }
-}
-constexpr result_type operator()(result_type bound) noexcept{
-return next(bound);
-}
-template <result_type Bound, std::integral T = result_type>
+constexpr result_type operator()(result_type bound) noexcept{ return next(bound); }
+template <result_type Bound, class T = result_type>
 constexpr T next() noexcept{
-static_assert(Bound > 0, "Bound must be positive");
-static_assert(Bound - 1 <= static_cast<result_type>(std::numeric_limits<T>::max()),
-"Bound is too large for return type T");
+static_assert(Bound > 0, "Random::next<Bound>(): bound must be positive");
+static_assert(detail::supported_integer<T>, "Random::next<Bound, T>() requires a supported fixed-width integer type");
+static_assert(uint64_t{Bound - 1} <= detail::integral_max<T>(), "Bound is too large for return type T");
 if constexpr(Bound == 1){
 return T{0};
 }else if constexpr((Bound & (Bound - 1)) == 0){
-constexpr unsigned bits_needed = std::countr_zero(Bound);
-return bits<bits_needed, T>();
-} else{
+using U = detail::unsigned_t<T>;
+return static_cast<T>(bits<detail::power_of_two_exponent(Bound), U>());
+}else{
 return static_cast<T>(next(Bound));
 }
 }
-template <std::integral I>
+template <class I, detail::enable_if_t<detail::supported_integer<I>, int> = 0>
 constexpr I between(I lo, I hi) noexcept{
 if(!(lo < hi)){
-assert(false && "between(lo, hi): inverted or empty range");
+assert(false && "Random::between(lo, hi): inverted or empty range.");
 return lo;
 }
-using U = std::make_unsigned_t<I>;
-U bound = U(hi) - U(lo);
-assert(bound <= E::max() &&
-"between(lo, hi): range too large for this engine. Consider a 64-bit engine "
-"(xoshiro256ss, SmallFast64) or ensure hi–lo <= max()");
-auto safe_bound = static_cast<result_type>(bound);
-return static_cast<I>(U(lo) + static_cast<U>(next(safe_bound)));
+using U = detail::unsigned_t<I>;
+const U bound = static_cast<U>(hi) - static_cast<U>(lo);
+assert(uint64_t{bound} <= uint64_t{(max)()} && "Random::between(lo, hi): range is too large for this engine.");
+return static_cast<I>(static_cast<U>(lo) +
+static_cast<U>(next(static_cast<result_type>(bound))));
 }
-template <supported_float F = float>
-constexpr F normalized() noexcept{
-using UInt = std::conditional_t<sizeof(F) == sizeof(std::uint32_t), std::uint32_t, std::uint64_t>;
-constexpr int mantissa_bits = std::numeric_limits<F>::digits - 1;
-constexpr UInt base = std::bit_cast<UInt>(F{1});
-const UInt mantissa = this->template bits<mantissa_bits, UInt>();
-const UInt as_int = base | mantissa;
-return std::bit_cast<F>(as_int) - F{1};
+template <class F = float>
+RND_DETAIL_FLOAT_CONSTEXPR F normalized() noexcept{
+static_assert(detail::supported_float<F>,
+"Random floating-point functions require IEEE-754 binary32 float or binary32/binary64 double");
+using real_type = detail::remove_cvref_t<F>;
+using UInt = detail::unsigned_t<real_type>;
+constexpr unsigned mantissa_bits = detail::float_traits<real_type>::mantissa_bits;
+const UInt mantissa = bits<mantissa_bits, UInt>();
+return detail::unit_float_from_mantissa<real_type>(mantissa);
 }
-template <supported_float F = float>
-constexpr F signed_norm() noexcept{
+template <class F = float>
+RND_DETAIL_FLOAT_CONSTEXPR F signed_norm() noexcept{
+static_assert(detail::supported_float<F>,
+"Random::signed_norm() requires a supported floating-point type");
 return F{2} * normalized<F>() - F{1};
 }
-template <supported_float F = float>
-constexpr F between(F lo, F hi) noexcept{
-assert(lo < hi && "between(lo, hi): inverted or empty range");
+template <class F, detail::enable_if_t<detail::supported_float<F>, int> = 0>
+RND_DETAIL_FLOAT_CONSTEXPR F between(F lo, F hi) noexcept{
+assert(lo < hi && "Random::between(lo, hi): inverted or empty range.");
 return lo + (hi - lo) * normalized<F>();
 }
 constexpr bool coin_flip() noexcept{
 return bits<1, unsigned>() != 0;
 }
-template <supported_float F = float>
-constexpr bool coin_flip(F probability) noexcept{
-assert(F{0} <= probability && probability <= F{1} && "coin_flip(probability): probability must be in [0, 1]");
+template <class F = float>
+RND_DETAIL_FLOAT_CONSTEXPR bool coin_flip(F probability) noexcept{
+static_assert(detail::supported_float<F>, "Random::coin_flip(probability) requires a supported floating-point type");
+assert(F{0} <= probability && probability <= F{1} && "Random::coin_flip(probability): probability must be in [0, 1].");
 return normalized<F>() < probability;
 }
-template <supported_float F = float>
-constexpr F gaussian(F mean, F stddev) noexcept{
-assert(stddev >= F{0} && "gaussian(mean, stddev): standard deviation must be non-negative");
+template <class F = float>
+RND_DETAIL_FLOAT_CONSTEXPR F gaussian(F mean, F stddev) noexcept{
+static_assert(detail::supported_float<F>, "Random::gaussian() requires a supported floating-point type");
+assert(stddev >= F{0} && "Random::gaussian(mean, stddev): standard deviation must be non-negative.");
 F sum{};
-for(auto i = 0; i < 12; ++i){
+for(unsigned i = 0; i < 12; ++i){
 sum += normalized<F>();
 }
 return mean + (sum - F{6}) * stddev;
 }
-[[nodiscard]] constexpr std::size_t index(std::size_t size) noexcept{
+[[nodiscard]] constexpr size_t index(size_t size) noexcept{
 assert(size != 0 && "Random::index(): empty collection.");
-assert(size <= max() &&
-"Random::index(): collection is too large for this engine.");
-return static_cast<std::size_t>(next(static_cast<result_type>(size)));
+assert(size <= static_cast<size_t>((max)()) && "Random::index(): collection is too large for this engine.");
+return static_cast<size_t>(next(static_cast<result_type>(size)));
 }
-template <class C>
-requires contiguous_collection<const C>
-[[nodiscard]] constexpr std::size_t index(const C& collection) noexcept{
-return index(static_cast<std::size_t>(std::size(collection)));
+template <class C,
+detail::enable_if_t<detail::contiguous_collection<const C>::value, int> = 0>
+[[nodiscard]] constexpr size_t index(const C& collection) noexcept{
+return index(static_cast<size_t>(detail::collection_size(collection)));
 }
 template <class T>
-[[nodiscard]] constexpr T* iterator(T* collection, std::size_t size) noexcept{
+[[nodiscard]] constexpr T* iterator(T* collection, size_t size) noexcept{
 assert(collection != nullptr && "Random::iterator(): null collection.");
 return collection + index(size);
 }
-template <class C>
-requires contiguous_collection<C>
+template <class C,
+detail::enable_if_t<detail::contiguous_collection<C>::value, int> = 0>
 [[nodiscard]] constexpr auto iterator(C& collection) noexcept{
-const auto offset = static_cast<std::ptrdiff_t>(
-index(static_cast<std::size_t>(std::size(collection))));
-return std::next(std::begin(collection), offset);
+return detail::collection_begin(collection) +
+index(static_cast<size_t>(detail::collection_size(collection)));
 }
 template <class T>
-[[nodiscard]] constexpr T& element(T* collection, std::size_t size) noexcept{
+[[nodiscard]] constexpr T& element(T* collection, size_t size) noexcept{
 return *iterator(collection, size);
 }
-template <class C>
-requires contiguous_collection<C>
+template <class C,
+detail::enable_if_t<detail::contiguous_collection<C>::value, int> = 0>
 [[nodiscard]] constexpr decltype(auto) element(C& collection) noexcept{
 return *iterator(collection);
 }
-template <class W>
-requires valid_weight_type<W>
-[[nodiscard]] constexpr std::size_t weighted_index(const W* weights, std::size_t size) noexcept{
-assert(weights != nullptr && "Random::weighted_index(): null weight collection.");
-auto weight_at = [weights](std::size_t i) constexpr -> decltype(auto){
-return weights[i];
-};
+template <class W, detail::enable_if_t<valid_weight_type<W>, int> = 0>
+[[nodiscard]] constexpr size_t weighted_index(const W* weights, size_t size) noexcept{
+if(weights == nullptr){
+assert(false && "Random::weighted_index(): null weight collection.");
+abort();
+}
+auto weight_at = [weights](size_t i) constexpr -> decltype(auto){ return weights[i]; };
 return weighted_offset(size, weight_at);
 }
-template <class C>
-requires contiguous_collection<const C>
-[[nodiscard]] constexpr std::size_t weighted_index(const C& weights) noexcept{
-return weighted_index(std::data(weights), static_cast<std::size_t>(std::size(weights)));
+template <class C,
+detail::enable_if_t<detail::valid_weight_collection<C, result_type>::value, int> = 0>
+[[nodiscard]] constexpr size_t weighted_index(const C& weights) noexcept{
+return weighted_index(
+detail::collection_data(weights),
+static_cast<size_t>(detail::collection_size(weights)));
 }
-template <class T, class Projection>
-requires valid_projection<T, Projection>
+template <class T, class Projection,
+detail::enable_if_t<detail::valid_projection<T, Projection, result_type>::value, int> = 0>
 [[nodiscard]] constexpr T* weighted_iterator(
-T* collection, std::size_t size, Projection projection) noexcept{
+T* collection, size_t size, Projection projection) noexcept{
 return collection + projected_weighted_offset(collection, size, projection);
 }
-template <class C, class Projection>
-requires contiguous_collection<C>
+template <class C, class Projection,
+detail::enable_if_t<detail::valid_projected_collection<C, Projection, result_type>::value, int> = 0>
 [[nodiscard]] constexpr auto weighted_iterator(C& collection, Projection projection) noexcept{
-const auto offset = static_cast<std::ptrdiff_t>(projected_weighted_offset(
-std::data(collection),
-static_cast<std::size_t>(std::size(collection)),
-projection));
-return std::next(std::begin(collection), offset);
+const size_t offset = projected_weighted_offset(
+detail::collection_data(collection),
+static_cast<size_t>(detail::collection_size(collection)),
+projection);
+return detail::collection_begin(collection) + offset;
 }
-template <class T, class Projection>
-requires valid_projection<T, Projection>
+template <class T, class Projection,
+detail::enable_if_t<detail::valid_projection<T, Projection, result_type>::value, int> = 0>
 [[nodiscard]] constexpr T& weighted_element(
-T* collection, std::size_t size, Projection projection) noexcept{
-return *weighted_iterator(collection, size, std::move(projection));
+T* collection, size_t size, Projection projection) noexcept{
+return *weighted_iterator(collection, size, projection);
 }
-template <class C, class Projection>
-requires contiguous_collection<C>
+template <class C, class Projection,
+detail::enable_if_t<detail::valid_projected_collection<C, Projection, result_type>::value, int> = 0>
 [[nodiscard]] constexpr decltype(auto) weighted_element(C& collection, Projection projection) noexcept{
-return *weighted_iterator(collection, std::move(projection));
+return *weighted_iterator(collection, projection);
 }
 private:
-E _e{};
+engine_type _engine{};
+template <class T>
+static constexpr T low_bits_mask(unsigned n) noexcept{
+return n >= detail::bit_width<T>()
+? static_cast<T>(~T{0})
+: static_cast<T>((T{1} << n) - T{1});
+}
+template <class T>
+static constexpr T take_high_bits(result_type value, unsigned n) noexcept{
+assert(n > 0 && n <= value_bits && n <= detail::bit_width<T>());
+return static_cast<T>(value >> (value_bits - n)) & low_bits_mask<T>(n);
+}
+template <class T>
+constexpr T gather_bits(unsigned n) noexcept{
+assert(value_bits < n && n <= detail::bit_width<T>());
+T result{};
+unsigned filled{};
+while(filled < n){
+const unsigned remaining = n - filled;
+const unsigned take = remaining < value_bits ? remaining : value_bits;
+const T chunk = take_high_bits<T>(next(), take);
+result = static_cast<T>(result | static_cast<T>(chunk << filled));
+filled += take;
+}
+return static_cast<T>(result & low_bits_mask<T>(n));
+}
+template <class WeightAt>
+constexpr result_type total_weight(size_t size, WeightAt& weight_at) noexcept{
+using weight_type = detail::remove_cvref_t<decltype(weight_at(size_t{}))>;
+static_assert(valid_weight_type<weight_type>, "Weights must be non-boolean unsigned integers no wider than result_type");
+result_type total{};
+for(size_t i = 0; i < size; ++i){
+const result_type weight = static_cast<result_type>(weight_at(i));
+if(weight > (max)() - total){
+assert(false && "Random::weighted_index(): total weight is too large for this engine.");
+abort();
+}
+total += weight;
+}
+return total;
+}
 template <class T, class Projection>
-[[nodiscard]] constexpr std::size_t projected_weighted_offset(
-T* collection, std::size_t size, Projection& projection) noexcept{
-static_assert(valid_projection<T, Projection>,
-"Projection must be noexcept and return a valid unsigned weight type");
-assert(collection != nullptr && "Random::weighted_iterator(): null collection.");
-auto weight_at = [collection, &projection](std::size_t i) constexpr noexcept -> decltype(auto){
-return std::invoke(projection, collection[i]);
+constexpr size_t projected_weighted_offset(T* collection, size_t size, Projection& projection) noexcept{
+if(collection == nullptr){
+assert(false && "Random::weighted_iterator(): null collection.");
+abort();
+}
+static_assert(detail::valid_projection<T, Projection, result_type>::value, "Projection must be noexcept and return a valid unsigned weight type");
+auto weight_at = [collection, &projection](size_t i) constexpr noexcept -> decltype(auto){
+return detail::invoke(projection, collection[i]);
 };
 return weighted_offset(size, weight_at);
 }
 template <class WeightAt>
-[[nodiscard]] constexpr std::size_t weighted_offset(
-std::size_t size, WeightAt& weight_at) noexcept{
-using weight_type = std::remove_cvref_t<decltype(weight_at(std::size_t{}))>;
-static_assert(valid_weight_type<weight_type>,
-"Weights must be non-boolean unsigned integers no wider than result_type");
-assert(size != 0 && "Random::weighted_index(): empty weight collection.");
-result_type total{};
-for(std::size_t i = 0; i < size; ++i){
-const result_type weight = static_cast<result_type>(weight_at(i));
-assert(weight <= max() - total &&
-"Random::weighted_index(): total weight is too large for this engine.");
-total += weight;
+constexpr size_t weighted_offset(size_t size, WeightAt& weight_at) noexcept{
+if(size == 0){
+assert(false && "Random::weighted_index(): empty weight collection.");
+abort();
 }
-assert(total != 0 && "Random::weighted_index(): at least one weight must be positive.");
+result_type total = total_weight(size, weight_at);
+if(total == 0){
+assert(false && "Random::weighted_index(): at least one weight must be positive.");
+abort();
+}
 result_type target = next(total);
-for(std::size_t i = 0; i < size; ++i){
+for(size_t i = 0; i < size; ++i){
 const result_type weight = static_cast<result_type>(weight_at(i));
-if(target < weight) return i;
+if(target < weight){
+return i;
+}
 target -= weight;
 }
-std::unreachable();
+assert(false && "Random::weighted_index(): weights changed during selection.");
+abort();
 }
-template <class T>
-static constexpr T low_bits_mask(unsigned n) noexcept{
-assert(n <= std::numeric_limits<T>::digits);
-constexpr unsigned W = std::numeric_limits<T>::digits;
-if(n == 0) return T{0};
-if(n >= W) return std::numeric_limits<T>::max();
-return static_cast<T>((T{1} << n) - T{1});
+static constexpr result_type scale_to_bound(result_type value, result_type bound) noexcept{
+if constexpr(sizeof(result_type) == 1){
+return static_cast<result_type>((uint16_t{value} * uint16_t{bound}) >> 8);
+}else if constexpr(sizeof(result_type) == 2){
+return static_cast<result_type>((uint32_t{value} * uint32_t{bound}) >> 16);
+}else if constexpr(sizeof(result_type) == 4){
+return static_cast<result_type>((uint64_t{value} * uint64_t{bound}) >> 32);
+}else{
+return static_cast<result_type>(detail::mul64_to_128_parts(value, bound).hi);
 }
-template <class T>
-constexpr T take_high_bits(E::result_type x, unsigned n) noexcept{
-assert(1 <= n && n <= value_bits && n <= std::numeric_limits<T>::digits);
-const unsigned shift = value_bits - n;
-return static_cast<T>(x >> shift) & low_bits_mask<T>(n);
-}
-template <class T>
-constexpr T gather_bits_runtime(unsigned n) noexcept{
-assert(1 <= n && n <= std::numeric_limits<T>::digits);
-T acc = 0;
-unsigned filled = 0;
-while(filled < n){
-const unsigned take = std::min<unsigned>(value_bits, n - filled);
-const T chunk = take_high_bits<T>(next(), take);
-acc |= (chunk << filled);
-filled += take;
-}
-return acc & low_bits_mask<T>(n);
 }
 };
 }
+#undef RND_DETAIL_FLOAT_CONSTEXPR
 #include <limits.h>
 #if __cplusplus >= 202002L || (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L)
 #include <bit>
