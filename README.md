@@ -40,7 +40,7 @@ cpp_prngs is header-only. Copy the complete `includes/` directory into your proj
 
 | Target | Header | C++ version | Collection interface |
 |--------|--------|-------------|----------------------|
-| Desktop and other full standard-library targets | [`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) | C++23 | Standard ranges and iterators |
+| Desktop and other full standard-library targets | [`random.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random.hpp) | C++23 | Contiguous collections and native iterators |
 | Classic AVR-based Arduino boards | [`random_avr.hpp`](https://github.com/ulfben/cpp_prngs/blob/main/includes/random_avr.hpp) | C++17 | C arrays and pointer-plus-length buffers |
 
 Both frontends expose `rnd::Random<E>` and provide the same generation features: bounded integers, floats, coin flips, Gaussian samples, random element selection, weighted draws and raw bits. The included engines themselves are C++17-compatible.
@@ -216,15 +216,17 @@ Want to use your own engine? If it satisfies `RandomBitEngine`, you can plug it 
 | Method | Description |
 |--------|-------------|
 | `index(collection)` | Returns a random index into a collection |
-| `iterator(collection)` | Returns an iterator or pointer to a random element |
+| `iterator(collection)` | Returns the collection's iterator to a random element |
 | `element(collection)` | Returns a reference to a random element |
+
+iterator(container) returns the container's native iterator. iterator(pointer, count) returns a pointer to the selected element, which serves as the iterator for a pointer-defined range.
 
 ### Weighted collections
 
 | Method | Description |
 |--------|-------------|
 | `weighted_index(weights)` | Returns an index selected proportionally to unsigned weights; zero-weight indices are excluded |
-| `weighted_iterator(collection, projection)` | Returns an iterator or pointer selected proportionally to weights returned by `projection(element)` |
+| `weighted_iterator(collection, projection)` | Returns the collection's iterator selected proportionally to weights returned by `projection(element)` |
 | `weighted_element(collection, projection)` | Returns a reference selected proportionally to weights returned by `projection(element)` |
 
 The weighted helpers let you pick items with different chances of being selected. Weights should be non-negative whole numbers, such as `{70u, 25u, 5u}`. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
@@ -233,7 +235,7 @@ The weighted helpers let you pick items with different chances of being selected
 
 `random_avr.hpp` provides the same generation features without relying on the standard-library facilities unavailable in AVR-libc:
 
-* Collection methods accept C arrays directly and deduce their length, so `rng.element(values)` and `rng.weighted_index(weights)` work as written. They also accept a pointer and element count. Standard containers available in the Arduino toolchain, such as `std::array`, can be passed with `.data()` and `.size()`. The desktop frontend accepts standard sized ranges directly.
+* Collection methods accept C arrays directly and deduce their length, so `rng.element(values)` and `rng.weighted_index(weights)` work as written. They also accept a pointer and element count. Standard containers available in the Arduino toolchain, such as `std::array`, can be passed with `.data()` and `.size()`. The desktop frontend accepts contiguous containers such as `std::array`, `std::vector`, `std::string`, and `std::span` directly.
 * AVR `float` and `double` are both 32-bit IEEE 754 types. The floating-point methods therefore accept either spelling but produce binary32 precision.
 * Floating-point generation is `constexpr` by default. Defining `RND_AVR_FAST_FLOAT` consistently for the whole program selects the faster  but makes the floating-point methods runtime-only.
 * The library is designed to work thoroughly at compile time. On C++17, however, there is no std::bit_cast, so the very fast [Inigo Quilez technique](https://iquilezles.org/articles/sfrand/) cannot be implemented portably in constexpr! If your program does not need to generate floating-point values at compile time, define `RND_AVR_FAST_FLOAT`. This restores the fast IQ implementation but makes the floating-point methods runtime-only. The rest of the library remains constexpr.

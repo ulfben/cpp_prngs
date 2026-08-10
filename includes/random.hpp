@@ -5,10 +5,11 @@
 #include <bit> // for std::bit_cast
 #include <cassert>
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <iterator>
 #include <limits>
-#include <ranges>
 #include <type_traits>
 #include <utility>
 
@@ -38,8 +39,24 @@ namespace rnd {
 			!std::same_as<std::remove_cv_t<T>, bool> &&
 			(std::numeric_limits<std::remove_cv_t<T>>::digits <= value_bits);
 
-		template <class R, class Projection>
-		using projected_weight_t = std::remove_cvref_t<std::invoke_result_t<Projection&, std::ranges::range_reference_t<R>>>;
+		// The collection API deliberately supports contiguous, random-access containers
+		// through the small set of operations it actually uses.
+		template <class C>
+		static constexpr bool contiguous_collection = requires(C& collection){
+			std::data(collection);
+			std::size(collection);
+			std::begin(collection);
+		};
+
+		template <class T, class Projection>
+		static constexpr bool valid_projection =
+			requires(Projection & projection, T & value){
+				{ std::invoke(projection, value) } noexcept;
+
+				requires valid_weight_type<
+					std::remove_cvref_t<
+						decltype(std::invoke(projection, value))>>;
+		};
 
 	public:
 		using engine_type = E;
@@ -252,93 +269,153 @@ namespace rnd {
 		}
 
 		// --- collections ---
+		// data() and size() define the supported storage model. begin() is used only
+		// when iterator() or weighted_iterator() must return the container's native iterator.
+		// std::span looks like the natural parameter type for these functions, but a
+		// function template such as element(std::span<T>) cannot deduce T when it is
+		// called with a vector or array. T matters here because it is the element type
+		// that element() must return by reference. Function-template deduction does not
+		// consider the conversion from that container to span, so callers would have to
+		// write element(std::span{items}) themselves. The overloads below keep the convenient
+		// element(items) spelling while pointer-and-size remains the primitive API.
 
 		// pick an index in [0, size)
-		template <std::ranges::sized_range R>
-		[[nodiscard]] constexpr auto index(R&& collection) noexcept{
-			using size_type = std::ranges::range_size_t<R>;
-			const size_type size = std::ranges::size(collection);
+		[[nodiscard]] constexpr std::size_t index(std::size_t size) noexcept{
 			assert(size != 0 && "Random::index(): empty collection.");
-			assert(std::in_range<result_type>(size) &&
+			assert(size <= max() &&
 				"Random::index(): collection is too large for this engine.");
-			return static_cast<size_type>(next(static_cast<result_type>(size)));
+			return static_cast<std::size_t>(next(static_cast<result_type>(size)));
 		}
 
-		// get an iterator to a random element. Accepts const and non-const ranges
-		template <std::ranges::forward_range R>
-			requires std::ranges::sized_range<R> &&
-				std::ranges::borrowed_range<R>
-		[[nodiscard]] constexpr auto iterator(R&& collection) noexcept{
-			const auto offset = static_cast<std::ranges::range_difference_t<R>>(index(collection));
-			return std::ranges::next(std::ranges::begin(collection), offset);
+		template <class C>
+			requires contiguous_collection<const C>
+		[[nodiscard]] constexpr std::size_t index(const C& collection) noexcept{
+			return index(static_cast<std::size_t>(std::size(collection)));
+		}
+
+		// get an iterator to a random element. Accepts const and non-const collections
+		template <class T>
+		[[nodiscard]] constexpr T* iterator(T* collection, std::size_t size) noexcept{
+			assert(collection != nullptr && "Random::iterator(): null collection.");
+			return collection + index(size);
+		}
+
+		template <class C>
+			requires contiguous_collection<C>
+		[[nodiscard]] constexpr auto iterator(C& collection) noexcept{
+			const auto offset = static_cast<std::ptrdiff_t>(
+				index(static_cast<std::size_t>(std::size(collection))));
+			return std::next(std::begin(collection), offset);
 		}
 
 		//return a reference to a random element in a collection
-		//accepts both const and non-const ranges
-		template <std::ranges::forward_range R>
-			requires std::ranges::sized_range<R> &&
-				std::ranges::borrowed_range<R>
-		[[nodiscard]] constexpr decltype(auto) element(R&& collection) noexcept{
-			return *iterator(std::forward<R>(collection));
+		//accepts both const and non-const collections
+		template <class T>
+		[[nodiscard]] constexpr T& element(T* collection, std::size_t size) noexcept{
+			return *iterator(collection, size);
+		}
+
+		template <class C>
+			requires contiguous_collection<C>
+		[[nodiscard]] constexpr decltype(auto) element(C& collection) noexcept{
+			return *iterator(collection);
 		}
 
 		// Pick an index proportionally to unsigned integral weights.
 		// A zero weight excludes the corresponding index from selection.
 		// At least one weight must be positive and the sum must fit in result_type.
-		template <std::ranges::forward_range R>
-			requires std::ranges::sized_range<R> &&
-				valid_weight_type<std::ranges::range_value_t<R>>
-		[[nodiscard]] constexpr auto weighted_index(R&& weights) noexcept{
-			using size_type = std::ranges::range_size_t<R>;
-			assert(!std::ranges::empty(weights) && "Random::weighted_index(): empty weight range.");
+		template <class W>
+			requires valid_weight_type<W>
+		[[nodiscard]] constexpr std::size_t weighted_index(const W* weights, std::size_t size) noexcept{
+			assert(weights != nullptr && "Random::weighted_index(): null weight collection.");
+			auto weight_at = [weights](std::size_t i) constexpr -> decltype(auto){
+				return weights[i];
+			};
+			return weighted_offset(size, weight_at);
+		}
 
-			result_type total{};
-			for(const auto weight : weights){
-				assert(weight <= max() - total && "Random::weighted_index(): total weight is too large for this engine.");
-				total += weight;
-			}
-			assert(total != 0 && "Random::weighted_index(): at least one weight must be positive.");
-
-			result_type target = next(total);
-			size_type selected{};
-			for(const auto weight : weights){
-				if(target < weight){
-					return selected;
-				}
-				target -= weight;
-				++selected;
-			}			
-			std::unreachable(); //with stable weights, a positive total, and target < total, the loop must return.
+		template <class C>
+			requires contiguous_collection<const C>
+		[[nodiscard]] constexpr std::size_t weighted_index(const C& weights) noexcept{
+			return weighted_index(std::data(weights), static_cast<std::size_t>(std::size(weights)));
 		}
 
 		// Get an iterator to an element selected proportionally to its projected weight.
 		// A zero weight excludes the corresponding element from selection.
 		// At least one projected weight must be positive, the sum must fit in
 		// result_type, and the projection must return stable weights across both passes.
-		template <std::ranges::forward_range R, class Projection>
-			requires std::ranges::sized_range<R>&&
-				std::ranges::borrowed_range<R>&&
-				std::invocable<Projection&, std::ranges::range_reference_t<R>>&&
-				valid_weight_type<projected_weight_t<R, Projection>>
-		[[nodiscard]] constexpr auto weighted_iterator(R&& collection, Projection projection) noexcept{
-			auto weights = collection | std::views::transform(std::move(projection));
-			const auto offset = static_cast<std::ranges::range_difference_t<R>>(weighted_index(weights));
-			return std::ranges::next(std::ranges::begin(collection), offset);
+		template <class T, class Projection>
+			requires valid_projection<T, Projection>
+		[[nodiscard]] constexpr T* weighted_iterator(
+			T* collection, std::size_t size, Projection projection) noexcept{
+			return collection + projected_weighted_offset(collection, size, projection);
+		}
+
+		template <class C, class Projection>
+			requires contiguous_collection<C>
+		[[nodiscard]] constexpr auto weighted_iterator(C& collection, Projection projection) noexcept{
+			const auto offset = static_cast<std::ptrdiff_t>(projected_weighted_offset(
+				std::data(collection),
+				static_cast<std::size_t>(std::size(collection)),
+				projection));
+			return std::next(std::begin(collection), offset);
 		}
 
 		// Return a reference to an element selected proportionally to its projected weight.
-		// Note: if your projection throws an exception, we die.
-		template <std::ranges::forward_range R, class Projection>
-			requires std::ranges::sized_range<R>&&
-				std::ranges::borrowed_range<R>&&
-				std::invocable<Projection&, std::ranges::range_reference_t<R>>&&
-				valid_weight_type<projected_weight_t<R, Projection>>
-		[[nodiscard]] constexpr decltype(auto) weighted_element(R&& collection, Projection projection) noexcept{
-			return *weighted_iterator(std::forward<R>(collection), std::move(projection));
+		// Projections must be noexcept.
+		template <class T, class Projection>
+			requires valid_projection<T, Projection>
+		[[nodiscard]] constexpr T& weighted_element(
+			T* collection, std::size_t size, Projection projection) noexcept{
+			return *weighted_iterator(collection, size, std::move(projection));
+		}
+
+		template <class C, class Projection>
+			requires contiguous_collection<C>
+		[[nodiscard]] constexpr decltype(auto) weighted_element(C& collection, Projection projection) noexcept{
+			return *weighted_iterator(collection, std::move(projection));
 		}			
 
 	private:
 		E _e{}; //the underlying engine providing random bits. This class will turn those into useful values.
+
+		template <class T, class Projection>
+		[[nodiscard]] constexpr std::size_t projected_weighted_offset(
+			T* collection, std::size_t size, Projection& projection) noexcept{
+			static_assert(valid_projection<T, Projection>,
+				"Projection must be noexcept and return a valid unsigned weight type");
+			assert(collection != nullptr && "Random::weighted_iterator(): null collection.");
+			auto weight_at = [collection, &projection](std::size_t i) constexpr noexcept -> decltype(auto){
+				return std::invoke(projection, collection[i]);
+			};
+			return weighted_offset(size, weight_at);
+		}
+
+		template <class WeightAt>
+		[[nodiscard]] constexpr std::size_t weighted_offset(
+			std::size_t size, WeightAt& weight_at) noexcept{
+			using weight_type = std::remove_cvref_t<decltype(weight_at(std::size_t{}))>;
+			static_assert(valid_weight_type<weight_type>,
+				"Weights must be non-boolean unsigned integers no wider than result_type");
+			assert(size != 0 && "Random::weighted_index(): empty weight collection.");
+
+			result_type total{};
+			for(std::size_t i = 0; i < size; ++i){
+				const result_type weight = static_cast<result_type>(weight_at(i));
+				assert(weight <= max() - total &&
+					"Random::weighted_index(): total weight is too large for this engine.");
+				total += weight;
+			}
+			assert(total != 0 && "Random::weighted_index(): at least one weight must be positive.");
+
+			result_type target = next(total);
+			for(std::size_t i = 0; i < size; ++i){
+				const result_type weight = static_cast<result_type>(weight_at(i));
+				if(target < weight) return i;
+				target -= weight;
+			}
+			std::unreachable(); // Stable weights and target < total guarantee that the loop returns.
+		}
 
 		template <class T>
 		static constexpr T low_bits_mask(unsigned n) noexcept{

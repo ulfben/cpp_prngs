@@ -76,7 +76,7 @@ int main(){
 
    std::println("  gaussian(0.0, 1.0) sample: {}\n", random.gaussian(0.0f, 1.0f));
 
-   std::println("  element(str): {}", random.element(str));                             // random element from a sized forward range
+   std::println("  element(str): {}", random.element(str));                             // random element from a contiguous collection
    std::size_t i = random.index(str);                                                   // random index in [0, size)
    std::println("  index(str): {} ({})", i, str[i]);                                  
 
