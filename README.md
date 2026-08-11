@@ -144,7 +144,7 @@ Each included engine is a small, self-contained random number generator. You can
 
 For everyday use, wrap an engine in `Random<E>`. It adds bounded numbers, floats, coin flips, random elements, weighted selection, Gaussian samples, and more while letting you swap the underlying engine without changing the rest of your code.
 
-All included engines satisfy the optional C++20 [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp) concept and are compatible with standard C++ facilities such as `std::shuffle` and `std::sample`. The C++17 `Random<E>` implementation checks its essential engine assumptions with focused `static_assert` diagnostics instead of requiring concepts.
+All included engines satisfy the C++20 [`RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/includes/concepts.hpp) concept and are compatible with standard C++ facilities such as `std::shuffle` and `std::sample`. Since porting to C++17 the `Random<E>` implementation checks its essential engine assumptions with `static_assert` diagnostics instead of requiring concepts.
 
 Want to use your own engine? It must provide the interface described by `RandomBitEngine`, use an 8-, 16-, 32-, or 64-bit unsigned `result_type`, and span that type from zero through its maximum value.
 
@@ -178,7 +178,7 @@ Want to use your own engine? It must provide the interface described by `RandomB
 | `bits(n)` | Returns `n` random bits in the low bits of `T` at runtime (`1 ≤ n ≤ digits(T)`), drawing from the high bits of one or more engine outputs; `T` defaults to `result_type`[^1] |
 | `bits<N, T>()` | Returns `N` random bits in the low bits of `T`; constraints are checked at compile time[^1] |
 | `bits_as<T>()` | Returns an unsigned `T` filled with high-quality random bits |
-| fill_bits<T>(buffer, count) | Efficiently fills buffer with raw random T values, minimizing engine calls when T is narrower than the engine output |
+| `fill_bits<T>(buffer, count)` | Efficiently fills buffer with raw random T values, minimizing engine calls when T is narrower than the engine output |
 
 ### Integers
 
