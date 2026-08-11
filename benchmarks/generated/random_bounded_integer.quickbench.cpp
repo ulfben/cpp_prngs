@@ -443,7 +443,7 @@ assert(n > 0 && n <= detail::bit_width<T>());
 if(n <= value_bits){
 return take_high_bits<T>(next(), n);
 }
-return gather_bits<T>(n);
+return gather_high_bits<T>(n);
 }
 template <unsigned N, class T = result_type>
 constexpr T bits() noexcept{
@@ -453,12 +453,47 @@ static_assert(N <= detail::bit_width<T>(), "T cannot hold N bits");
 if constexpr(N <= value_bits){
 return take_high_bits<T>(next(), N);
 }else{
-return gather_bits<T>(N);
+return gather_high_bits<T>(N);
 }
 }
 template <class T>
 constexpr T bits_as() noexcept{
 return bits<detail::bit_width<T>(), T>();
+}
+template <class T>
+constexpr void fill_bits(T* buffer, size_t count) noexcept{
+static_assert(detail::supported_uint<T>, "Random::fill_bits<T>() requires an 8-, 16-, 32-, or 64-bit unsigned type");
+assert(buffer != nullptr || count == 0);
+if(buffer == nullptr || count == 0){
+return;
+}
+constexpr unsigned target_bits = detail::bit_width<T>();
+if constexpr(value_bits == target_bits){
+for(size_t i = 0; i < count; ++i){
+buffer[i] = static_cast<T>(next());
+}
+}else if constexpr(value_bits > target_bits){
+static_assert(value_bits % target_bits == 0, "Random::fill_bits<T>() requires evenly divisible bit widths");
+constexpr unsigned values_per_draw = value_bits / target_bits;
+size_t i{};
+while(i < count){
+const result_type value = next();
+for(unsigned part = 0; part < values_per_draw && i < count; ++part){
+const unsigned shift = value_bits - target_bits * (part + 1);
+buffer[i++] = static_cast<T>(value >> shift);
+}
+}
+}else{
+static_assert(target_bits % value_bits == 0, "Random::fill_bits<T>() requires evenly divisible bit widths");
+constexpr unsigned draws_per_value = target_bits / value_bits;
+for(size_t i = 0; i < count; ++i){
+T value{};
+for(unsigned part = 0; part < draws_per_value; ++part){
+value = static_cast<T>((value << value_bits) | static_cast<T>(next()));
+}
+buffer[i] = value;
+}
+}
 }
 [[nodiscard]] constexpr Random split() noexcept{
 return Random{bits_as<seed_type>()};
@@ -528,11 +563,22 @@ template <class F = float>
 RND_DETAIL_FLOAT_CONSTEXPR F gaussian(F mean, F stddev) noexcept{
 static_assert(detail::supported_float<F>, "Random::gaussian() requires a supported floating-point type");
 assert(stddev >= F{0} && "Random::gaussian(mean, stddev): standard deviation must be non-negative.");
+if constexpr(value_bits >= 32){
 F sum{};
 for(unsigned i = 0; i < 12; ++i){
 sum += normalized<F>();
 }
 return mean + (sum - F{6}) * stddev;
+}else{
+uint16_t lanes[12]{};
+fill_bits<uint16_t>(lanes, 12);
+uint32_t sum{};
+for(const uint16_t lane : lanes){
+sum += static_cast<uint32_t>(lane);
+}
+const F normalized_sum = (static_cast<F>(sum) + F{6}) / F{65536};
+return mean + (normalized_sum - F{6}) * stddev;
+}
 }
 [[nodiscard]] constexpr size_t index(size_t size) noexcept{
 assert(size != 0 && "Random::index(): empty collection.");
@@ -620,7 +666,7 @@ assert(n > 0 && n <= value_bits && n <= detail::bit_width<T>());
 return static_cast<T>(value >> (value_bits - n)) & low_bits_mask<T>(n);
 }
 template <class T>
-constexpr T gather_bits(unsigned n) noexcept{
+constexpr T gather_high_bits(unsigned n) noexcept{
 assert(value_bits < n && n <= detail::bit_width<T>());
 T result{};
 unsigned filled{};
