@@ -90,7 +90,7 @@ namespace rnd {
 		// Runtime bit extraction. Returns n random bits in the low end of T.
 		// We take high bits from the engine because those are the bits most
 		// small PRNGs are designed to make strongest. If T is wider than one engine
-		// result, gather_bits() stitches together as many draws as are needed.
+		// result, gather_high_bits() stitches together as many draws as are needed.
 		template <class T = result_type>
 		constexpr T bits(unsigned n) noexcept{
 			static_assert(detail::supported_uint<T>, "Random::bits<T>() requires an 8-, 16-, 32-, or 64-bit unsigned type");
@@ -98,7 +98,7 @@ namespace rnd {
 			if(n <= value_bits){
 				return take_high_bits<T>(next(), n);
 			}
-			return gather_bits<T>(n);
+			return gather_high_bits<T>(n);
 		}
 
 		// Bit extraction with a compile-time bit count.
@@ -113,7 +113,7 @@ namespace rnd {
 			if constexpr(N <= value_bits){
 				return take_high_bits<T>(next(), N);
 			}else{
-				return gather_bits<T>(N);
+				return gather_high_bits<T>(N);
 			}
 		}
 
@@ -121,6 +121,51 @@ namespace rnd {
 		template <class T>
 		constexpr T bits_as() noexcept{
 			return bits<detail::bit_width<T>(), T>();
+		}
+
+		// Fill a buffer with random bit patterns, using the engine output efficiently
+		// across the whole batch. This is useful when many raw random values are
+		// needed and can avoid discarding unused bits from individual engine draws.
+		// see gaussian(mean, stdev) for an example use case.
+		// 
+		// The implementation looks branchy, but all width comparisons are compile-time
+		// constants. For any given engine/T combination, if constexpr discards all but
+		// one path, leaving simple fixed-width loops that compilers can optimize well.
+		template <class T>
+		constexpr void fill_bits(T* buffer, size_t count) noexcept{
+			static_assert(detail::supported_uint<T>, "Random::fill_bits<T>() requires an 8-, 16-, 32-, or 64-bit unsigned type");
+			assert(buffer != nullptr || count == 0);
+			if(buffer == nullptr || count == 0){
+				return;
+			}
+			constexpr unsigned target_bits = detail::bit_width<T>();
+
+			if constexpr(value_bits == target_bits){
+				for(size_t i = 0; i < count; ++i){
+					buffer[i] = static_cast<T>(next());
+				}
+			}else if constexpr(value_bits > target_bits){
+				static_assert(value_bits % target_bits == 0, "Random::fill_bits<T>() requires evenly divisible bit widths");
+				constexpr unsigned values_per_draw = value_bits / target_bits;
+				size_t i{};
+				while(i < count){
+					const result_type value = next();
+					for(unsigned part = 0; part < values_per_draw && i < count; ++part){
+						const unsigned shift = value_bits - target_bits * (part + 1);
+						buffer[i++] = static_cast<T>(value >> shift);
+					}
+				}
+			}else{
+				static_assert(target_bits % value_bits == 0, "Random::fill_bits<T>() requires evenly divisible bit widths");
+				constexpr unsigned draws_per_value = target_bits / value_bits;
+				for(size_t i = 0; i < count; ++i){
+					T value{};
+					for(unsigned part = 0; part < draws_per_value; ++part){
+						value = static_cast<T>((value << value_bits) | static_cast<T>(next()));
+					}
+					buffer[i] = value;
+				}
+			}
 		}
 
 		// Derive a child generator by consuming enough parent output to fill one seed.
@@ -226,19 +271,43 @@ namespace rnd {
 			return normalized<F>() < probability;
 		}
 
+		// This is the pleasantly simple Irwin-Hall approximation to a normal
+		// distribution. The sum of twelve U(0,1) samples has mean 6 and variance
+		// 1, so subtracting 6 and applying mean/stddev gives an approximate normal.
+		// See: https://en.wikipedia.org/wiki/Irwin-Hall_distribution
+		//
+		// Narrow engines use a 16-bit integer form to avoid repeatedly
+		// constructing floating-point values from multiple engine draws. 
+		// fill_bits() produces twelve 16-bit lanes, which are summed as integers
+		// and converted to floating point only once. Benchmarks showed this to be
+		// substantially faster for 8- and 16-bit engines, but slower for engines
+		// 32 bits and wider.
+		// 
+		// SmallFast8 => 2.9x faster 
+		// SmallFast16 => 3.9x faster 
+		// SmallFast32 / QuarkBurst64 => ~1.5x slower
 		template <class F = float>
 		RND_DETAIL_FLOAT_CONSTEXPR F gaussian(F mean, F stddev) noexcept{
 			static_assert(detail::supported_float<F>, "Random::gaussian() requires a supported floating-point type");
 			assert(stddev >= F{0} && "Random::gaussian(mean, stddev): standard deviation must be non-negative.");
-			// This is the pleasantly simple Irwin-Hall approximation to a normal
-			// distribution. The sum of twelve U(0,1) samples has mean 6 and variance
-			// 1, so subtracting 6 and applying mean/stddev gives an approximate normal.
-			// See: https://en.wikipedia.org/wiki/Irwin-Hall_distribution
-			F sum{};
-			for(unsigned i = 0; i < 12; ++i){
-				sum += normalized<F>();
+			if constexpr(value_bits >= 32){
+				// On desktop-width engines this direct form was faster in my benchmarks.
+				F sum{};
+				for(unsigned i = 0; i < 12; ++i){
+					sum += normalized<F>();
+				}
+				return mean + (sum - F{6}) * stddev;
+			}else{				
+				uint16_t lanes[12]{};
+				fill_bits<uint16_t>(lanes, 12);
+				uint32_t sum{};
+				for(const uint16_t lane : lanes){
+					sum += static_cast<uint32_t>(lane);
+				}
+				// 6 is 12 midpoint corrections of 0.5; 65536 is 2^16, the number of equally likely values in a uint16_t lane.
+				const F normalized_sum = (static_cast<F>(sum) + F{6}) / F{65536};
+				return mean + (normalized_sum - F{6}) * stddev;
 			}
-			return mean + (sum - F{6}) * stddev;
 		}
 
 		// --- collections ---
@@ -373,7 +442,7 @@ namespace rnd {
 
 		// Fill T one engine-width chunk at a time.
 		template <class T>
-		constexpr T gather_bits(unsigned n) noexcept{
+		constexpr T gather_high_bits(unsigned n) noexcept{
 			assert(value_bits < n && n <= detail::bit_width<T>());
 
 			T result{};

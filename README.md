@@ -178,6 +178,7 @@ Want to use your own engine? It must provide the interface described by `RandomB
 | `bits(n)` | Returns `n` random bits in the low bits of `T` at runtime (`1 ≤ n ≤ digits(T)`), drawing from the high bits of one or more engine outputs; `T` defaults to `result_type`[^1] |
 | `bits<N, T>()` | Returns `N` random bits in the low bits of `T`; constraints are checked at compile time[^1] |
 | `bits_as<T>()` | Returns an unsigned `T` filled with high-quality random bits |
+| fill_bits<T>(buffer, count) | Efficiently fills buffer with raw random T values, minimizing engine calls when T is narrower than the engine output |
 
 ### Integers
 

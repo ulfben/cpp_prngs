@@ -116,6 +116,32 @@ constexpr bool validate_integer_api(){
 		return false;
 	}
 
+	rnd::Random<Engine32> byte_stream{UINT32_C(0x12345678)};
+	uint8_t bytes[4]{};
+	byte_stream.fill_bits(bytes, 4);
+	if(bytes[0] != uint8_t{0x12} || bytes[1] != uint8_t{0x34} ||
+		bytes[2] != uint8_t{0x56} || bytes[3] != uint8_t{0x78} ||
+		byte_stream.engine().draws != 1){
+		return false;
+	}
+
+	rnd::Random<Engine32> wide_stream{UINT32_C(0x12345678)};
+	uint64_t wide_value[1]{};
+	wide_stream.fill_bits(wide_value, 1);
+	if(wide_value[0] != UINT64_C(0x1234567812345679) ||
+		wide_stream.engine().draws != 2){
+		return false;
+	}
+
+	rnd::Random<Engine64> narrow_stream{UINT64_C(0x123456789abcdef0)};
+	uint16_t narrow_values[4]{};
+	narrow_stream.fill_bits(narrow_values, 4);
+	if(narrow_values[0] != uint16_t{0x1234} || narrow_values[1] != uint16_t{0x5678} ||
+		narrow_values[2] != uint16_t{0x9abc} || narrow_values[3] != uint16_t{0xdef0} ||
+		narrow_stream.engine().draws != 1){
+		return false;
+	}
+
 	rnd::Random<Engine8> ranges{uint8_t{128}};
 	if(ranges.between(int16_t{-10}, int16_t{10}) != int16_t{0}){
 		return false;
@@ -263,7 +289,43 @@ constexpr bool validate_constexpr_float_api(){
 	}
 
 	rnd::Random<Engine32> gaussian{uint32_t{0}};
-	if(gaussian.gaussian(3.0f, 0.0f) != 3.0f || gaussian.engine().draws != 12){
+	if(gaussian.gaussian(3.0f, 0.0f) != 3.0f){
+		return false;
+	}
+
+	rnd::Random<Engine64> gaussian_64{uint64_t{0}};
+	if(gaussian_64.gaussian(3.0f, 0.0f) != 3.0f){
+		return false;
+	}
+
+	rnd::Random<Engine16> gaussian_16{uint16_t{0}};
+	if(gaussian_16.gaussian(3.0f, 0.0f) != 3.0f){
+		return false;
+	}
+
+	rnd::Random<Engine8> gaussian_8{uint8_t{0}};
+	if(gaussian_8.gaussian(3.0f, 0.0f) != 3.0f){
+		return false;
+	}
+
+	rnd::Random<Engine32> unit_gaussian{UINT32_C(0x12345678)};
+	rnd::Random<Engine32> transformed_gaussian{UINT32_C(0x12345678)};
+	const float unit_sample = unit_gaussian.gaussian(0.0f, 1.0f);
+	const float transformed_sample = transformed_gaussian.gaussian(3.0f, 2.0f);
+	const float expected_sample = 3.0f + unit_sample * 2.0f;
+	const float error = transformed_sample > expected_sample ?
+		transformed_sample - expected_sample : expected_sample - transformed_sample;
+	if(error > 1.0e-5f){
+		return false;
+	}
+
+	rnd::Random<Engine64> gaussian_double_64{uint64_t{0}};
+	if(gaussian_double_64.gaussian(3.0, 0.0) != 3.0){
+		return false;
+	}
+
+	rnd::Random<Engine32> gaussian_double_32{uint32_t{0}};
+	if(gaussian_double_32.gaussian(3.0, 0.0) != 3.0){
 		return false;
 	}
 
@@ -302,7 +364,18 @@ bool validate_runtime_float_api(){
 	}
 
 	rnd::Random<Engine32> gaussian{uint32_t{0}};
-	if(gaussian.gaussian(7.0f, 0.0f) != 7.0f || gaussian.engine().draws != 12){
+	if(gaussian.gaussian(7.0f, 0.0f) != 7.0f){
+		return false;
+	}
+
+	rnd::Random<Engine32> unit_gaussian{UINT32_C(0x12345678)};
+	rnd::Random<Engine32> transformed_gaussian{UINT32_C(0x12345678)};
+	const float unit_sample = unit_gaussian.gaussian(0.0f, 1.0f);
+	const float transformed_sample = transformed_gaussian.gaussian(3.0f, 2.0f);
+	const float expected_sample = 3.0f + unit_sample * 2.0f;
+	const float error = transformed_sample > expected_sample ?
+		transformed_sample - expected_sample : expected_sample - transformed_sample;
+	if(error > 1.0e-5f){
 		return false;
 	}
 
