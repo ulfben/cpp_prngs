@@ -197,8 +197,7 @@ return UINT64_C(0x3ff0000000000000);
 template <class F>
 RND_DETAIL_FLOAT_CONSTEXPR remove_cvref_t<F>
 unit_float_from_mantissa(unsigned_t<F> mantissa) noexcept{
-static_assert(supported_float<F>,
-"unit_float_from_mantissa() requires a supported floating-point type");
+static_assert(supported_float<F>, "unit_float_from_mantissa() requires a supported floating-point type");
 using real_type = remove_cvref_t<F>;
 using UInt = unsigned_t<real_type>;
 #if RND_DETAIL_HAS_CONSTEXPR_BIT_CAST
