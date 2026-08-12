@@ -9,14 +9,8 @@
 // mostly gives our implementation short, uniform names for standard facilities.
 // On AVR-libc, where headers such as <type_traits> and <iterator> are missing,
 // it supplies only the handful of operations Random actually needs.
-//
-// Keeping these details here is what lets the interesting RNG code live in one
-// header. It also gives students a compact example of a useful compatibility
-// layer: feature detection at the edge, ordinary portable code in the middle.
 
-// First ask the toolchain what it has. We deliberately detect the facilities,
-// rather than the AVR platform name, so another constrained C++17 library can
-// use the same fallback path without pretending to be AVR.
+// First ask the toolchain what it has.
 #if defined(__has_include)
 	#if __has_include(<iterator>) && __has_include(<limits>) && __has_include(<type_traits>) && __has_include(<utility>)
 		#define RND_DETAIL_HAS_STANDARD_COMPAT 1
@@ -52,7 +46,7 @@
 // constexpr only when a feature exists”, so RND_DETAIL_FLOAT_CONSTEXPR is the
 // one small preprocessor detail that the public floating-point declarations use.
 #if defined(RND_FAST_FLOAT) && !RND_DETAIL_HAS_CONSTEXPR_BIT_CAST
-	#include <string.h>
+	#include <string.h> //for memcpy
 	#define RND_DETAIL_FLOAT_CONSTEXPR
 #else
 	#define RND_DETAIL_FLOAT_CONSTEXPR constexpr
@@ -67,10 +61,9 @@ namespace rnd::detail {
 // Types reaching the traits below may carry references or const/volatile
 // qualifiers that do not change what the underlying value actually is. For
 // example, reading a member from a const object may produce const uint8_t&.
-// remove_cvref_t lets the rest of the file classify uint8_t in both cases.
+// remove_cvref_t lets the rest of the file see a clean uint8_t in both cases.
 //
-// On a full standard library these are intentionally boring aliases. That is a
-// nice property: desktop builds pay no price for the fallback implementation.
+// On a full standard library these are just aliases.
 
 #if RND_DETAIL_HAS_STANDARD_COMPAT
 
@@ -175,11 +168,7 @@ namespace rnd::detail {
 	//
 	// These are our C++17-era “poor person's concepts”. The library intentionally
 	// accepts the familiar fixed-width integers and rejects bool, plain char,
-	// wchar_t and character types whose numeric intent would be ambiguous.
-	//
-	// Having one explicit contract everywhere is important: it prevents the
-	// desktop implementation from quietly accepting a type that the same program
-	// cannot use when it is moved to an embedded target.
+	// wchar_t etc.
 
 	template <class T>
 	static constexpr bool supported_uint =
@@ -240,9 +229,7 @@ namespace rnd::detail {
 	//     integral_max<T>()              -> std::numeric_limits<T>::max()
 	//     power_of_two_exponent(value)   -> std::countr_zero(value)
 	//
-	// Desktop builds simply use those facilities when they are available. The
-	// fallback implementations are deliberately small and readable so random.hpp
-	// does not need to know which standard-library surface its target provides.
+	// Desktop builds simply use those facilities when they are available.
 
 	template <class T>
 	constexpr unsigned bit_width() noexcept{
@@ -297,13 +284,11 @@ namespace rnd::detail {
 	// -----------------------------------------------------------------------------
 	//
 	// The normalized() trick needs to know two things about F: how many random
-	// mantissa bits it can hold, and which bit pattern represents 1.0 when a C++17
-	// runtime bit cast is requested. Desktop double is normally IEEE binary64;
-	// classic AVR double is binary32. Both are genuine, supported configurations.
+	// mantissa bits it can hold, and which bit pattern represents 1.0.
+    // Desktop double is normally IEEE binary64; classic AVR double is binary32.
 	//
 	// The primary template deliberately rejects everything else, including long
-	// double. Supporting a new representation should be an explicit decision,
-	// rather than an accidental consequence of sizeof happening to match.
+	// double.
 
 	template <class F>
 	struct float_traits{
@@ -346,8 +331,7 @@ namespace rnd::detail {
 	template <class F>
 	RND_DETAIL_FLOAT_CONSTEXPR remove_cvref_t<F>
 	unit_float_from_mantissa(unsigned_t<F> mantissa) noexcept{
-		static_assert(supported_float<F>,
-			"unit_float_from_mantissa() requires a supported floating-point type");
+		static_assert(supported_float<F>, "unit_float_from_mantissa() requires a supported floating-point type");
 		using real_type = remove_cvref_t<F>;
 		using UInt = unsigned_t<real_type>;
 
