@@ -177,13 +177,32 @@ namespace rnd {
 
 		// --- integers ---
 
-		// Produce [0, bound) using multiply-high range reduction (often called
-		// Lemire's FastRange). It is much faster than a division-based reduction,
-		// perfectly unbiased for power-of-two bounds, and has only tiny bias otherwise.
+		// Produce [0, bound) using Lemire's multiply-high range reduction with its
+		// rejection step. The rejection is necessary for non-power-of-two bounds:
+		// multiply-high alone maps some source values to one result more often than
+		// others, which is especially visible for narrow engines.
 		// See: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
 		constexpr result_type next(result_type bound) noexcept{
 			assert(bound > 0 && "Random::next(bound): bound must be positive.");
-			return scale_to_bound(next(), bound);
+
+			result_type value = next();
+			auto product = multiply_parts(value, bound);
+			if(product.lo >= bound){
+				return static_cast<result_type>(product.hi);
+			}
+
+			// Only the small low-product region needs the threshold. Keeping
+			// this modulo out of the common path is important for engines where
+			// integer division costs more than generating the next value.
+			// (-bound) modulo 2^value_bits is the size of the incomplete low
+			// product region. Values below it are rejected so every result in
+			// [0, bound) has the same number of accepted source values.
+			const result_type threshold = static_cast<result_type>(-bound) % bound;
+			while(product.lo < threshold){
+				value = next();
+				product = multiply_parts(value, bound);
+			}
+			return static_cast<result_type>(product.hi);
 		}
 
 		constexpr result_type operator()(result_type bound) noexcept{ return next(bound); }
@@ -521,18 +540,24 @@ namespace rnd {
 			abort();
 		}
 
-		// Multiply in the next wider integer type and keep the high half. A 64-bit
-		// engine needs the portable 64x64->128 helper because __uint128_t is not
-		// available on every desktop compiler (notably MSVC) or on AVR.
-		static constexpr result_type scale_to_bound(result_type value, result_type bound) noexcept{
+		// Multiply in the next wider integer type and retain both halves of the
+		// full-width product. A 64-bit engine needs the portable 64x64->128 helper
+		// because __uint128_t is not available on every desktop compiler (notably
+		// MSVC) or on AVR.
+		static constexpr detail::u128_parts multiply_parts(result_type value, result_type bound) noexcept{
 			if constexpr(sizeof(result_type) == 1){
-				return static_cast<result_type>((uint16_t{value} * uint16_t{bound}) >> 8);
+				const uint16_t product = uint16_t{value} * uint16_t{bound};
+				return {static_cast<uint64_t>(static_cast<result_type>(product)),
+					static_cast<uint64_t>(product >> 8)};
 			}else if constexpr(sizeof(result_type) == 2){
-				return static_cast<result_type>((uint32_t{value} * uint32_t{bound}) >> 16);
+				const uint32_t product = uint32_t{value} * uint32_t{bound};
+				return {static_cast<uint64_t>(static_cast<result_type>(product)),
+					static_cast<uint64_t>(product >> 16)};
 			}else if constexpr(sizeof(result_type) == 4){
-				return static_cast<result_type>((uint64_t{value} * uint64_t{bound}) >> 32);
+				const uint64_t product = uint64_t{value} * uint64_t{bound};
+				return {product & UINT32_MAX, product >> 32};
 			}else{
-				return static_cast<result_type>(detail::mul64_to_128_parts(value, bound).hi);
+				return detail::mul64_to_128_parts(value, bound);
 			}
 		}
 	};

@@ -184,7 +184,7 @@ Want to use your own engine? It must provide the interface described by `RandomB
 
 | Method | Description |
 |--------|-------------|
-| `next(bound)` / `operator()(bound)` | Returns an integer in `[0, bound)`, using [Lemire’s FastRange](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) without rejection |
+| `next(bound)` / `operator()(bound)` | Returns an unbiased integer in `[0, bound)`, using [Lemire’s FastRange](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) with rejection when needed |
 | `next<N, T>()` | Returns an integer in `[0, N)` with a compile-time bound and optional result type `T`; optimized for power-of-two bounds[^1] |
 | `between(I lo, I hi)` | Returns an integer in `[lo, hi)` |
 

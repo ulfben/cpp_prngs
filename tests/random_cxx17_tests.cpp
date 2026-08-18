@@ -93,8 +93,48 @@ static_assert(!noexcept(rnd::detail::invoke(
 	*static_cast<LootDrop*>(nullptr))));
 
 constexpr bool validate_integer_api(){
-	rnd::Random<Engine8> bounded{uint8_t{128}};
+	rnd::Random<Engine8> bounded{uint8_t{129}};
 	if(bounded.next(uint8_t{100}) != uint8_t{50} || bounded.engine().draws != 1){
+		return false;
+	}
+
+	// The first source value is rejected for this bound. This verifies both the
+	// rejection step and that the redraw consumes exactly one additional value.
+	rnd::Random<Engine8> rejected{uint8_t{0}};
+	if(rejected.next(uint8_t{10}) != uint8_t{0} || rejected.engine().draws != 2){
+		return false;
+	}
+
+	// One full 8-bit source cycle contains exactly 250 accepted values for
+	// bound 10. Each of the ten outputs must therefore occur 25 times.
+	rnd::Random<Engine8> exhaustive{uint8_t{0}};
+	unsigned counts[10]{};
+	for(unsigned i = 0; i < 250; ++i){
+		++counts[exhaustive.next(uint8_t{10})];
+	}
+	for(const unsigned count : counts){
+		if(count != 25){
+			return false;
+		}
+	}
+	if(exhaustive.engine().draws != 256){
+		return false;
+	}
+
+	// For bound 129, the old multiply-high-only mapping gives two outcomes
+	// twice the probability of the others. Rejection leaves exactly 129
+	// accepted source values in one 8-bit cycle, one for each output.
+	rnd::Random<Engine8> extreme{uint8_t{0}};
+	unsigned extreme_counts[129]{};
+	for(unsigned i = 0; i < 129; ++i){
+		++extreme_counts[extreme.next(uint8_t{129})];
+	}
+	for(const unsigned count : extreme_counts){
+		if(count != 1){
+			return false;
+		}
+	}
+	if(extreme.engine().draws != 256){
 		return false;
 	}
 
@@ -147,17 +187,17 @@ constexpr bool validate_integer_api(){
 		return false;
 	}
 
-	rnd::Random<Engine16> native_16{uint16_t{32768}};
+	rnd::Random<Engine16> native_16{uint16_t{32769}};
 	if(native_16.next(uint16_t{1000}) != uint16_t{500} || native_16.engine().draws != 1){
 		return false;
 	}
 
-	rnd::Random<Engine32> native_32{uint32_t{0x80000000}};
+	rnd::Random<Engine32> native_32{uint32_t{0x80000001}};
 	if(native_32.next(uint32_t{1000}) != uint32_t{500} || native_32.engine().draws != 1){
 		return false;
 	}
 
-	rnd::Random<Engine64> native_64{uint64_t{0x8000000000000000}};
+	rnd::Random<Engine64> native_64{uint64_t{0x8000000000000001}};
 	if(native_64.next(uint64_t{1000}) != uint64_t{500} || native_64.engine().draws != 1){
 		return false;
 	}
