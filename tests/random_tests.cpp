@@ -1,7 +1,7 @@
 #include "engine_reference_validation.hpp"
 #include "wide_multiply_validation.hpp"
 #include "gtest/gtest.h"
-#include "../includes/random.hpp"
+#include <rnd/random.hpp>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -11,6 +11,8 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+using namespace rnd;
 
 // Source: https://github.com/ulfben/cpp_prngs/
 // Demo is available on Compiler Explorer: https://compiler-explorer.com/z/YTbGcreEe

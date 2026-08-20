@@ -2,17 +2,14 @@
 #include "../detail/bit_operations.hpp"
 #include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 /*
-  SmallFast8 PRNG - a C++ port of the 8-bit Jenkins Small Fast variant.
+  SmallFast16 PRNG - a C++ port of the 16-bit Jenkins Small Fast variant.
 
-  Intended for highly resource-constrained 8-bit targets, using byte-wide arithmetic and 4 bytes of state.
-  It favors minimal state over long streams; O'Neill reports a PractRand failure at 2^28 bytes.
-  Ergo: statistical weaknesses become detectable after roughly 268 million raw outputs. 
-  Likely well more than enough for an Arduboy game. :) 
+  Intended for 8-bit microcontrollers, relying on narrower arithmetic and 8 byte state.
 
   Original algorithm by Bob Jenkins (public domain):
   https://burtleburtle.net/bob/rand/smallprng.html
 
-  8-bit constants and statistical validation by Melissa E. O'Neill:
+  16-bit constants and statistical validation by Melissa E. O'Neill:
   https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html
 
   Based on jsf.hpp, Copyright (c) 2018 Melissa E. O'Neill (MIT License):
@@ -23,31 +20,33 @@
 
   Licensed under the MIT License. See LICENSE.md for details.
 */
-class SmallFast8 final{
-	using u8 = uint8_t;
+namespace rnd {
 
-	u8 a;
-	u8 b;
-	u8 c;
-	u8 d;
+class SmallFast16 final{
+	using u16 = uint16_t;
+
+	u16 a;
+	u16 b;
+	u16 c;
+	u16 d;
 
 public:
-	using result_type = u8;
-	using seed_type = u8;
+	using result_type = u16;
+	using seed_type = u16;
 
-	constexpr SmallFast8() noexcept
-		: SmallFast8(0xDCu){}
+	constexpr SmallFast16() noexcept
+		: SmallFast16(0xBADCu){}
 
-	explicit constexpr SmallFast8(seed_type seed) noexcept
-		: a(0xEDu), b(seed), c(seed), d(seed){
+	explicit constexpr SmallFast16(seed_type seed) noexcept
+		: a(0x5eedu), b(seed), c(seed), d(seed){
 		discard(20); // Warm up the state
 	}
 
 	constexpr void seed() noexcept{
-		*this = SmallFast8{};
+		*this = SmallFast16{};
 	}
 	constexpr void seed(seed_type value) noexcept{
-		*this = SmallFast8{value};
+		*this = SmallFast16{value};
 	}
 
 	static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.
@@ -59,13 +58,11 @@ public:
 	}
 
 	constexpr result_type next() noexcept{
-		// C++ promotes u8 values to int during arithmetic.
-		// Casting back to u8 keeps only the low 8 bits, giving the 8-bit wraparound required by the algorithm.
-		const u8 e = static_cast<u8>(a - rnd::detail::rotl(b, 1));
-		a = static_cast<u8>(b ^ rnd::detail::rotl(c, 4));
-		b = static_cast<u8>(c + d);
-		c = static_cast<u8>(d + e);
-		d = static_cast<u8>(e + a);
+		const u16 e = a - rnd::detail::rotl(b, 13);
+		a = b ^ rnd::detail::rotl(c, 8);
+		b = c + d;
+		c = d + e;
+		d = e + a;
 		return d;
 	}
 
@@ -79,10 +76,12 @@ public:
 		}
 	}
 
-	constexpr bool operator==(const SmallFast8& rhs) const noexcept{
+	constexpr bool operator==(const SmallFast16& rhs) const noexcept{
 		return a == rhs.a && b == rhs.b && c == rhs.c && d == rhs.d;
 	}
-	constexpr bool operator!=(const SmallFast8& rhs) const noexcept{
+	constexpr bool operator!=(const SmallFast16& rhs) const noexcept{
 		return !(*this == rhs);
 	}
 };
+
+} // namespace rnd

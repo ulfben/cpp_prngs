@@ -199,7 +199,7 @@ namespace rnd {
 			// (-bound) modulo 2^value_bits is the size of the incomplete low
 			// product region. Values below it are rejected so every result in
 			// [0, bound) has the same number of accepted source values.
-			const result_type threshold = static_cast<result_type>(-bound) % bound;
+			const result_type threshold = (result_type{0} - bound) % bound;
 			while(product.lo < threshold){
 				value = next();
 				product = multiply_parts(value, bound);
@@ -227,7 +227,7 @@ namespace rnd {
 				// Finch's constantly-divisionless form: Bound is known here, so the
 				// rejection threshold is folded at compile time and the loop contains
 				// only the product, low-half comparison, and occasional redraw.
-				constexpr result_type threshold = static_cast<result_type>(-Bound) % Bound;
+				constexpr result_type threshold = (result_type{0} - Bound) % Bound;
 				auto product = multiply_parts(next(), Bound);
 				while(product.lo < threshold){
 					product = multiply_parts(next(), Bound);

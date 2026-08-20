@@ -1,5 +1,7 @@
 #include "engine_reference_validation.hpp"
-#include <random.hpp>
+#include <rnd/random.hpp>
+
+using namespace rnd;
 
 volatile uint64_t output;
 volatile uint16_t input = 0x8000;

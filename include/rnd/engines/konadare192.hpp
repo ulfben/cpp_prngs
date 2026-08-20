@@ -31,6 +31,8 @@
  * Modifications and C++ port by Ulf Benjaminsson, 2025.
  *    https://github.com/ulfben/cpp_prngs
  */
+namespace rnd {
+
 class Konadare192 final{
 	using u64 = uint64_t;
 	static constexpr u64 INC = 0xBB67AE8584CAA73BULL;
@@ -107,3 +109,5 @@ public:
 		return !(*this == rhs);
 	}
 };
+
+} // namespace rnd

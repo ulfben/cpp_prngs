@@ -368,6 +368,7 @@ return {low, high};
 #include <limits>
 #include <random>
 #include <type_traits>
+namespace rnd {
 template<typename E>
 concept RandomBitEngine =
 requires {
@@ -398,6 +399,7 @@ requires(E& e, const E& ce, typename E::seed_type seed, unsigned long long n){
 { e.seed(seed) } noexcept -> std::same_as<void>;
 { e.discard(n) } noexcept -> std::same_as<void>;
 };
+}
 #endif
 namespace rnd {
 template <class E>
@@ -523,7 +525,12 @@ return T{0};
 using U = detail::unsigned_t<T>;
 return static_cast<T>(bits<detail::power_of_two_exponent(Bound), U>());
 }else{
-return static_cast<T>(next(Bound));
+constexpr result_type threshold = static_cast<result_type>(-Bound) % Bound;
+auto product = multiply_parts(next(), Bound);
+while(product.lo < threshold){
+product = multiply_parts(next(), Bound);
+}
+return static_cast<T>(product.hi);
 }
 }
 template <class I, detail::enable_if_t<detail::supported_integer<I>, int> = 0>
@@ -783,6 +790,7 @@ return amount == 0 ? value : static_cast<T>((value >> amount) | (value << (digit
 }
 }
 #include <stdint.h>
+namespace rnd {
 class Konadare192 final{
 using u64 = uint64_t;
 static constexpr u64 INC = 0xBB67AE8584CAA73BULL;
@@ -850,7 +858,9 @@ constexpr bool operator!=(const Konadare192& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <stdint.h>
+namespace rnd {
 class QuarkBurst64 final{
 using u64 = uint64_t;
 static constexpr u64 DEFAULT_SEED = 0xFEEDFACECAFEBEEFULL;
@@ -920,8 +930,10 @@ constexpr bool operator!=(const QuarkBurst64& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <assert.h>
 #include <stdint.h>
+namespace rnd {
 class RomuDuoJr final{
 using u64 = uint64_t;
 using state_type = u64;
@@ -980,10 +992,12 @@ constexpr bool operator!=(const RomuDuoJr& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <benchmark/benchmark.h>
 #include <cstdint>
 #include <cstdlib>
 #include <random>
+using namespace rnd;
 namespace {
 constexpr std::int64_t values_per_iteration = 1024;
 constexpr std::uint64_t seed = 1234567890ULL;

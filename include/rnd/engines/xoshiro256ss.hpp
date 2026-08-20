@@ -17,6 +17,8 @@
   https://github.com/ulfben/cpp_prngs/
 */
 
+namespace rnd {
+
 class Xoshiro256SS{
 	using u64 = uint64_t;
 	u64 s[4]{};
@@ -123,3 +125,5 @@ public:
 		return !(*this == rhs);
 	}
 };
+
+} // namespace rnd

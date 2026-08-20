@@ -25,6 +25,7 @@ return amount == 0 ? value : static_cast<T>((value >> amount) | (value << (digit
 }
 }
 #include <stdint.h>
+namespace rnd {
 class Konadare192 final{
 using u64 = uint64_t;
 static constexpr u64 INC = 0xBB67AE8584CAA73BULL;
@@ -92,8 +93,10 @@ constexpr bool operator!=(const Konadare192& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <assert.h>
 #include <stdint.h>
+namespace rnd {
 class PCG32 final{
 struct Direct{};
 using u64 = uint64_t;
@@ -173,7 +176,9 @@ constexpr bool operator!=(const PCG32& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <stdint.h>
+namespace rnd {
 class QuarkBurst64 final{
 using u64 = uint64_t;
 static constexpr u64 DEFAULT_SEED = 0xFEEDFACECAFEBEEFULL;
@@ -243,8 +248,10 @@ constexpr bool operator!=(const QuarkBurst64& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <assert.h>
 #include <stdint.h>
+namespace rnd {
 class RomuDuoJr final{
 using u64 = uint64_t;
 using state_type = u64;
@@ -303,7 +310,9 @@ constexpr bool operator!=(const RomuDuoJr& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <stdint.h>
+namespace rnd {
 class SmallFast8 final{
 using u8 = uint8_t;
 u8 a;
@@ -354,7 +363,9 @@ constexpr bool operator!=(const SmallFast8& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <stdint.h>
+namespace rnd {
 class SmallFast16 final{
 using u16 = uint16_t;
 u16 a;
@@ -405,7 +416,9 @@ constexpr bool operator!=(const SmallFast16& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <stdint.h>
+namespace rnd {
 class SmallFast32 final{
 using u32 = uint32_t;
 using u64 = uint64_t;
@@ -467,7 +480,9 @@ constexpr bool operator!=(const SmallFast32& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <stdint.h>
+namespace rnd {
 class SmallFast64{
 using u64 = uint64_t;
 u64 a;
@@ -517,8 +532,10 @@ constexpr bool operator!=(const SmallFast64& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <assert.h>
 #include <stdint.h>
+namespace rnd {
 class XorShift32Star8 final{
 using u8 = uint8_t;
 using u32 = uint32_t;
@@ -574,8 +591,10 @@ constexpr bool operator!=(const XorShift32Star8& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <stdint.h>
 #include <assert.h>
+namespace rnd {
 class Xoshiro256SS{
 using u64 = uint64_t;
 u64 s[4]{};
@@ -648,10 +667,12 @@ constexpr bool operator!=(const Xoshiro256SS& rhs) const noexcept{
 return !(*this == rhs);
 }
 };
+}
 #include <benchmark/benchmark.h>
 #include <cstdint>
 #include <cstdlib>
 #include <random>
+using namespace rnd;
 namespace {
 constexpr std::int64_t values_per_iteration = 1024;
 template<class Engine>

@@ -22,6 +22,8 @@
     See LICENSE.md for details.  
 */
 
+namespace rnd {
+
 class QuarkBurst64 final{
     using u64 = uint64_t;
 
@@ -111,3 +113,5 @@ public:
         return !(*this == rhs);
     }
 };
+
+} // namespace rnd

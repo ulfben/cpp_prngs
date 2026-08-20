@@ -22,6 +22,8 @@
 
   Licensed under the MIT License. See LICENSE.md for details.
 */
+namespace rnd {
+
 class RomuDuoJr final{
    using u64 = uint64_t;
    using state_type = u64;
@@ -101,3 +103,5 @@ public:
       return !(*this == rhs);
    }
 };
+
+} // namespace rnd

@@ -24,6 +24,8 @@
 // Copyright (c) 2014 M.E. O'Neill, pcg-random.org
 // Copyright (c) 2025 Ulf Benjaminsson, github.com/ulfben/cpp_prngs
 
+namespace rnd {
+
 class PCG32 final{
 	struct Direct{}; //tag for from_state()
 	using u64 = uint64_t;
@@ -121,3 +123,5 @@ public:
 		return !(*this == rhs);
 	}
 };
+
+} // namespace rnd

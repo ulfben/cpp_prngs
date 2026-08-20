@@ -181,6 +181,30 @@ function Add-SourceFile {
 			continue
 		}
 
+		# Public headers use installed-style angle-bracket paths. Expand only
+		# this repository's <rnd/...> headers; leave system and benchmark
+		# headers in the generated source.
+		$publicIncludeMatch = [regex]::Match(
+			$line,
+			'^\s*#\s*include\s*<((?:rnd)/[^>]+)>'
+		)
+
+		if($publicIncludeMatch.Success){
+			$includePath = [System.IO.Path]::GetFullPath(
+				(Join-Path $repositoryRoot ('include\' + $publicIncludeMatch.Groups[1].Value.Replace('/', '\')))
+			)
+
+			if(-not $includePath.StartsWith(
+				$repositoryPrefix,
+				[System.StringComparison]::OrdinalIgnoreCase
+			)){
+				throw "Public include escapes the repository: $includePath"
+			}
+
+			Add-SourceFile -Path $includePath -IsIncludedFile $true
+			continue
+		}
+
 		if($IsIncludedFile -and $line -match '^\s*#\s*pragma\s+once\s*$'){
 			continue
 		}

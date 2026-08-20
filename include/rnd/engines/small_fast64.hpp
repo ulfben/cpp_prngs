@@ -12,6 +12,8 @@
   https://github.com/ulfben/cpp_prngs/
 */
 
+namespace rnd {
+
 class SmallFast64{
    using u64 = uint64_t;
    u64 a;
@@ -72,3 +74,5 @@ public:
       return !(*this == rhs);
    }
 };
+
+} // namespace rnd

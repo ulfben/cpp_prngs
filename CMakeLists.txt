@@ -6,7 +6,7 @@ add_library(cpp_prngs INTERFACE)
 add_library(cpp_prngs::cpp_prngs ALIAS cpp_prngs)
 
 target_include_directories(cpp_prngs INTERFACE
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/includes>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 target_compile_features(cpp_prngs INTERFACE cxx_std_17)
 
@@ -29,19 +29,25 @@ if(CPP_PRNGS_BUILD_TESTS)
 	enable_testing()
 
 	add_executable(cpp_prngs_engine_cxx17_tests tests/engine_cxx17_tests.cpp)
+	target_include_directories(cpp_prngs_engine_cxx17_tests PRIVATE include)
 	target_compile_features(cpp_prngs_engine_cxx17_tests PRIVATE cxx_std_17)
 	add_test(NAME EngineCxx17Compatibility COMMAND cpp_prngs_engine_cxx17_tests)
 
 	add_executable(cpp_prngs_random_cxx17_tests tests/random_cxx17_tests.cpp)
-	target_include_directories(cpp_prngs_random_cxx17_tests PRIVATE includes)
+	target_include_directories(cpp_prngs_random_cxx17_tests PRIVATE include)
 	target_compile_features(cpp_prngs_random_cxx17_tests PRIVATE cxx_std_17)
 	add_test(NAME RandomCxx17Compatibility COMMAND cpp_prngs_random_cxx17_tests)
 
 	add_executable(cpp_prngs_random_cxx17_fast_float_tests tests/random_cxx17_tests.cpp)
-	target_include_directories(cpp_prngs_random_cxx17_fast_float_tests PRIVATE includes)
+	target_include_directories(cpp_prngs_random_cxx17_fast_float_tests PRIVATE include)
 	target_compile_features(cpp_prngs_random_cxx17_fast_float_tests PRIVATE cxx_std_17)
 	target_compile_definitions(cpp_prngs_random_cxx17_fast_float_tests PRIVATE RND_FAST_FLOAT)
 	add_test(NAME RandomCxx17FastFloatCompatibility COMMAND cpp_prngs_random_cxx17_fast_float_tests)
+
+	add_executable(cpp_prngs_consumer_cxx17_test tests/consumer_cxx17_test.cpp)
+	target_link_libraries(cpp_prngs_consumer_cxx17_test PRIVATE cpp_prngs::cpp_prngs)
+	target_compile_features(cpp_prngs_consumer_cxx17_test PRIVATE cxx_std_17)
+	add_test(NAME ConsumerCxx17InstalledStyle COMMAND cpp_prngs_consumer_cxx17_test)
 
 	add_executable(cpp_prngs_tests tests/random_tests.cpp)
 	target_link_libraries(cpp_prngs_tests PRIVATE cpp_prngs::cpp_prngs GTest::gtest)

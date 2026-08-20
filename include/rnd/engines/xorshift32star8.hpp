@@ -26,6 +26,8 @@
 
 	Licensed under the MIT License. See LICENSE.md for details.
 */
+namespace rnd {
+
 class XorShift32Star8 final{
 	using u8 = uint8_t;
 	using u32 = uint32_t;
@@ -96,3 +98,5 @@ public:
 		return !(*this == rhs);
 	}
 };
+
+} // namespace rnd

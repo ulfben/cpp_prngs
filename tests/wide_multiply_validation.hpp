@@ -1,5 +1,5 @@
 #pragma once
-#include "../includes/detail/wide_multiply.hpp"
+#include <rnd/detail/wide_multiply.hpp>
 #include <cstdint>
 #include <limits>
 

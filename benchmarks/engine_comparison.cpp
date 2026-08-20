@@ -4,21 +4,23 @@
 // generate-quickbench.ps1 to produce self-contained source files for
 // https://quick-bench.com/.
 
-#include "../includes/engines/konadare192.hpp"
-#include "../includes/engines/pcg32.hpp"
-#include "../includes/engines/quarkburst64.hpp"
-#include "../includes/engines/romuduojr.hpp"
-#include "../includes/engines/small_fast8.hpp"
-#include "../includes/engines/small_fast16.hpp"
-#include "../includes/engines/small_fast32.hpp"
-#include "../includes/engines/small_fast64.hpp"
-#include "../includes/engines/xorshift32star8.hpp"
-#include "../includes/engines/xoshiro256ss.hpp"
+#include <rnd/engines/konadare192.hpp>
+#include <rnd/engines/pcg32.hpp>
+#include <rnd/engines/quarkburst64.hpp>
+#include <rnd/engines/romuduojr.hpp>
+#include <rnd/engines/small_fast8.hpp>
+#include <rnd/engines/small_fast16.hpp>
+#include <rnd/engines/small_fast32.hpp>
+#include <rnd/engines/small_fast64.hpp>
+#include <rnd/engines/xorshift32star8.hpp>
+#include <rnd/engines/xoshiro256ss.hpp>
 
 #include <benchmark/benchmark.h>
 #include <cstdint>
 #include <cstdlib>
 #include <random>
+
+using namespace rnd;
 
 namespace {
 

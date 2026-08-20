@@ -11,6 +11,8 @@
   Licensed under the MIT License. See LICENSE.md for details.
   https://github.com/ulfben/cpp_prngs/
 */
+namespace rnd {
+
 class SmallFast32 final{
 	using u32 = uint32_t;
 	using u64 = uint64_t;
@@ -87,3 +89,5 @@ public:
 		return !(*this == rhs);
 	}
 };
+
+} // namespace rnd

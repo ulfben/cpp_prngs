@@ -26,6 +26,8 @@
 // - discard(n) is equivalent to n consecutive calls to operator().
 // - Seed and discard arguments are consumed without narrowing.
 
+namespace rnd {
+
 template<typename E>
 concept RandomBitEngine =
 requires {
@@ -55,4 +57,6 @@ std::numeric_limits<typename E::seed_type>::is_integer &&
         { e.seed() } noexcept -> std::same_as<void>;
         { e.seed(seed) } noexcept -> std::same_as<void>;
         { e.discard(n) } noexcept -> std::same_as<void>;
-};
+    };
+
+} // namespace rnd

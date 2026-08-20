@@ -1,12 +1,14 @@
-#include "../includes/random.hpp"
-#include "../includes/engines/konadare192.hpp"
-#include "../includes/engines/quarkburst64.hpp"
-#include "../includes/engines/romuduojr.hpp"
+#include <rnd/random.hpp>
+#include <rnd/engines/konadare192.hpp>
+#include <rnd/engines/quarkburst64.hpp>
+#include <rnd/engines/romuduojr.hpp>
 
 #include <benchmark/benchmark.h>
 #include <cstdint>
 #include <cstdlib>
 #include <random>
+
+using namespace rnd;
 
 namespace {
 

@@ -1,10 +1,10 @@
-#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/concepts.hpp>
-#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/bit_operations.hpp> // shared C++17/20 bit-operation helpers used by the engines
-#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/compat.hpp> // portable standard-library compatibility helpers used by Random
-#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/detail/portable_wide_multiply.hpp> // implementation used by random.hpp
-#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/engines/pcg32.hpp> //pcg32 engine
-#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/engines/romuduojr.hpp> // RomuDuoJr engine 
-#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/includes/random.hpp> // the Random interface, which wraps any engine to provide a rich set of random generation features
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/include/rnd/concepts.hpp>
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/include/rnd/detail/bit_operations.hpp> // shared C++17/20 bit-operation helpers used by the engines
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/include/rnd/detail/compat.hpp> // portable standard-library compatibility helpers used by Random
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/include/rnd/detail/portable_wide_multiply.hpp> // implementation used by random.hpp
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/include/rnd/engines/pcg32.hpp> //pcg32 engine
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/include/rnd/engines/romuduojr.hpp> // RomuDuoJr engine
+#include <https://raw.githubusercontent.com/ulfben/cpp_prngs/refs/heads/main/include/rnd/random.hpp> // the Random interface, which wraps any engine to provide a rich set of random generation features
 #include <algorithm>
 #include <array>
 #include <cstddef>
