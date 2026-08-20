@@ -81,3 +81,4 @@ TestResults/
 # 2. Make builds reproducible without external package managers
 # 3. Protect against upstream package deletions
 !/vendor/**/*   # Keep vendor directory
+/REVIEW_TASKS.md
