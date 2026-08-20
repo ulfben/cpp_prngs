@@ -523,7 +523,12 @@ return T{0};
 using U = detail::unsigned_t<T>;
 return static_cast<T>(bits<detail::power_of_two_exponent(Bound), U>());
 }else{
-return static_cast<T>(next(Bound));
+constexpr result_type threshold = static_cast<result_type>(-Bound) % Bound;
+auto product = multiply_parts(next(), Bound);
+while(product.lo < threshold){
+product = multiply_parts(next(), Bound);
+}
+return static_cast<T>(product.hi);
 }
 }
 template <class I, detail::enable_if_t<detail::supported_integer<I>, int> = 0>
