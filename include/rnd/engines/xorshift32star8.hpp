@@ -45,7 +45,9 @@ class XorShift32Star8 final{
 public:
 	using result_type = u8;
 	using seed_type = u32;
-	using state_type = u32;
+	struct state_type{
+		u32 state;
+	};
 
 	constexpr XorShift32Star8() noexcept
 		: XorShift32Star8(DEFAULT_SEED){}
@@ -54,8 +56,12 @@ public:
 	explicit constexpr XorShift32Star8(seed_type seed) noexcept
 		: state_(seed != 0 ? seed : DEFAULT_SEED){}
 
+	constexpr state_type state() const noexcept{
+		return {state_};
+	}
+
 	static constexpr XorShift32Star8 from_state(state_type state) noexcept{
-		return XorShift32Star8{state, Direct{}};
+		return XorShift32Star8{state.state, Direct{}};
 	}
 
 	constexpr void seed() noexcept{

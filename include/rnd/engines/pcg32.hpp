@@ -33,19 +33,22 @@ class PCG32 final{
 	static constexpr u64 DEFAULT_SEED = 0x853c49e6748fea9bULL;
 	static constexpr u64 DEFAULT_STREAM = 0xda3e39cb94b95bdbULL;
 	static constexpr u64 MULT = 6364136223846793005ULL;
-	u64 state{0}; // RNG state.  All values are possible.
+	u64 state_{0}; // RNG state.  All values are possible.
 	u64 inc{1}; // controls which RNG sequence (stream) is selected. Must *always* be odd.
 
 	//private constructor to allow factory function from_state() to bypass the seeding routines.
 	constexpr PCG32(u64 state_val, u64 inc_val, Direct) noexcept
-		: state(state_val), inc(inc_val){
+		: state_(state_val), inc(inc_val){
 		assert((inc & 1u) != 0 && "PCG32 state increment must be odd");
 	}
 
 public:
 	using result_type = u32;
 	using seed_type = u64;
-	using state_type = u64;
+	struct state_type{
+		u64 state;
+		u64 inc;
+	};
 
 	constexpr PCG32() noexcept
 		: PCG32(DEFAULT_SEED, DEFAULT_STREAM){}
@@ -57,12 +60,16 @@ public:
 		seed(seed_val, sequence);
 	}
 	//factory function to create a PCG32 from a state, bypassing the seeding routines.
-	static constexpr PCG32 from_state(state_type state_val, state_type inc_val) noexcept{
-		return PCG32{state_val, inc_val, Direct{}};
+	constexpr state_type state() const noexcept{
+		return {state_, inc};
+	}
+
+	static constexpr PCG32 from_state(state_type state) noexcept{
+		return PCG32{state.state, state.inc, Direct{}};
 	}
 	constexpr result_type next() noexcept{
-		const auto oldstate = state;
-		state = oldstate * MULT + inc;
+		const auto oldstate = state_;
+		state_ = oldstate * MULT + inc;
 		const u32 xorshifted = static_cast<u32>(((oldstate >> 18u) ^ oldstate) >> 27u);
 		const u32 rot = static_cast<u32>(oldstate >> 59u);
 		return rnd::detail::rotr(xorshifted, rot);
@@ -77,10 +84,10 @@ public:
 
 	//seed and a sequence selection constant (a.k.a. stream id).
 	constexpr void seed(seed_type seed_val, seed_type sequence = DEFAULT_STREAM) noexcept{
-		state = 0U;
+		state_ = 0U;
 		inc = (sequence << 1u) | 1u; //ensure inc is odd
 		(void) next(); //“Warm up” the internal LCG so the first returned bits are mixed.
-		state += seed_val;
+		state_ += seed_val;
 		(void) next();
 	}
 
@@ -100,7 +107,7 @@ public:
 			cur_mult *= cur_mult;
 			delta /= 2;
 		}
-		state = acc_mult * state + acc_plus;
+		state_ = acc_mult * state_ + acc_plus;
 	}
 
 	// Engine-specific stream operation: consume two outputs to derive a PCG32
@@ -120,7 +127,7 @@ public:
 	}
 
 	constexpr bool operator==(const PCG32& rhs) const noexcept{
-		return state == rhs.state && inc == rhs.inc;
+		return state_ == rhs.state_ && inc == rhs.inc;
 	}
 	constexpr bool operator!=(const PCG32& rhs) const noexcept{
 		return !(*this == rhs);

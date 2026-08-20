@@ -69,8 +69,9 @@ namespace rnd {
 		constexpr bool operator==(const Random& rhs) const noexcept{ return _engine == rhs._engine; }
 		constexpr bool operator!=(const Random& rhs) const noexcept{ return !(*this == rhs); }
 
-		// Direct engine access is useful for manual serialization, debugging, or any
-		// engine-specific operation that the friendly Random wrapper does not expose.
+		// Direct engine access enables engine-specific operations and diagnostics.
+		// For portable snapshots, use engine().state() and E::from_state(...);
+		// never serialize the engine object's representation.
 		constexpr const engine_type& engine() const noexcept{ return _engine; }
 		constexpr engine_type& engine() noexcept{ return _engine; }
 

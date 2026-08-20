@@ -137,6 +137,42 @@ static_assert(!RandomBitEngine<MissingSeedTypeEngine>);
 static_assert(!std::assignable_from<NonAssignableSeedEngine&, NonAssignableSeedEngine>);
 static_assert(!std::is_same_v<PCG32::result_type, PCG32::seed_type>);
 
+template <class Engine>
+consteval bool engineStateApiIsConstexpr(){
+    using seed_type = typename Engine::seed_type;
+    static_assert(std::is_aggregate_v<typename Engine::state_type>);
+    static_assert(std::is_trivially_copyable_v<typename Engine::state_type>);
+    static_assert(noexcept(std::declval<const Engine&>().state()));
+    static_assert(noexcept(Engine::from_state(std::declval<typename Engine::state_type>())));
+
+    Engine original{seed_type{123}};
+    for(int i = 0; i < 9; ++i){
+        (void) original();
+    }
+    const auto snapshot = original.state();
+    Engine restored = Engine::from_state(snapshot);
+    if(!(original == restored)){
+        return false;
+    }
+    for(int i = 0; i < 32; ++i){
+        if(original() != restored()){
+            return false;
+        }
+    }
+    return true;
+}
+
+static_assert(engineStateApiIsConstexpr<RomuDuoJr>());
+static_assert(engineStateApiIsConstexpr<Konadare192>());
+static_assert(engineStateApiIsConstexpr<PCG32>());
+static_assert(engineStateApiIsConstexpr<SmallFast8>());
+static_assert(engineStateApiIsConstexpr<SmallFast16>());
+static_assert(engineStateApiIsConstexpr<SmallFast32>());
+static_assert(engineStateApiIsConstexpr<SmallFast64>());
+static_assert(engineStateApiIsConstexpr<XorShift32Star8>());
+static_assert(engineStateApiIsConstexpr<Xoshiro256SS>());
+static_assert(engineStateApiIsConstexpr<QuarkBurst64>());
+
 consteval bool weightedHelpersAreConstexpr(){
     rnd::Random<PCG32> rng{123u};
     std::array<unsigned, 3> weights{0, 7, 0};    
@@ -502,6 +538,28 @@ TYPED_TEST(RandomTypedTest, EngineAccessorsPreserveConstnessAndExposeState){
     wrapped.engine()();
     expected.next();
     EXPECT_EQ(wrapped, expected);
+}
+
+TYPED_TEST(RandomTypedTest, StateSnapshotRoundTripReproducesFutureSequence){
+    using Engine = TypeParam;
+    using Rng = rnd::Random<Engine>;
+    using seed_type = typename Engine::seed_type;
+
+    Engine original{seed_type{123}};
+    original.discard(17);
+    const auto snapshot = original.state();
+    Engine restored = Engine::from_state(snapshot);
+
+    EXPECT_EQ(original, restored);
+    for(int i = 0; i < 128; ++i){
+        EXPECT_EQ(original(), restored());
+    }
+
+    Rng wrapped{Engine::from_state(snapshot)};
+    Rng replay{Engine::from_state(snapshot)};
+    for(int i = 0; i < 64; ++i){
+        EXPECT_EQ(wrapped.next(), replay.next());
+    }
 }
 
 

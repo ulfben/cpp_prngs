@@ -26,19 +26,22 @@ namespace rnd {
 
 class RomuDuoJr final{
    using u64 = uint64_t;
-   using state_type = u64;
-   state_type x;
-   state_type y;
+   u64 x;
+   u64 y;
 
    struct Direct{}; //tag for from_state()
    //private constructor to allow factory function from_state() to bypass the seeding routines.
-   constexpr RomuDuoJr(state_type xstate, state_type ystate, Direct) noexcept
+   constexpr RomuDuoJr(u64 xstate, u64 ystate, Direct) noexcept
       : x(xstate), y(ystate){
       assert((x | y) != 0 && "RomuDuoJr all-zero state is invalid");
    }
 public:
    using result_type = u64;
    using seed_type = u64;   
+   struct state_type{
+      u64 x;
+      u64 y;
+   };
 
    constexpr RomuDuoJr() noexcept : RomuDuoJr(0xFEEDFACEFEEDFACEULL){}
 
@@ -66,12 +69,16 @@ public:
    }
 
    //factory function to create a RomuDuoJr from a state, bypassing the seeding routines.
-   static constexpr RomuDuoJr from_state(state_type xstate, state_type ystate) noexcept{
-      return RomuDuoJr{xstate, ystate, Direct{}};
+   constexpr state_type state() const noexcept{
+      return {x, y};
+   }
+
+   static constexpr RomuDuoJr from_state(state_type state) noexcept{
+      return RomuDuoJr{state.x, state.y, Direct{}};
    }
 
    constexpr result_type next() noexcept{
-      const state_type old_x = x;
+      const u64 old_x = x;
       x = y * 15241094284759029579ULL;
       y = rnd::detail::rotl(y - old_x, 27);
       return old_x;

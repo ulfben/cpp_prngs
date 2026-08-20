@@ -1,5 +1,6 @@
 #pragma once
 #include "../detail/bit_operations.hpp"
+#include <assert.h>
 #include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 /*
   SmallFast64 PRNG - a modern C++ 64-bit three-rotate implementation of Jenkins Small Fast PRNG.
@@ -16,15 +17,31 @@ namespace rnd {
 
 class SmallFast64{
    using u64 = uint64_t;
+
+public:
+   using result_type = u64;
+   using seed_type = u64;
+   struct state_type{
+      u64 a;
+      u64 b;
+      u64 c;
+      u64 d;
+   };
+
+private:
+   struct Direct{};
+
    u64 a;
    u64 b;
    u64 c;
    u64 d;
 
-public:
-   using result_type = u64;
-   using seed_type = u64;
+   constexpr SmallFast64(state_type state, Direct) noexcept
+      : a(state.a), b(state.b), c(state.c), d(state.d){
+      assert((a | b | c | d) != 0 && "SmallFast64 all-zero state is invalid");
+   }
 
+public:
    constexpr SmallFast64() noexcept
       : SmallFast64(0xBADC0FFEE0DDF00DuLL){}
 
@@ -37,6 +54,14 @@ public:
    }
    constexpr void seed(seed_type seed) noexcept{
       *this = SmallFast64{seed};
+   }
+
+   constexpr state_type state() const noexcept{
+      return {a, b, c, d};
+   }
+
+   static constexpr SmallFast64 from_state(state_type state) noexcept{
+      return SmallFast64{state, Direct{}};
    }
 
    static constexpr result_type (max)() noexcept{ // Parentheses prevent expansion of Arduino's max macro.

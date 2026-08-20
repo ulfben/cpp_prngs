@@ -41,7 +41,12 @@ class Xoshiro256SS{
 public:
 	using result_type = u64;
 	using seed_type = u64;
-	using state_type = u64;
+	struct state_type{
+		u64 s0;
+		u64 s1;
+		u64 s2;
+		u64 s3;
+	};
 
 	constexpr Xoshiro256SS() noexcept
 		: Xoshiro256SS(0xFEEDFACECAFEBEEFuLL){}
@@ -57,10 +62,13 @@ public:
 		}
 	}
 
-	//factory function to create a Xoshiro256SS from a state, bypassing the seeding routines.
-	template <class State>
-	static constexpr Xoshiro256SS from_state(const State& state) noexcept{
-		return Xoshiro256SS{state[0], state[1], state[2], state[3], Direct{}};
+	constexpr state_type state() const noexcept{
+		return {s[0], s[1], s[2], s[3]};
+	}
+
+	// Factory function to create a Xoshiro256SS from a state, bypassing the seeding routines.
+	static constexpr Xoshiro256SS from_state(state_type state) noexcept{
+		return Xoshiro256SS{state.s0, state.s1, state.s2, state.s3, Direct{}};
 	}
 	constexpr void seed() noexcept{
 		*this = Xoshiro256SS{};

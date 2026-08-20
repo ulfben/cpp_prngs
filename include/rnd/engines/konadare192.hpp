@@ -1,5 +1,6 @@
 #pragma once
 #include "../detail/bit_operations.hpp"
+#include <assert.h>
 #include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 
 /*
@@ -37,9 +38,15 @@ class Konadare192 final{
 	using u64 = uint64_t;
 	static constexpr u64 INC = 0xBB67AE8584CAA73BULL;
 	static constexpr u64 DEFAULT_SEED = 1;
+	struct Direct{};
 	u64 a_{};
 	u64 b_{};
 	u64 c_{};
+
+	constexpr Konadare192(u64 a, u64 b, u64 c, Direct) noexcept
+		: a_(a), b_(b), c_(c){
+		assert((a_ | b_ | c_) != 0 && "Konadare192 all-zero state is invalid");
+	}
 
 	static constexpr u64 mix(u64 a, u64 b) noexcept{
 	   // "kMixNoMul" from Evensen original repo
@@ -57,6 +64,11 @@ class Konadare192 final{
 public:
 	using result_type = uint64_t;
 	using seed_type = u64;
+	struct state_type{
+		u64 a;
+		u64 b;
+		u64 c;
+	};
 
 	constexpr Konadare192() noexcept : Konadare192(DEFAULT_SEED){}
 	constexpr explicit Konadare192(seed_type seed_val) noexcept : a_(seed_val), b_(seed_val + 1), c_(seed_val + 2){
@@ -93,6 +105,14 @@ public:
 
 	constexpr void seed() noexcept{
 		*this = Konadare192{};
+	}
+
+	constexpr state_type state() const noexcept{
+		return {a_, b_, c_};
+	}
+
+	static constexpr Konadare192 from_state(state_type state) noexcept{
+		return Konadare192{state.a, state.b, state.c, Direct{}};
 	}
 
 	static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.

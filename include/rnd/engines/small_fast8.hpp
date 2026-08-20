@@ -1,5 +1,6 @@
 #pragma once
 #include "../detail/bit_operations.hpp"
+#include <assert.h>
 #include <stdint.h> // AVR-libc provides <stdint.h>, but not the C++ <cstdint> wrapper.
 /*
   SmallFast8 PRNG - a C++ port of the 8-bit Jenkins Small Fast variant.
@@ -28,15 +29,30 @@ namespace rnd {
 class SmallFast8 final{
 	using u8 = uint8_t;
 
+public:
+	using result_type = u8;
+	using seed_type = u8;
+	struct state_type{
+		u8 a;
+		u8 b;
+		u8 c;
+		u8 d;
+	};
+
+	private:
+	struct Direct{};
+
 	u8 a;
 	u8 b;
 	u8 c;
 	u8 d;
 
-public:
-	using result_type = u8;
-	using seed_type = u8;
+	constexpr SmallFast8(state_type state, Direct) noexcept
+		: a(state.a), b(state.b), c(state.c), d(state.d){
+		assert((a | b | c | d) != 0 && "SmallFast8 all-zero state is invalid");
+	}
 
+	public:
 	constexpr SmallFast8() noexcept
 		: SmallFast8(0xDCu){}
 
@@ -50,6 +66,14 @@ public:
 	}
 	constexpr void seed(seed_type value) noexcept{
 		*this = SmallFast8{value};
+	}
+
+	constexpr state_type state() const noexcept{
+		return {a, b, c, d};
+	}
+
+	static constexpr SmallFast8 from_state(state_type state) noexcept{
+		return SmallFast8{state, Direct{}};
 	}
 
 	static constexpr result_type (min)() noexcept{ // Parentheses prevent expansion of Arduino's min macro.

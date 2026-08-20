@@ -50,7 +50,11 @@ class QuarkBurst64 final{
 public:
     using result_type = u64;
     using seed_type = u64;
-    using state_type = u64;
+    struct state_type{
+        u64 a;
+        u64 b;
+        u64 c;
+    };
 
     constexpr QuarkBurst64() noexcept
         : QuarkBurst64(DEFAULT_SEED){}
@@ -64,12 +68,12 @@ public:
         discard(3);
     }
 
-    static constexpr QuarkBurst64 from_state(
-        state_type a,
-        state_type b,
-        state_type c
-    ) noexcept{
-        return QuarkBurst64{a, b, c, Direct{}};
+    constexpr state_type state() const noexcept{
+        return {a_, b_, c_};
+    }
+
+    static constexpr QuarkBurst64 from_state(state_type state) noexcept{
+        return QuarkBurst64{state.a, state.b, state.c, Direct{}};
     }
 
     constexpr void seed() noexcept{

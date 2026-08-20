@@ -160,11 +160,42 @@ Want to use your own engine? It must provide the interface described by `rnd::Ra
 | `Random<E>(seed)` | Constructs by seeding the engine with `seed` |
 | `Random<E>(engine)` | Constructs by copying an existing engine instance |
 | `operator==(other)` | Returns `true` if two generators have identical state |
-| `engine()` / `engine() const` | Accesses the underlying engine instance for manual serialization, debugging, etc. |
+| `engine()` / `engine() const` | Enables engine-specific operations and diagnostics; use the engine's `state()` API for portable snapshots. |
+| `engine().state()` | Returns the engine's complete public state aggregate for checkpointing or replay. |
+| `E::from_state(state)` | Reconstructs an engine from a complete state snapshot. Restoration validates engine invariants in debug builds. |
 | `seed()` | Reseeds the engine back to its default state |
 | `seed(v)` | Reseeds the engine with value `v` |
 | `discard(n)` | Advances the underlying engine by `n` steps |
 | `child()` | Derives a deterministic child generator from the parent by consuming enough output to fill one seed; it does not promise independent or non-overlapping streams |
+
+### Portable state snapshots and replay
+
+Every included engine exposes a public aggregate `state_type`, a `state()` snapshot, and a matching `E::from_state(snapshot)` factory. The aggregate contains the complete logical state, so a replay can resume without accessing private engine members:
+
+```cpp
+using Engine = rnd::PCG32;
+using Rng = rnd::Random<Engine>;
+
+Rng live{123};
+live.discard(100);
+const Engine::state_type checkpoint = live.engine().state();
+
+// Store checkpoint's numeric fields, then restore it later.
+Rng replay{Engine::from_state(checkpoint)};
+```
+
+Restoring a state must satisfy the engine's invariants; all-zero states are invalid for the SmallFast engines, `XorShift32Star8`, `RomuDuoJr`, `Konadare192`, and `Xoshiro256SS`, while `PCG32::state_type::inc` must be odd.
+
+The state fields are:
+
+| Engine | Numeric state fields |
+|--------|----------------------|
+| `SmallFast8`, `SmallFast16`, `SmallFast32`, `SmallFast64` | `a`, `b`, `c`, `d` |
+| `XorShift32Star8` | `state` |
+| `RomuDuoJr` | `x`, `y` |
+| `Konadare192`, `QuarkBurst64` | `a`, `b`, `c` |
+| `PCG32` | `state`, `inc` |
+| `Xoshiro256SS` | `s0`, `s1`, `s2`, `s3` |
 
 ### Raw values and bits
 

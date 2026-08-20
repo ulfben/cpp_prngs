@@ -38,6 +38,30 @@ namespace rnd::detail::validation {
 		return true;
 	}
 
+	template <typename Engine>
+	constexpr bool state_api_round_trip(){
+		Engine original{typename Engine::seed_type{123}};
+		for(size_t i = 0; i < 9; ++i) (void) original();
+		const auto snapshot = original.state();
+		Engine restored = Engine::from_state(snapshot);
+		if(!(original == restored)) return false;
+		for(size_t i = 0; i < 32; ++i){
+			if(original() != restored()) return false;
+		}
+		return true;
+	}
+
+	static_assert(state_api_round_trip<RomuDuoJr>());
+	static_assert(state_api_round_trip<Konadare192>());
+	static_assert(state_api_round_trip<PCG32>());
+	static_assert(state_api_round_trip<SmallFast8>());
+	static_assert(state_api_round_trip<SmallFast16>());
+	static_assert(state_api_round_trip<SmallFast32>());
+	static_assert(state_api_round_trip<SmallFast64>());
+	static_assert(state_api_round_trip<XorShift32Star8>());
+	static_assert(state_api_round_trip<Xoshiro256SS>());
+	static_assert(state_api_round_trip<QuarkBurst64>());
+
 	constexpr fixed_array<uint32_t, 6> pcg32_reference{{
 		0xa15c02b7, 0x7b47f409, 0xba1d3330,
 		0x83d2f293, 0xbfa4784b, 0xcbed606e
@@ -54,7 +78,7 @@ namespace rnd::detail::validation {
 	}};
 
 	static_assert(
-		arrays_equal(prng_outputs(QuarkBurst64::from_state(1, 2, 3)), quarkburst64_reference),
+		arrays_equal(prng_outputs(QuarkBurst64::from_state(QuarkBurst64::state_type{1, 2, 3})), quarkburst64_reference),
 		"QuarkBurst64 output does not match the archived reference implementation"
 	);
 
@@ -81,7 +105,7 @@ namespace rnd::detail::validation {
 	}
 
 	static_assert(
-		arrays_equal(prng_outputs(RomuDuoJr::from_state(123, 0)), romu_reference_outputs()),
+		arrays_equal(prng_outputs(RomuDuoJr::from_state(RomuDuoJr::state_type{123, 0})), romu_reference_outputs()),
 		"RomuDuoJr output does not match the original reference implementation"
 	);
 
@@ -150,7 +174,7 @@ namespace rnd::detail::validation {
 	}};
 
 	static_assert(
-		arrays_equal(prng_outputs(XorShift32Star8::from_state(123)), xorshift32star8_reference),
+		arrays_equal(prng_outputs(XorShift32Star8::from_state(XorShift32Star8::state_type{123})), xorshift32star8_reference),
 		"XorShift32Star8 output does not match M.E. O'Neill's reference implementation"
 	);
 	static_assert(XorShift32Star8{uint32_t{0}} == XorShift32Star8{});
@@ -212,7 +236,10 @@ namespace rnd::detail::validation {
 	}
 
 	static_assert(
-		arrays_equal(prng_outputs(Xoshiro256SS::from_state(xoshiro_initial_state)), xoshiro_reference_outputs()),
+		arrays_equal(prng_outputs(Xoshiro256SS::from_state(Xoshiro256SS::state_type{
+			xoshiro_initial_state[0], xoshiro_initial_state[1],
+			xoshiro_initial_state[2], xoshiro_initial_state[3]
+		})), xoshiro_reference_outputs()),
 		"Xoshiro256SS output does not match the original reference implementation"
 	);
 
