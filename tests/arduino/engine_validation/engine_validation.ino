@@ -100,7 +100,7 @@ void setup(){
 	float_output += random_32.signed_norm<float>();
 	float_output += random_32.between(-10.0f, 20.0f);
 	float_output += random_32.coin_flip(0.75f);
-	float_output += random_32.gaussian(10.0f, 2.0f);
+	float_output += random_32.normal_approx(10.0f, 2.0f);
 	double_output = random_32.normalized<double>();
 }
 

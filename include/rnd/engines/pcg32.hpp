@@ -103,6 +103,9 @@ public:
 		state = acc_mult * state + acc_plus;
 	}
 
+	// Engine-specific stream operation: consume two outputs to derive a PCG32
+	// with a new odd stream selector. This is stronger and more specific than
+	// Random<PCG32>::child(), which only derives a generator from seed material.
 	constexpr PCG32 split() noexcept{
 		return PCG32{next(), (next() << 1u) | 1u};
 	}

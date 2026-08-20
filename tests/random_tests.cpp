@@ -347,6 +347,34 @@ TEST(RandomBoundaryTest, BetweenHandlesWideSignedInt64Ranges){
     }
 }
 
+template <class I>
+void expectSignedBetweenBoundaryRanges(){
+    rnd::Random<SmallFast64> rng{uint64_t{0x123456789abcdef0}};
+    const I min = (std::numeric_limits<I>::min)();
+    const I max = (std::numeric_limits<I>::max)();
+
+    const auto expect_range = [&rng](I lo, I hi){
+        for(int i = 0; i < 512; ++i){
+            const I value = rng.between(lo, hi);
+            EXPECT_GE(value, lo);
+            EXPECT_LT(value, hi);
+        }
+    };
+
+    expect_range(min, I{-1});
+    expect_range(I{-4}, I{5});
+    expect_range(min, static_cast<I>(min + I{4}));
+    expect_range(static_cast<I>(max - I{4}), max);
+    expect_range(min, max);
+}
+
+TEST(RandomBoundaryTest, BetweenHandlesSignedBoundaryRangesForEveryWidth){
+    expectSignedBetweenBoundaryRanges<std::int8_t>();
+    expectSignedBetweenBoundaryRanges<std::int16_t>();
+    expectSignedBetweenBoundaryRanges<std::int32_t>();
+    expectSignedBetweenBoundaryRanges<std::int64_t>();
+}
+
 TYPED_TEST(RandomTypedTest, BetweenFloatingPointProducesExclusiveRange){
     for(int i = 0; i < 2048; ++i){
         const float v = this->rng.between(-2.5f, 4.25f);
@@ -645,7 +673,7 @@ TYPED_TEST(RandomTypedTest, SeedWithValueResetsToGivenSequence){
 
 
 // -----------------------------------------------------------------------------
-// Collection helpers, gaussian(), and split()
+// Collection helpers, normal_approx(), and child()
 // -----------------------------------------------------------------------------
 TYPED_TEST(RandomTypedTest, CollectionHelpersReturnValidMutableAndConstElements){
     using Rng = rnd::Random<TypeParam>;
@@ -862,33 +890,33 @@ TEST(RandomBoundaryTest, NarrowEngineAcceptsWideWeightsAndTotals){
     }
 }
 
-TYPED_TEST(RandomTypedTest, GaussianWithZeroDeviationReturnsMean){
+TYPED_TEST(RandomTypedTest, NormalApproxWithZeroDeviationReturnsMean){
     for(int i = 0; i < 32; ++i){
-        EXPECT_EQ(this->rng.gaussian(12.5f, 0.0f), 12.5f);
+        EXPECT_EQ(this->rng.normal_approx(12.5f, 0.0f), 12.5f);
     }
 }
 
-TYPED_TEST(RandomTypedTest, SplitIsDeterministic){
+TYPED_TEST(RandomTypedTest, ChildIsDeterministic){
     using Engine = TypeParam;
     using Rng = rnd::Random<Engine>;
     
     Rng a{123u};
     Rng b{123u};
 
-    EXPECT_EQ(a.split(), b.split());
+    EXPECT_EQ(a.child(), b.child());
     EXPECT_EQ(a, b);
 }
 
-TYPED_TEST(RandomTypedTest, ConsecutiveSplitsEventuallyProduceDifferentChildren){
+TYPED_TEST(RandomTypedTest, ConsecutiveChildrenEventuallyDiffer){
     using Engine = TypeParam;
     using Rng = rnd::Random<Engine>;
     
     Rng parent{123u};
 
-    auto first = parent.split();
+    auto first = parent.child();
     bool all_equal = true;
     for(int i = 0; i < 7; ++i){
-        if(parent.split() != first){
+        if(parent.child() != first){
             all_equal = false;
             break;
         }
@@ -897,16 +925,27 @@ TYPED_TEST(RandomTypedTest, ConsecutiveSplitsEventuallyProduceDifferentChildren)
     EXPECT_FALSE(all_equal);
 }
 
-TYPED_TEST(RandomTypedTest, SplitAdvancesParent){
+TYPED_TEST(RandomTypedTest, ChildAdvancesParent){
     using Engine = TypeParam;
     using Rng = rnd::Random<Engine>;
     
     Rng parent{123u};
     Rng original = parent;
 
-    [[maybe_unused]] auto child = parent.split();
+    [[maybe_unused]] auto child = parent.child();
 
     EXPECT_FALSE(parent == original);
+}
+
+TEST(EngineSpecificRandomTest, PCG32SplitRemainsAnEngineSpecificOperation){
+    PCG32 a{123u};
+    PCG32 b{123u};
+
+    const auto child_a = a.split();
+    const auto child_b = b.split();
+
+    EXPECT_EQ(child_a, child_b);
+    EXPECT_EQ(a, b);
 }
 
 // -----------------------------------------------------------------------------

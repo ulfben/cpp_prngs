@@ -22,7 +22,7 @@ For a deep, game-focused comparison of 47 PRNGs across nine platforms, see Rhet 
 So, if you want a random-number generator that is:
 
 * compact (**4–32 bytes of state**) and [fast](https://github.com/ulfben/cpp_prngs#performance-benchmarks)
-* deterministic across platforms (for equivalent integer and floating-point representations)
+* deterministic across platforms for supported fixed-width integer operations (and for floating-point operations when the representation and arithmetic behavior match)
 * [easy to seed](https://github.com/ulfben/cpp_prngs#seeding)
 * [feature-rich](https://github.com/ulfben/cpp_prngs#random-api), with integers, floats, coin flips, weighted draws, random element selection, Gaussian samples, raw bits
 * usable at compile time with `constexpr`
@@ -140,7 +140,7 @@ An engine's output width only describes how many random bits it produces per dra
 
 Each included engine is a small, self-contained random number generator. You can use an engine directly, but it deliberately provides only the basics: seeding, advancing its state, comparing states, and generating random unsigned integers.
 
-For everyday use, wrap an engine in `Random<E>`. It adds bounded numbers, floats, coin flips, random elements, weighted selection, Gaussian samples, and more while letting you swap the underlying engine without changing the rest of your code.
+For everyday use, wrap an engine in `Random<E>`. It adds bounded numbers, floats, coin flips, random elements, weighted selection, approximate normal samples, and more while letting you swap the underlying engine without changing the rest of your code.
 
 All included engines satisfy the C++20 [`rnd::RandomBitEngine`](https://github.com/ulfben/cpp_prngs/blob/main/include/rnd/concepts.hpp) concept and are compatible with standard C++ facilities such as `std::shuffle` and `std::sample`. Since porting to C++17 the `rnd::Random<E>` implementation checks its essential engine assumptions with `static_assert` diagnostics instead of requiring concepts.
 
@@ -164,7 +164,7 @@ Want to use your own engine? It must provide the interface described by `rnd::Ra
 | `seed()` | Reseeds the engine back to its default state |
 | `seed(v)` | Reseeds the engine with value `v` |
 | `discard(n)` | Advances the underlying engine by `n` steps |
-| `split()` | Derives a child generator from the parent, useful for task- or thread-local generators when strict stream separation is not required |
+| `child()` | Derives a deterministic child generator from the parent by consuming enough output to fill one seed; it does not promise independent or non-overlapping streams |
 
 ### Raw values and bits
 
@@ -209,7 +209,7 @@ Lemire's runtime algorithm is **nearly divisionless**: it first checks whether r
 |--------|-------------|
 | `coin_flip()` | Fair coin flip (`true` approximately 50% of the time) |
 | `coin_flip(p)` | Weighted coin (`true` with probability `p`, where `p` is in `[0.0, 1.0]`) |
-| `gaussian(mean, stddev)` | Returns an approximate normal sample via the Irwin–Hall sum-of-12 method |
+| `normal_approx(mean, stddev)` | Returns an approximate normal sample via the Irwin–Hall sum-of-12 method; support is roughly six standard deviations on either side of `mean` |
 
 ### Collections
 
@@ -236,6 +236,8 @@ The weighted helpers let you pick items with different chances of being selected
 `random.hpp` uses standard type traits, collection access helpers, and constexpr `std::bit_cast` when the toolchain provides them. Its private compatibility layer also provides a narrow constexpr projection helper for callables, member functions, and data members. On AVR-libc, the layer supplies small fallbacks for the unavailable standard-library facilities.
 
 In C++20 and later, normalized floating-point generation uses constexpr `std::bit_cast`. In C++17 it uses a constexpr arithmetic implementation by default. If you don't need constexpr execution you can define `RND_FAST_FLOAT` to select a runtime `memcpy` bit cast instead; only the floating-point methods lose constexpr evaluation in that mode.
+
+Supported signed integer ranges, including ranges that cross zero or begin at the signed minimum, are reconstructed with defined C++17 arithmetic. Their results therefore do not depend on an implementation-defined unsigned-to-signed conversion. Floating-point reproducibility remains conditional on equivalent floating-point representations and arithmetic behavior.
 
 Methods are templates or inline functions, so unused features do not add code to the final program.
 

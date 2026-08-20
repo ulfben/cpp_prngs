@@ -135,7 +135,7 @@ namespace rnd {
 		// Fill a buffer with random bit patterns, using the engine output efficiently
 		// across the whole batch. This is useful when many raw random values are
 		// needed and can avoid discarding unused bits from individual engine draws.
-		// see gaussian(mean, stdev) for an example use case.
+		// see normal_approx(mean, stddev) for an example use case.
 		// 
 		// The implementation looks branchy, but all width comparisons are compile-time
 		// constants. For any given engine/T combination, if constexpr discards all but
@@ -177,10 +177,11 @@ namespace rnd {
 			}
 		}
 
-		// Derive a child generator by consuming enough parent output to fill one seed.
-		// This is handy when you need multiple generators for different purposes, or
-		// running in different threads.
-		[[nodiscard]] constexpr Random split() noexcept{
+		// Derive a deterministic child generator by consuming enough parent output
+		// to fill one seed. This generic operation does not promise independent or
+		// non-overlapping streams; engines with stronger facilities expose those
+		// operations separately.
+		[[nodiscard]] constexpr Random child() noexcept{
 			return Random{bits_as<seed_type>()};
 		}
 
@@ -252,8 +253,12 @@ namespace rnd {
 			}
 			using U = detail::unsigned_t<I>; // (portable but) equivalent to std::make_unsigned_t<I>;
 			const U bound = static_cast<U>(hi) - static_cast<U>(lo);
-			return static_cast<I>(static_cast<U>(lo) +
-				static_cast<U>(next(bound)));
+			const U offset = static_cast<U>(next(bound));
+			if constexpr(detail::supported_uint<I>){
+				return static_cast<I>(static_cast<U>(lo) + offset);
+			}else{
+				return reconstruct_signed(lo, hi, offset);
+			}
 		}
 
 		// --- floating point ---
@@ -310,6 +315,7 @@ namespace rnd {
 		// This is the pleasantly simple Irwin-Hall approximation to a normal
 		// distribution. The sum of twelve U(0,1) samples has mean 6 and variance
 		// 1, so subtracting 6 and applying mean/stddev gives an approximate normal.
+		// Its support is roughly six standard deviations on either side of mean.
 		// See: https://en.wikipedia.org/wiki/Irwin-Hall_distribution
 		//
 		// Narrow engines use a 16-bit integer form to avoid repeatedly
@@ -323,9 +329,9 @@ namespace rnd {
 		// SmallFast16 => 3.9x faster 
 		// SmallFast32 / QuarkBurst64 => ~1.5x slower
 		template <class F = float>
-		RND_DETAIL_FLOAT_CONSTEXPR F gaussian(F mean, F stddev) noexcept{
-			static_assert(detail::supported_float<F>, "Random::gaussian() requires a supported floating-point type");
-			assert(stddev >= F{0} && "Random::gaussian(mean, stddev): standard deviation must be non-negative.");
+		RND_DETAIL_FLOAT_CONSTEXPR F normal_approx(F mean, F stddev) noexcept{
+			static_assert(detail::supported_float<F>, "Random::normal_approx() requires a supported floating-point type");
+			assert(stddev >= F{0} && "Random::normal_approx(mean, stddev): standard deviation must be non-negative.");
 			if constexpr(value_bits >= 32){
 				// On desktop-width engines this direct form was faster in my benchmarks.
 				F sum{};
@@ -495,6 +501,34 @@ namespace rnd {
 
 			// When n == detail::bit_width<T>(), low_bits_mask() returns all ones.
 			return static_cast<T>(result & low_bits_mask<T>(n));
+		}
+
+		// Reconstruct a signed value from an unsigned offset without converting an
+		// out-of-range unsigned value to I. Such a conversion is implementation-
+		// defined in C++17, which matters for the negative half of ranges crossing
+		// zero and for ranges beginning at the signed minimum.
+		template <class I>
+		static constexpr I reconstruct_signed(
+			I lo, I hi, detail::unsigned_t<I> offset) noexcept{
+			using U = detail::unsigned_t<I>;
+
+			// In a one-sided range, offset is always representable as I. The
+			// precondition offset < (hi - lo) makes the addition itself safe.
+			if(hi <= I{0} || lo >= I{0}){
+				return static_cast<I>(lo + static_cast<I>(offset));
+			}
+
+			// For a range crossing zero, first consume the negative portion. The
+			// count is representable in U even when lo is the signed minimum.
+			const U negative_count = static_cast<U>(U{0} - static_cast<U>(lo));
+			if(offset < negative_count){
+				// offset is at most the signed maximum here, so this conversion is
+				// well-defined and the resulting signed addition remains negative.
+				return static_cast<I>(lo + static_cast<I>(offset));
+			}
+
+			// The remainder is non-negative and below hi, hence representable in I.
+			return static_cast<I>(offset - negative_count);
 		}
 
 		// First pass of weighted selection: validate and add the weights without ever

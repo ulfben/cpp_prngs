@@ -73,7 +73,7 @@ int main(){
    std::println("  bits<24, uint32_t>(): #{:06x}", random.bits<24, std::uint32_t>());   // 24 random bits (0xRRGGBB)
    std::println("  bits<uint64_t>(7): {:07b}b\n", random.bits<std::uint64_t>(7));       // runtime: 7 random bits in low bits
 
-   std::println("  gaussian(0.0, 1.0) sample: {}\n", random.gaussian(0.0f, 1.0f));
+   std::println("  normal_approx(0.0, 1.0) sample: {}\n", random.normal_approx(0.0f, 1.0f));
 
    std::println("  element(str): {}", random.element(str));                             // random element from a contiguous collection
    std::size_t i = random.index(str);                                                   // random index in [0, size)

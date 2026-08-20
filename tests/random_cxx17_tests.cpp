@@ -1,5 +1,6 @@
 #include <rnd/random.hpp>
 #include <array>
+#include <limits>
 #include <stdint.h>
 
 enum class UnsupportedInteger : uint8_t{};
@@ -70,6 +71,56 @@ using Engine8 = CountingEngine<uint8_t>;
 using Engine16 = CountingEngine<uint16_t>;
 using Engine32 = CountingEngine<uint32_t>;
 using Engine64 = CountingEngine<uint64_t>;
+
+template <class I, class U>
+constexpr bool validate_signed_between_width(){
+	using Rng = rnd::Random<CountingEngine<U>>;
+	constexpr I min = (std::numeric_limits<I>::min)();
+	constexpr I max = (std::numeric_limits<I>::max)();
+	constexpr U half = static_cast<U>(rnd::detail::integral_max<U>() / 2 + 1);
+
+	const auto in_range = [](Rng& rng, I lo, I hi) constexpr{
+		const I value = rng.between(lo, hi);
+		return value >= lo && value < hi;
+	};
+
+	// Whole range: these seeds produce offsets on opposite sides of zero.
+	Rng full_negative{half};
+	if(full_negative.between(min, max) != I{-1}){
+		return false;
+	}
+	Rng full_non_negative{static_cast<U>(half + U{1})};
+	if(full_non_negative.between(min, max) != I{0}){
+		return false;
+	}
+
+	Rng below_zero{half};
+	if(!in_range(below_zero, min, I{-1})){
+		return false;
+	}
+
+	Rng crossing_zero{half};
+	if(!in_range(crossing_zero, I{-4}, I{5})){
+		return false;
+	}
+
+	Rng near_min{U{0}};
+	if(!in_range(near_min, min, static_cast<I>(min + I{4}))){
+		return false;
+	}
+
+	Rng near_max{half};
+	if(!in_range(near_max, static_cast<I>(max - I{4}), max)){
+		return false;
+	}
+
+	return true;
+}
+
+static_assert(validate_signed_between_width<int8_t, uint8_t>());
+static_assert(validate_signed_between_width<int16_t, uint16_t>());
+static_assert(validate_signed_between_width<int32_t, uint32_t>());
+static_assert(validate_signed_between_width<int64_t, uint64_t>());
 
 struct LootDrop{
 	int id;
@@ -374,30 +425,30 @@ constexpr bool validate_constexpr_float_api(){
 		return false;
 	}
 
-	rnd::Random<Engine32> gaussian{uint32_t{0}};
-	if(gaussian.gaussian(3.0f, 0.0f) != 3.0f){
+	rnd::Random<Engine32> normal_approx{uint32_t{0}};
+	if(normal_approx.normal_approx(3.0f, 0.0f) != 3.0f){
 		return false;
 	}
 
-	rnd::Random<Engine64> gaussian_64{uint64_t{0}};
-	if(gaussian_64.gaussian(3.0f, 0.0f) != 3.0f){
+	rnd::Random<Engine64> normal_approx_64{uint64_t{0}};
+	if(normal_approx_64.normal_approx(3.0f, 0.0f) != 3.0f){
 		return false;
 	}
 
-	rnd::Random<Engine16> gaussian_16{uint16_t{0}};
-	if(gaussian_16.gaussian(3.0f, 0.0f) != 3.0f){
+	rnd::Random<Engine16> normal_approx_16{uint16_t{0}};
+	if(normal_approx_16.normal_approx(3.0f, 0.0f) != 3.0f){
 		return false;
 	}
 
-	rnd::Random<Engine8> gaussian_8{uint8_t{0}};
-	if(gaussian_8.gaussian(3.0f, 0.0f) != 3.0f){
+	rnd::Random<Engine8> normal_approx_8{uint8_t{0}};
+	if(normal_approx_8.normal_approx(3.0f, 0.0f) != 3.0f){
 		return false;
 	}
 
-	rnd::Random<Engine32> unit_gaussian{UINT32_C(0x12345678)};
-	rnd::Random<Engine32> transformed_gaussian{UINT32_C(0x12345678)};
-	const float unit_sample = unit_gaussian.gaussian(0.0f, 1.0f);
-	const float transformed_sample = transformed_gaussian.gaussian(3.0f, 2.0f);
+	rnd::Random<Engine32> unit_normal{UINT32_C(0x12345678)};
+	rnd::Random<Engine32> transformed_normal{UINT32_C(0x12345678)};
+	const float unit_sample = unit_normal.normal_approx(0.0f, 1.0f);
+	const float transformed_sample = transformed_normal.normal_approx(3.0f, 2.0f);
 	const float expected_sample = 3.0f + unit_sample * 2.0f;
 	const float error = transformed_sample > expected_sample ?
 		transformed_sample - expected_sample : expected_sample - transformed_sample;
@@ -405,13 +456,13 @@ constexpr bool validate_constexpr_float_api(){
 		return false;
 	}
 
-	rnd::Random<Engine64> gaussian_double_64{uint64_t{0}};
-	if(gaussian_double_64.gaussian(3.0, 0.0) != 3.0){
+	rnd::Random<Engine64> normal_approx_double_64{uint64_t{0}};
+	if(normal_approx_double_64.normal_approx(3.0, 0.0) != 3.0){
 		return false;
 	}
 
-	rnd::Random<Engine32> gaussian_double_32{uint32_t{0}};
-	if(gaussian_double_32.gaussian(3.0, 0.0) != 3.0){
+	rnd::Random<Engine32> normal_approx_double_32{uint32_t{0}};
+	if(normal_approx_double_32.normal_approx(3.0, 0.0) != 3.0){
 		return false;
 	}
 
@@ -449,15 +500,15 @@ bool validate_runtime_float_api(){
 		return false;
 	}
 
-	rnd::Random<Engine32> gaussian{uint32_t{0}};
-	if(gaussian.gaussian(7.0f, 0.0f) != 7.0f){
+	rnd::Random<Engine32> normal_approx{uint32_t{0}};
+	if(normal_approx.normal_approx(7.0f, 0.0f) != 7.0f){
 		return false;
 	}
 
-	rnd::Random<Engine32> unit_gaussian{UINT32_C(0x12345678)};
-	rnd::Random<Engine32> transformed_gaussian{UINT32_C(0x12345678)};
-	const float unit_sample = unit_gaussian.gaussian(0.0f, 1.0f);
-	const float transformed_sample = transformed_gaussian.gaussian(3.0f, 2.0f);
+	rnd::Random<Engine32> unit_normal{UINT32_C(0x12345678)};
+	rnd::Random<Engine32> transformed_normal{UINT32_C(0x12345678)};
+	const float unit_sample = unit_normal.normal_approx(0.0f, 1.0f);
+	const float transformed_sample = transformed_normal.normal_approx(3.0f, 2.0f);
 	const float expected_sample = 3.0f + unit_sample * 2.0f;
 	const float error = transformed_sample > expected_sample ?
 		transformed_sample - expected_sample : expected_sample - transformed_sample;

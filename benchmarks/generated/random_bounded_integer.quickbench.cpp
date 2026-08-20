@@ -524,7 +524,7 @@ buffer[i] = value;
 }
 }
 }
-[[nodiscard]] constexpr Random split() noexcept{
+[[nodiscard]] constexpr Random child() noexcept{
 return Random{bits_as<seed_type>()};
 }
 constexpr result_type next(result_type bound) noexcept{
@@ -600,9 +600,9 @@ assert(F{0} <= probability && probability <= F{1} && "Random::coin_flip(probabil
 return normalized<F>() < probability;
 }
 template <class F = float>
-RND_DETAIL_FLOAT_CONSTEXPR F gaussian(F mean, F stddev) noexcept{
-static_assert(detail::supported_float<F>, "Random::gaussian() requires a supported floating-point type");
-assert(stddev >= F{0} && "Random::gaussian(mean, stddev): standard deviation must be non-negative.");
+RND_DETAIL_FLOAT_CONSTEXPR F normal_approx(F mean, F stddev) noexcept{
+static_assert(detail::supported_float<F>, "Random::normal_approx() requires a supported floating-point type");
+assert(stddev >= F{0} && "Random::normal_approx(mean, stddev): standard deviation must be non-negative.");
 if constexpr(value_bits >= 32){
 F sum{};
 for(unsigned i = 0; i < 12; ++i){
