@@ -499,7 +499,17 @@ return Random{bits_as<seed_type>()};
 }
 constexpr result_type next(result_type bound) noexcept{
 assert(bound > 0 && "Random::next(bound): bound must be positive.");
-return scale_to_bound(next(), bound);
+result_type value = next();
+auto product = multiply_parts(value, bound);
+if(product.lo >= bound){
+return static_cast<result_type>(product.hi);
+}
+const result_type threshold = static_cast<result_type>(-bound) % bound;
+while(product.lo < threshold){
+value = next();
+product = multiply_parts(value, bound);
+}
+return static_cast<result_type>(product.hi);
 }
 constexpr result_type operator()(result_type bound) noexcept{ return next(bound); }
 template <result_type Bound, class T = result_type>
@@ -727,15 +737,20 @@ target -= weight;
 assert(false && "Random::weighted_index(): weights changed during selection.");
 abort();
 }
-static constexpr result_type scale_to_bound(result_type value, result_type bound) noexcept{
+static constexpr detail::u128_parts multiply_parts(result_type value, result_type bound) noexcept{
 if constexpr(sizeof(result_type) == 1){
-return static_cast<result_type>((uint16_t{value} * uint16_t{bound}) >> 8);
+const uint16_t product = uint16_t{value} * uint16_t{bound};
+return {static_cast<uint64_t>(static_cast<result_type>(product)),
+static_cast<uint64_t>(product >> 8)};
 }else if constexpr(sizeof(result_type) == 2){
-return static_cast<result_type>((uint32_t{value} * uint32_t{bound}) >> 16);
+const uint32_t product = uint32_t{value} * uint32_t{bound};
+return {static_cast<uint64_t>(static_cast<result_type>(product)),
+static_cast<uint64_t>(product >> 16)};
 }else if constexpr(sizeof(result_type) == 4){
-return static_cast<result_type>((uint64_t{value} * uint64_t{bound}) >> 32);
+const uint64_t product = uint64_t{value} * uint64_t{bound};
+return {product & UINT32_MAX, product >> 32};
 }else{
-return static_cast<result_type>(detail::mul64_to_128_parts(value, bound).hi);
+return detail::mul64_to_128_parts(value, bound);
 }
 }
 };
