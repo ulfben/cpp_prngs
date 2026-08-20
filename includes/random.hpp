@@ -182,6 +182,8 @@ namespace rnd {
 		// multiply-high alone maps some source values to one result more often than
 		// others, which is especially visible for narrow engines.
 		// See: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
+		// The nearly-divisionless fast/slow-path arrangement follows Tony Finch's
+		// explanation at: https://dotat.at/@/2025-03-05-lemire-inline.html
 		constexpr result_type next(result_type bound) noexcept{
 			assert(bound > 0 && "Random::next(bound): bound must be positive.");
 
@@ -209,7 +211,8 @@ namespace rnd {
 
 		// Bounded generation with a bound known at compile time and an optional result type.
 		// This lets the compiler specialize for Bound: 1 needs no random draw, powers of two
-		// can use exact bit extraction, and other constant bounds can be optimized aggressively.
+		// can use exact bit extraction, and other constant bounds use a rejection threshold
+		// that is computed at compile time.
 		template <result_type Bound, class T = result_type>
 		constexpr T next() noexcept{
 			static_assert(Bound > 0, "Random::next<Bound>(): bound must be positive");
@@ -220,8 +223,16 @@ namespace rnd {
 			}else if constexpr((Bound & (Bound - 1)) == 0){ // if Bound is a power of two, we can use a mask / bit-extract.
 				using U = detail::unsigned_t<T>;
 				return static_cast<T>(bits<detail::power_of_two_exponent(Bound), U>());
-			}else{ // Otherwise just call the runtime version.
-				return static_cast<T>(next(Bound)); // Bound is a compile-time constant here, so the compiler can constant-fold the multiply/shift.
+			}else{
+				// Finch's constantly-divisionless form: Bound is known here, so the
+				// rejection threshold is folded at compile time and the loop contains
+				// only the product, low-half comparison, and occasional redraw.
+				constexpr result_type threshold = static_cast<result_type>(-Bound) % Bound;
+				auto product = multiply_parts(next(), Bound);
+				while(product.lo < threshold){
+					product = multiply_parts(next(), Bound);
+				}
+				return static_cast<T>(product.hi);
 			}
 		}
 

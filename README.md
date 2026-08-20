@@ -188,6 +188,14 @@ Want to use your own engine? It must provide the interface described by `RandomB
 | `next<N, T>()` | Returns an integer in `[0, N)` with a compile-time bound and optional result type `T`; optimized for power-of-two bounds[^1] |
 | `between(I lo, I hi)` | Returns an integer in `[lo, hi)` |
 
+Bounded generation uses the multiply-high result for the common case and only
+computes the rejection threshold when the low product half falls into the
+candidate rejection region. This nearly-divisionless arrangement is explained
+by [Tony Finch](https://dotat.at/@/2025-03-05-lemire-inline.html), including why
+compile-time bounds can fold the threshold calculation away. The result remains
+unbiased; the rejection step corrects the small floor/ceiling imbalance of raw
+FastRange.
+
 ### Floating point
 
 | Method | Description |
