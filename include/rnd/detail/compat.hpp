@@ -76,6 +76,9 @@ namespace rnd::detail {
 	template <bool Condition, class T = void>
 	using enable_if_t = typename std::enable_if<Condition, T>::type;
 
+	template <bool Condition, class T, class F>
+	using conditional_t = typename std::conditional<Condition, T, F>::type;
+
 	template <class... T>
 	using void_t = std::void_t<T...>;
 
@@ -153,6 +156,19 @@ namespace rnd::detail {
 
 	template <bool Condition, class T = void>
 	using enable_if_t = typename enable_if<Condition, T>::type;
+
+	template <bool Condition, class T, class F>
+	struct conditional{
+		using type = F;
+	};
+
+	template <class T, class F>
+	struct conditional<true, T, F>{
+		using type = T;
+	};
+
+	template <bool Condition, class T, class F>
+	using conditional_t = typename conditional<Condition, T, F>::type;
 
 	template <class...>
 	using void_t = void;
@@ -259,6 +275,21 @@ namespace rnd::detail {
 		}
 	#endif
 	}
+
+	// Smallest supported unsigned type whose maximum can represent Value. This
+	// is used by compile-time bounded generation so a bound can select its public
+	// width without inheriting the engine's result_type.
+	template <uint64_t Value>
+	using minimal_uint_t = conditional_t<
+		Value <= integral_max<uint8_t>(), uint8_t,
+		conditional_t<
+			Value <= integral_max<uint16_t>(), uint16_t,
+			conditional_t<
+				Value <= integral_max<uint32_t>(), uint32_t,
+				uint64_t
+			>
+		>
+	>;
 
 	template <class UInt>
 	constexpr unsigned power_of_two_exponent(UInt value) noexcept{
@@ -521,8 +552,7 @@ namespace rnd::detail {
 			declval<Projection&>(), declval<T&>()))>;
 		static constexpr bool value =
 			noexcept(invoke(declval<Projection&>(), declval<T&>())) &&
-			supported_uint<weight_type> &&
-			(sizeof(weight_type) <= sizeof(Result));
+			supported_uint<weight_type>;
 	};
 
 	template <class C, class Result, class = void>
@@ -536,8 +566,7 @@ namespace rnd::detail {
 		using weight_type = remove_cvref_t<decltype(*collection_data(declval<const C&>()))>;
 		static constexpr bool value =
 			contiguous_collection<const C>::value &&
-			supported_uint<weight_type> &&
-			(sizeof(weight_type) <= sizeof(Result));
+			supported_uint<weight_type>;
 	};
 
 	template <class C, class Projection, class Result, class = void>

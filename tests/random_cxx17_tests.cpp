@@ -98,6 +98,19 @@ constexpr bool validate_integer_api(){
 		return false;
 	}
 
+	// A wider public bound does not force wider gathering when the value fits
+	// the engine width. The return type remains wide, but reduction stays 8-bit.
+	rnd::Random<Engine8> runtime_wide_bound{uint8_t{64}};
+	if(runtime_wide_bound.next(uint64_t{10}) != uint64_t{2} ||
+		runtime_wide_bound.engine().draws != 1){
+		return false;
+	}
+	runtime_wide_bound.seed(uint8_t{64});
+	if(runtime_wide_bound.index(size_t{10}) != size_t{2} ||
+		runtime_wide_bound.engine().draws != 1){
+		return false;
+	}
+
 	// The first source value is rejected for this bound. This verifies both the
 	// rejection step and that the redraw consumes exactly one additional value.
 	rnd::Random<Engine8> rejected{uint8_t{0}};
@@ -150,6 +163,15 @@ constexpr bool validate_integer_api(){
 	if(compile_time_bound.next<10, uint8_t>() != uint8_t{5}){
 		return false;
 	}
+	compile_time_bound.seed(uint8_t{0xb0});
+	if(compile_time_bound.next<256, uint8_t>() != uint8_t{0xb0}){
+		return false;
+	}
+
+	rnd::Random<Engine8> default_wide_bound{uint8_t{0}};
+	if(default_wide_bound.next<300>() >= uint16_t{300} || default_wide_bound.engine().draws != 2){
+		return false;
+	}
 
 	rnd::Random<Engine8> bits{uint8_t{0x12}};
 	if(bits.bits_as<uint16_t>() != uint16_t{0x1312} || bits.engine().draws != 2){
@@ -184,6 +206,15 @@ constexpr bool validate_integer_api(){
 
 	rnd::Random<Engine8> ranges{uint8_t{128}};
 	if(ranges.between(int16_t{-10}, int16_t{10}) != int16_t{0}){
+		return false;
+	}
+
+	rnd::Random<Engine8> wide_bound{uint8_t{0}};
+	if(wide_bound.next(uint16_t{300}) >= uint16_t{300} || wide_bound.engine().draws != 2){
+		return false;
+	}
+	wide_bound.seed(uint8_t{0});
+	if(wide_bound.next<300, uint16_t>() >= uint16_t{300} || wide_bound.engine().draws != 2){
 		return false;
 	}
 
@@ -243,7 +274,13 @@ constexpr bool validate_collections(){
 
 	const std::array<int, 4> const_array_values{{10, 20, 30, 40}};
 	random.seed(uint8_t{64});
-	return &random.element(const_array_values) == const_array_values.data() + 1;
+	if(&random.element(const_array_values) != const_array_values.data() + 1){
+		return false;
+	}
+
+	int wide_values[300]{};
+	random.seed(uint8_t{0});
+	return random.index(wide_values) < 300;
 }
 
 constexpr bool validate_weighted_collections(){
@@ -303,7 +340,16 @@ constexpr bool validate_weighted_collections(){
 		{40, 6}
 	}};
 	random.seed(uint8_t{0});
-	return random.weighted_iterator(array_loot, WeightProjection{}) == array_loot.begin() + 1;
+	if(random.weighted_iterator(array_loot, WeightProjection{}) != array_loot.begin() + 1){
+		return false;
+	}
+
+	const uint16_t wide_weights[]{200, 100};
+	random.seed(uint8_t{64});
+	if(random.weighted_index(wide_weights, 2) != 0 || random.engine().draws != 2){
+		return false;
+	}
+	return true;
 }
 
 #ifndef RND_FAST_FLOAT

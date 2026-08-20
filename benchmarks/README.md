@@ -6,8 +6,10 @@ The canonical benchmark sources are:
 - `random_bounded_integer.cpp`: compares bounded integer generation.
 - `random_bounded_float.cpp`: compares bounded floating-point generation.
 
-The public API comparisons currently include `QuarkBurst64`, `RomuDuoJr`, and
-`Konadare192`. Add or remove engine headers and their `BENCHMARK_TEMPLATE`
+The general public API comparisons currently include `QuarkBurst64`,
+`RomuDuoJr`, and `Konadare192`. The bounded-integer benchmark also measures
+native-width and promoted-width calls separately for `SmallFast8` and
+`SmallFast16`. Add or remove engine headers and their `BENCHMARK_TEMPLATE`
 registrations in the two `random_bounded_*.cpp` sources to change that set.
 
 Run the generator from the repository root with Windows PowerShell:

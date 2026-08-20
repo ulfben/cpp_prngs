@@ -136,7 +136,7 @@ These engines return 8 or 16 bits at a time and use only 4–8 bytes of state. T
 | [`XorShift32Star8`](https://github.com/ulfben/cpp_prngs/blob/main/include/rnd/engines/xorshift32star8.hpp) | 8 bits | 4 bytes | A [tiny](https://excamera.com/sphinx/article-xorshift.html) [xorshift\* variant](https://arxiv.org/abs/1402.6246): Marsaglia's full-period 32-bit xorshift recurrence with Vigna-style multiplicative scrambling, returning the high 8 bits. |
 | [`SmallFast16`](https://github.com/ulfben/cpp_prngs/blob/main/include/rnd/engines/small_fast16.hpp) | 16 bits | 8 bytes | A useful middle ground when an 8-bit result is too restrictive; uses [O’Neill’s tested 16-bit constants](https://www.pcg-random.org/posts/bob-jenkins-small-prng-passes-practrand.html). |
 
-An engine's output width limits bounds, collection sizes, and total weights used by `Random<E>`. An 8-bit engine accepts bounds up to 255, `SmallFast16` up to 65,535, and a 32-bit engine up to roughly 4.29 billion. Methods such as `bits_as<T>()` can combine several engine outputs when you need a wider raw value. Debug builds alert you when a requested range is too large.
+An engine's output width only describes how many random bits it produces per draw; it does not limit the ranges supported by Random<E>. When a wider value is needed, the library automatically combines multiple engine outputs, while small bounds continue to use the narrowest efficient representation. For example, an 8-bit engine can still generate a value from a 32- or 64-bit range, and bits_as<T>() can explicitly fill any supported unsigned integer type with random bits.
 
 Each included engine is a small, self-contained random number generator. You can use an engine directly, but it deliberately provides only the basics: seeding, advancing its state, comparing states, and generating random unsigned integers.
 
@@ -172,7 +172,7 @@ Want to use your own engine? It must provide the interface described by `rnd::Ra
 |--------|-------------|
 | `min()` | Returns the engine’s minimum possible value, typically 0 |
 | `max()` | Returns the engine’s maximum possible value |
-| `next()` / `operator()()` | Returns the next random number in `[min(), max()]` |
+| `next()` / `operator()()` | Returns the next raw engine number in `[min(), max()]`; its width is `result_type` |
 | `bits(n)` | Returns `n` random bits in the low bits of `T` at runtime (`1 ≤ n ≤ digits(T)`), drawing from the high bits of one or more engine outputs; `T` defaults to `result_type`[^1] |
 | `bits<N, T>()` | Returns `N` random bits in the low bits of `T`; constraints are checked at compile time[^1] |
 | `bits_as<T>()` | Returns an unsigned `T` filled with high-quality random bits |
@@ -182,17 +182,18 @@ Want to use your own engine? It must provide the interface described by `rnd::Ra
 
 | Method | Description |
 |--------|-------------|
-| `next(bound)` / `operator()(bound)` | Returns an unbiased integer in `[0, bound)`, using [Lemire’s FastRange](https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/) with rejection when needed |
-| `next<N, T>()` | Returns an integer in `[0, N)` with a compile-time bound and optional result type `T`; optimized for power-of-two bounds[^1] |
-| `between(I lo, I hi)` | Returns an integer in `[lo, hi)` |
+| `next(U bound)` / `operator()(U bound)` | For a fixed-width unsigned `U`, returns an unbiased `U` in `[0, bound)`; reduction uses the smallest supported width that is at least the engine width and can represent `bound` |
+| `next<N, T>()` | Returns an integer in `[0, N)` with a compile-time bound and optional result type `T`; the reduction uses `T`'s unsigned width and is optimized for power-of-two bounds[^1] |
+| `between(I lo, I hi)` | Returns an integer in `[lo, hi)` using the unsigned width of `I` |
 
-Bounded generation uses the multiply-high result for the common case and only
-computes the rejection threshold when the low product half falls into the
-candidate rejection region. This nearly-divisionless arrangement is explained
-by [Tony Finch](https://dotat.at/@/2025-03-05-lemire-inline.html), including why
-compile-time bounds can fold the threshold calculation away. The result remains
-unbiased; the rejection step corrects the small floor/ceiling imbalance of raw
-FastRange.
+### Unbiased bounded integers
+
+Turning a random engine value into a smaller range is slightly trickier than it first appears. An 8-bit engine, for example, has 256 possible outputs (`0..255`). If we ask for `next(10)`, those 256 values cannot be divided evenly among 10 results: `256 = 25 * 10 + 6`. A naive mapping therefore makes six results slightly more likely than the other four. This is **range-reduction bias**.
+
+`cpp_prngs` uses [Daniel Lemire's multiply-and-reject method](https://lemire.me/blog/2016/06/30/fast-random-shuffling/). A random value is multiplied by the requested bound; the upper half of that product gives the result in `[0, bound)`, while the lower half tells us whether the draw landed in the small leftover region responsible for the bias. Those few values are rejected and redrawn, giving every possible result equal probability.
+
+Lemire's runtime algorithm is **nearly divisionless**: it first checks whether rejection is even possible, and only then computes the relatively expensive rejection cutoff. [Tony Finch](https://dotat.at/@/2025-03-05-lemire-inline.html) points out a useful specialization when the bound is known at compile time: the cutoff can then be computed during compilation, leaving the generated code division-free. `next<Bound>()` uses this form; power-of-two bounds are simpler still and reduce directly to random bit extraction.
+
 
 ### Floating point
 
@@ -214,7 +215,7 @@ FastRange.
 
 | Method | Description |
 |--------|-------------|
-| `index(collection)` | Returns a random index into a collection |
+| `index(collection)` | Returns a random index into a collection; `size_t` collection sizes are supported even with narrow engines |
 | `iterator(collection)` | Returns the collection's iterator to a random element |
 | `element(collection)` | Returns a reference to a random element |
 
@@ -228,7 +229,7 @@ iterator(container) returns the container's native iterator. iterator(pointer, c
 | `weighted_iterator(collection, projection)` | Returns the collection's iterator selected proportionally to weights returned by `projection(element)` |
 | `weighted_element(collection, projection)` | Returns a reference selected proportionally to weights returned by `projection(element)` |
 
-The weighted helpers let you pick items with different chances of being selected. Weights should be non-negative whole numbers, such as `{70u, 25u, 5u}`. A weight of 0 means the item will never be selected. At least one weight must be greater than zero.
+The weighted helpers let you pick items with different chances of being selected. Weights should be non-negative fixed-width unsigned integers, such as `{70u, 25u, 5u}`. A weight of 0 means the item will never be selected. At least one weight must be greater than zero, and the checked sum of all weights must fit in `uint64_t`; narrow engines gather enough bits only when the total requires a wider reduction width.
 
 ### Portability and floating-point details
 

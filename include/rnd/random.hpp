@@ -44,9 +44,18 @@ namespace rnd {
 			"Random<E> requires an engine spanning its complete result_type");
 
 		template <class T>
-		static constexpr bool valid_weight_type =
-			detail::supported_uint<T> &&
-			(sizeof(detail::remove_cvref_t<T>) <= sizeof(engine_result_type));
+		static constexpr bool valid_weight_type = detail::supported_uint<T>;
+
+		template <auto Bound>
+		static constexpr uint64_t bounded_result_max =
+			Bound > 0 ? static_cast<uint64_t>(Bound - 1) : uint64_t{0};
+
+		template <auto Bound>
+		using default_bounded_result_type = detail::conditional_t<
+			bounded_result_max<Bound> <= detail::integral_max<engine_result_type>(),
+			engine_result_type,
+			detail::minimal_uint_t<bounded_result_max<Bound>>
+		>;
 
 	public:
 		using engine_type = E;
@@ -180,61 +189,57 @@ namespace rnd {
 		// Produce [0, bound) using Lemire's multiply-high range reduction with its
 		// rejection step. The rejection is necessary for non-power-of-two bounds:
 		// multiply-high alone maps some source values to one result more often than
-		// others, which is especially visible for narrow engines.
+		// others, which is especially visible for narrow engines. This overload keeps
+		// the engine's native result type and therefore remains the cheap raw-width
+		// path.
 		// See: https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
-		// The nearly-divisionless fast/slow-path arrangement follows Tony Finch's
-		// explanation at: https://dotat.at/@/2025-03-05-lemire-inline.html
+		// The nearly-divisionless fast/slow-path arrangement is Lemire's runtime
+		// algorithm. Finch's explanation is relevant to the constant-bound
+		// specialization below: https://dotat.at/@/2025-03-05-lemire-inline.html
 		constexpr result_type next(result_type bound) noexcept{
 			assert(bound > 0 && "Random::next(bound): bound must be positive.");
-
-			result_type value = next();
-			auto product = multiply_parts(value, bound);
-			if(product.lo >= bound){
-				return static_cast<result_type>(product.hi);
-			}
-
-			// Only the small low-product region needs the threshold. Keeping
-			// this modulo out of the common path is important for engines where
-			// integer division costs more than generating the next value.
-			// (-bound) modulo 2^value_bits is the size of the incomplete low
-			// product region. Values below it are rejected so every result in
-			// [0, bound) has the same number of accepted source values.
-			const result_type threshold = static_cast<result_type>(
-				uint64_t{0} - static_cast<uint64_t>(bound)) % bound;
-			while(product.lo < threshold){
-				value = next();
-				product = multiply_parts(value, bound);
-			}
-			return static_cast<result_type>(product.hi);
+			return runtime_bounded_next(bound);
 		}
 
 		constexpr result_type operator()(result_type bound) noexcept{ return next(bound); }
+
+		// Produce [0, bound) and return it as U. The reduction uses the smallest
+		// supported width that is at least as wide as the engine and can represent
+		// bound; a wider U therefore does not force unnecessarily wide gathering.
+		template <class U, detail::enable_if_t<detail::supported_uint<U>, int> = 0>
+		constexpr U next(U bound) noexcept{
+			assert(bound > 0 && "Random::next(bound): bound must be positive.");
+			return runtime_bounded_next(bound);
+		}
+
+		template <class U, detail::enable_if_t<detail::supported_uint<U>, int> = 0>
+		constexpr U operator()(U bound) noexcept{ return next(bound); }
 
 		// Bounded generation with a bound known at compile time and an optional result type.
 		// This lets the compiler specialize for Bound: 1 needs no random draw, powers of two
 		// can use exact bit extraction, and other constant bounds use a rejection threshold
 		// that is computed at compile time.
-		template <result_type Bound, class T = result_type>
+		template <auto Bound, class T = default_bounded_result_type<Bound>>
 		constexpr T next() noexcept{
 			static_assert(Bound > 0, "Random::next<Bound>(): bound must be positive");
 			static_assert(detail::supported_integer<T>, "Random::next<Bound, T>() requires a supported fixed-width integer type");
-			static_assert(uint64_t{Bound - 1} <= detail::integral_max<T>(), "Bound is too large for return type T");
-			if constexpr(Bound == 1){
-				return T{0}; // The only possible result is 0, so no random draw is needed.
-			}else if constexpr((Bound & (Bound - 1)) == 0){ // if Bound is a power of two, we can use a mask / bit-extract.
+			static_assert(bounded_result_max<Bound> <= detail::integral_max<T>(), "Bound is too large for return type T");
+			if constexpr(Bound > 0){
 				using U = detail::unsigned_t<T>;
-				return static_cast<T>(bits<detail::power_of_two_exponent(Bound), U>());
-			}else{
-				// Finch's constantly-divisionless form: Bound is known here, so the
-				// rejection threshold is folded at compile time and the loop contains
-				// only the product, low-half comparison, and occasional redraw.
-				constexpr result_type threshold = static_cast<result_type>(
-					uint64_t{0} - static_cast<uint64_t>(Bound)) % Bound;
-				auto product = multiply_parts(next(), Bound);
-				while(product.lo < threshold){
-					product = multiply_parts(next(), Bound);
+				constexpr uint64_t wide_bound = static_cast<uint64_t>(Bound);
+				if constexpr(Bound == 1){
+					return T{0}; // The only possible result is 0, so no random draw is needed.
+				}else if constexpr((wide_bound & (wide_bound - 1)) == 0){ // if Bound is a power of two, we can use a mask / bit-extract.
+					return static_cast<T>(bits<detail::power_of_two_exponent(wide_bound), U>());
+				}else{
+					// Finch's constant-bound specialization: Bound is known here, so
+					// the rejection threshold is folded at compile time and the loop
+					// contains only the product, comparison, and occasional redraw.
+					return static_cast<T>(bounded_next<U, static_cast<U>(Bound)>());
 				}
-				return static_cast<T>(product.hi);
+			}else{
+				// Keep invalid calls focused on the precondition diagnostic above.
+				return T{0};
 			}
 		}
 
@@ -247,9 +252,8 @@ namespace rnd {
 			}
 			using U = detail::unsigned_t<I>; // (portable but) equivalent to std::make_unsigned_t<I>;
 			const U bound = static_cast<U>(hi) - static_cast<U>(lo);
-			assert(uint64_t{bound} <= uint64_t{(max)()} && "Random::between(lo, hi): range is too large for this engine.");
 			return static_cast<I>(static_cast<U>(lo) +
-				static_cast<U>(next(static_cast<result_type>(bound))));
+				static_cast<U>(next(bound)));
 		}
 
 		// --- floating point ---
@@ -357,8 +361,8 @@ namespace rnd {
 		// Pick an index in [0, size).
 		[[nodiscard]] constexpr size_t index(size_t size) noexcept{
 			assert(size != 0 && "Random::index(): empty collection.");
-			assert(size <= static_cast<size_t>((max)()) && "Random::index(): collection is too large for this engine.");
-			return static_cast<size_t>(next(static_cast<result_type>(size)));
+			using U = detail::uint_of_size<sizeof(size_t)>::type;
+			return static_cast<size_t>(next(static_cast<U>(size)));
 		}
 
 		template <class C,
@@ -397,8 +401,8 @@ namespace rnd {
 		// --- weighted collections ---
 		//
 		// Zero weights exclude an item. At least one weight must be positive, and the
-		// sum must fit in the engine's result_type. The latter keeps the bounded draw
-		// exact and is why an 8-bit engine intentionally accepts smaller totals.
+		// sum must fit in the checked uint64_t accumulator. Narrow engines gather
+		// enough bits for wider totals only when the total actually needs them.
 
 		// Pick an index proportionally to a simple array of unsigned weights.
 		template <class W, detail::enable_if_t<valid_weight_type<W>, int> = 0>
@@ -498,14 +502,14 @@ namespace rnd {
 		// abort() keeps a violated precondition from turning into undefined behavior
 		// when assertions are compiled out.
 		template <class WeightAt>
-		constexpr result_type total_weight(size_t size, WeightAt& weight_at) noexcept{
+		constexpr uint64_t total_weight(size_t size, WeightAt& weight_at) noexcept{
 			using weight_type = detail::remove_cvref_t<decltype(weight_at(size_t{}))>;
-			static_assert(valid_weight_type<weight_type>, "Weights must be non-boolean unsigned integers no wider than result_type");
-			result_type total{};
+			static_assert(valid_weight_type<weight_type>, "Weights must be non-boolean unsigned integers");
+			uint64_t total{};
 			for(size_t i = 0; i < size; ++i){
-				const result_type weight = static_cast<result_type>(weight_at(i));
-				if(weight > (max)() - total){
-					assert(false && "Random::weighted_index(): total weight is too large for this engine.");
+				const uint64_t weight = static_cast<uint64_t>(weight_at(i));
+				if(weight > detail::integral_max<uint64_t>() - total){
+					assert(false && "Random::weighted_index(): total weight exceeds uint64_t.");
 					abort();
 				}
 				total += weight;
@@ -536,18 +540,24 @@ namespace rnd {
 				assert(false && "Random::weighted_index(): empty weight collection.");
 				abort();
 			}
-			result_type total = total_weight(size, weight_at);
+			const uint64_t total = total_weight(size, weight_at);
 			if(total == 0){
 				assert(false && "Random::weighted_index(): at least one weight must be positive.");
 				abort();
 			}
-			result_type target = next(total);
+			return weighted_offset_with_target<uint64_t>(size, weight_at, total);
+		}
+
+		template <class U, class WeightAt>
+		constexpr size_t weighted_offset_with_target(
+			size_t size, WeightAt& weight_at, U total) noexcept{
+			U target = next(total);
 			for(size_t i = 0; i < size; ++i){
-				const result_type weight = static_cast<result_type>(weight_at(i));
-				if(target < weight){
+				const uint64_t weight = static_cast<uint64_t>(weight_at(i));
+				if(static_cast<uint64_t>(target) < weight){
 					return i;
 				}
-				target -= weight;
+				target = static_cast<U>(target - static_cast<U>(weight));
 			}
 			assert(false && "Random::weighted_index(): weights changed during selection.");
 			abort();
@@ -557,21 +567,103 @@ namespace rnd {
 		// full-width product. A 64-bit engine needs the portable 64x64->128 helper
 		// because __uint128_t is not available on every desktop compiler (notably
 		// MSVC) or on AVR.
-		static constexpr detail::u128_parts multiply_parts(result_type value, result_type bound) noexcept{
-			if constexpr(sizeof(result_type) == 1){
+		template <class U>
+		static constexpr detail::u128_parts multiply_parts(U value, U bound) noexcept{
+			if constexpr(sizeof(U) == 1){
 				const uint16_t product = uint16_t{value} * uint16_t{bound};
-				return {static_cast<uint64_t>(static_cast<result_type>(product)),
+				return {static_cast<uint64_t>(static_cast<U>(product)),
 					static_cast<uint64_t>(product >> 8)};
-			}else if constexpr(sizeof(result_type) == 2){
+			}else if constexpr(sizeof(U) == 2){
 				const uint32_t product = uint32_t{value} * uint32_t{bound};
-				return {static_cast<uint64_t>(static_cast<result_type>(product)),
+				return {static_cast<uint64_t>(static_cast<U>(product)),
 					static_cast<uint64_t>(product >> 16)};
-			}else if constexpr(sizeof(result_type) == 4){
+			}else if constexpr(sizeof(U) == 4){
 				const uint64_t product = uint64_t{value} * uint64_t{bound};
 				return {product & UINT32_MAX, product >> 32};
 			}else{
 				return detail::mul64_to_128_parts(value, bound);
 			}
+		}
+
+		template <class U>
+		static constexpr U rejection_threshold(U bound) noexcept{
+			return static_cast<U>(U{0} - bound) % bound;
+		}
+
+		template <class U>
+		constexpr U uniform_bits() noexcept{
+			static_assert(detail::supported_uint<U>);
+			constexpr unsigned target_bits = detail::bit_width<U>();
+			if constexpr(target_bits == value_bits){
+				return static_cast<U>(next());
+			}else if constexpr(target_bits < value_bits){
+				return take_high_bits<U>(next(), target_bits);
+			}else{
+				return gather_high_bits<U>(target_bits);
+			}
+		}
+
+		// Select the smallest reduction width that is at least as wide as the
+		// engine and can represent bound. The public U is retained as the return
+		// type, but does not by itself force wider random-bit gathering.
+		template <class U>
+		constexpr U runtime_bounded_next(U bound) noexcept{
+			static_assert(detail::supported_uint<U>);
+			if constexpr(sizeof(engine_result_type) >= sizeof(U)){
+				return static_cast<U>(bounded_next<engine_result_type>(
+					static_cast<engine_result_type>(bound)));
+			}else{
+				if(bound <= static_cast<U>(detail::integral_max<engine_result_type>())){
+					return static_cast<U>(bounded_next<engine_result_type>(
+						static_cast<engine_result_type>(bound)));
+				}
+
+				if constexpr(sizeof(engine_result_type) < sizeof(uint16_t) && sizeof(U) >= sizeof(uint16_t)){
+					if(bound <= static_cast<U>(detail::integral_max<uint16_t>())){
+						return static_cast<U>(bounded_next<uint16_t>(
+							static_cast<uint16_t>(bound)));
+					}
+				}
+
+				if constexpr(sizeof(engine_result_type) < sizeof(uint32_t) && sizeof(U) >= sizeof(uint32_t)){
+					if(bound <= static_cast<U>(detail::integral_max<uint32_t>())){
+						return static_cast<U>(bounded_next<uint32_t>(
+							static_cast<uint32_t>(bound)));
+					}
+				}
+
+				return bounded_next<U>(bound);
+			}
+		}
+
+		template <class U>
+		constexpr U bounded_next(U bound) noexcept{
+			U value = uniform_bits<U>();
+			auto product = multiply_parts(value, bound);
+			if(static_cast<U>(product.lo) >= bound){
+				return static_cast<U>(product.hi);
+			}
+
+			// Only the small low-product region needs the threshold. Keeping
+			// this modulo out of the common path is important for engines where
+			// integer division costs more than generating the next value.
+			const U threshold = rejection_threshold(bound);
+			while(static_cast<U>(product.lo) < threshold){
+				value = uniform_bits<U>();
+				product = multiply_parts(value, bound);
+			}
+			return static_cast<U>(product.hi);
+		}
+
+		template <class U, U Bound>
+		constexpr U bounded_next() noexcept{
+			static_assert(Bound > 0, "Random::bounded_next(): bound must be positive");
+			constexpr U threshold = rejection_threshold(Bound);
+			auto product = multiply_parts(uniform_bits<U>(), Bound);
+			while(static_cast<U>(product.lo) < threshold){
+				product = multiply_parts(uniform_bits<U>(), Bound);
+			}
+			return static_cast<U>(product.hi);
 		}
 	};
 

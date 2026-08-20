@@ -88,30 +88,37 @@ consumer can compile using only `#include <rnd/...>` paths.
 Depends on task 1, because every width-specific path needs the same unbiased
 reduction semantics.
 
-- [ ] Add an unsigned typed bounded primitive along the lines of
+- [x] Add an unsigned typed bounded primitive along the lines of
   `template<class U> U next(U bound)`, supporting the library's fixed 8-, 16-,
   32-, and 64-bit unsigned types.
-- [ ] Use a native-width path when suitable. When `U` is wider than the engine
-  result, gather enough uniformly distributed bits (using the existing bit
-  machinery) and perform reduction at `U`'s width.
-- [ ] Preserve `next()` and `result_type` as raw engine-facing APIs. Clearly
+- [x] Use a native-width path when suitable. Runtime requests choose the
+  smallest reduction width that is at least as wide as the engine and can
+  represent the bound; gather enough uniformly distributed bits only when the
+  bound requires a wider width.
+- [x] Preserve `next()` and `result_type` as raw engine-facing APIs. Clearly
   document the distinction between raw output width and high-level request
   width.
-- [ ] Make `index(size_t)` work with narrow engines for collections larger than
+- [x] Make `index(size_t)` work with narrow engines for collections larger than
   255 or 65,535.
-- [ ] Make integer `between()` request the unsigned width needed by its argument
+- [x] Make integer `between()` request the unsigned width needed by its argument
   type rather than asserting against `E::max()`.
-- [ ] Redesign weighted accumulation so a narrow engine can select from wider
+- [x] Redesign weighted accumulation so a narrow engine can select from wider
   weights and totals. Choose and document a checked accumulator limit (normally
   `uint64_t`), detect overflow before the draw, and keep zero-weight behavior.
-- [ ] Relax projection/weight constraints that currently reject a weight merely
+- [x] Relax projection/weight constraints that currently reject a weight merely
   because it is wider than the engine result.
-- [ ] Add tests for `Random<SmallFast8>` selecting from 300+ elements, accepting
+- [x] Add tests for `Random<SmallFast8>` selecting from 300+ elements, accepting
   totals above 255, and generating wider bounded integers without changing the
   cheap native-width cases.
-- [ ] Benchmark native-width and gathered-width calls separately. Narrow-engine
-  convenience is allowed to cost more only when the caller asks for a wider
-  result.
+- [ ] Benchmark native-width and promoted-width calls separately. Narrow-engine
+  convenience is allowed to cost more only when the bound requires a wider
+  reduction width.
+
+The implementation and test work is complete, and the benchmark sources now
+define separate native-width and promoted-width cases for narrow engines. The
+repository's benchmark workflow produces Quick Bench inputs rather than a local
+executable, so measured timings remain open until those cases are run and
+recorded.
 
 Acceptance: swapping a 32- or 64-bit engine for an 8-bit engine does not make an
 otherwise representable bound, collection size, or weight total invalid.
@@ -333,6 +340,23 @@ what security/entropy property each source does—or does not—provide.
 Acceptance: the advertised API, portability, reproducibility, packaging, and
 quality statements all have a corresponding automated check or a clearly
 documented limitation.
+
+### Review bounded reduction width on wide engines
+
+The current runtime bounded-integer path chooses a reduction width that is at least as wide as the engine. This avoids gathering extra bits for narrow engines, but it may be suboptimal for wide engines.
+
+For example, a 64-bit engine generating `next(10)` currently performs a 64x64 -> 128-bit multiply, even though the requested range easily fits in 8 or 32 bits. Since the library already treats the high bits of engine output as suitable for narrower random values, it may be faster to take the high 8/16/32 bits of a 64-bit engine result and perform Lemire's reduction at that narrower width instead. This remains unbiased, but whether it is actually faster is an empirical question.
+
+- [ ] Add benchmark cases for small and medium runtime bounds, for example `10`, `1'000`, `100'000`, and `UINT32_MAX`.
+- [ ] Run them with representative 64-bit engines, especially `QuarkBurst64` and `RomuDuoJr`.
+- [ ] Compare the current native-width path against a variant that reduces at the smallest supported width capable of representing the bound.
+- [ ] For narrower reduction, take the required high bits from one engine result rather than generating additional values.
+- [ ] Verify that both implementations produce unbiased results with the existing bounded-generation tests.
+- [ ] Compare not only throughput but generated assembly where useful, especially 32x32 -> 64 versus the portable 64x64 -> 128 multiplication path.
+- [ ] Check whether the result changes across major targets/compilers, particularly MSVC, GCC/Clang, and AVR where applicable.
+- [ ] If narrower reduction consistently wins, change `runtime_bounded_next()` to choose the smallest width capable of representing the bound, regardless of engine width.
+- [ ] If the difference is negligible or platform-dependent, keep the current simpler rule: use at least the engine's native width.
+
 
 ## Explicitly deferred
 

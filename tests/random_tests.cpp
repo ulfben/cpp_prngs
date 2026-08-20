@@ -69,6 +69,11 @@ struct WeightedValue{
     std::uint8_t weight;
 };
 
+struct WideWeightedValue{
+    int value;
+    std::uint64_t weight;
+};
+
 struct FloatingWeightProjection{
     constexpr float operator()(const WeightedValue& item) const noexcept{
         return static_cast<float>(item.weight);
@@ -692,18 +697,39 @@ TYPED_TEST(RandomTypedTest, CollectionHelpersReturnValidMutableAndConstElements)
     }
 }
 
+TEST(RandomBoundaryTest, NarrowEngineSupportsWiderIntegerRequestsAndCollections){
+    using Rng = rnd::Random<SmallFast8>;
+    Rng rng{std::uint8_t{123}};
+
+    static_assert(std::is_same_v<decltype(rng.next(std::uint16_t{300})), std::uint16_t>);
+    static_assert(std::is_same_v<decltype(rng.next(std::uint64_t{300})), std::uint64_t>);
+    static_assert(std::is_same_v<decltype(rng.next<1000>()), std::uint16_t>);
+
+    for(int i = 0; i < 256; ++i){
+        EXPECT_LT(rng.next(std::uint16_t{300}), std::uint16_t{300});
+        EXPECT_LT(rng.next(std::uint64_t{1000000}), std::uint64_t{1000000});
+        EXPECT_GE(rng.between(std::uint32_t{1000}, std::uint32_t{1300}), std::uint32_t{1000});
+        EXPECT_LT(rng.between(std::uint32_t{1000}, std::uint32_t{1300}), std::uint32_t{1300});
+        EXPECT_LT(rng.index(std::size_t{300}), std::size_t{300});
+    }
+
+    EXPECT_LT((rng.next<300, std::uint16_t>()), std::uint16_t{300});
+    EXPECT_LT(rng.next<1000>(), std::uint16_t{1000});
+
+    std::array<int, 300> values{};
+    for(int i = 0; i < 64; ++i){
+        EXPECT_LT(rng.index(values), values.size());
+    }
+}
+
 TYPED_TEST(RandomTypedTest, WeightedHelpersHaveSafeContiguousCollectionAndWeightConstraints){
     using Rng = rnd::Random<TypeParam>;
 
-    static_assert(CanGetWeightedIndexFromPointer<Rng, unsigned> ==
-        (std::numeric_limits<unsigned>::digits <=
-            std::numeric_limits<typename Rng::result_type>::digits));
+    static_assert(CanGetWeightedIndexFromPointer<Rng, unsigned>);
     static_assert(!CanGetWeightedIndexFromPointer<Rng, int>);
     static_assert(CanGetWeightedIndex<Rng, std::array<std::uint8_t, 3>>);
     static_assert(!CanGetWeightedIndexFromPointer<Rng, float>);
-    static_assert(CanGetWeightedIndexFromPointer<Rng, std::uint64_t> ==
-        (std::numeric_limits<std::uint64_t>::digits <=
-            std::numeric_limits<typename Rng::result_type>::digits));
+    static_assert(CanGetWeightedIndexFromPointer<Rng, std::uint64_t>);
 
     static_assert(CanGetWeightedIterator<
         Rng, std::vector<WeightedValue>&, decltype(&WeightedValue::weight)>);
@@ -805,6 +831,34 @@ TYPED_TEST(RandomTypedTest, WeightedIndexAccumulatesWithoutNarrowingOrOverflow){
             const std::size_t expected = target < 200 ? 0 : 1;
             EXPECT_EQ(weighted_rng.weighted_index(weights), expected);
         }
+    }
+}
+
+TEST(RandomBoundaryTest, NarrowEngineAcceptsWideWeightsAndTotals){
+    using Rng = rnd::Random<SmallFast8>;
+    const std::array<std::uint16_t, 2> weights{{200, 100}};
+
+    Rng weighted_rng{std::uint8_t{123}};
+    Rng target_rng{std::uint8_t{123}};
+    for(int i = 0; i < 256; ++i){
+        const std::uint64_t target = target_rng.next(std::uint64_t{300});
+        const std::size_t expected = target < 200 ? 0 : 1;
+        EXPECT_EQ(weighted_rng.weighted_index(weights), expected);
+    }
+
+    const std::array<WideWeightedValue, 2> values{{
+        {10, 200},
+        {20, 100}
+    }};
+    Rng projected_rng{std::uint8_t{123}};
+    Rng projected_target_rng{std::uint8_t{123}};
+    for(int i = 0; i < 64; ++i){
+        const std::uint64_t target = projected_target_rng.next(std::uint64_t{300});
+        const std::size_t expected = target < 200 ? 0 : 1;
+        EXPECT_EQ(
+            projected_rng.weighted_element(values, &WideWeightedValue::weight).value,
+            values[expected].value
+        );
     }
 }
 

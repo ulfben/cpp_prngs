@@ -40,6 +40,8 @@ template <class T>
 using remove_cvref_t = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
 template <bool Condition, class T = void>
 using enable_if_t = typename std::enable_if<Condition, T>::type;
+template <bool Condition, class T, class F>
+using conditional_t = typename std::conditional<Condition, T, F>::type;
 template <class... T>
 using void_t = std::void_t<T...>;
 template <class T, class U>
@@ -97,6 +99,16 @@ using type = T;
 };
 template <bool Condition, class T = void>
 using enable_if_t = typename enable_if<Condition, T>::type;
+template <bool Condition, class T, class F>
+struct conditional{
+using type = F;
+};
+template <class T, class F>
+struct conditional<true, T, F>{
+using type = T;
+};
+template <bool Condition, class T, class F>
+using conditional_t = typename conditional<Condition, T, F>::type;
 template <class...>
 using void_t = void;
 template <class T>
@@ -149,6 +161,17 @@ return uint64_t{static_cast<U>(~U{0})};
 }
 #endif
 }
+template <uint64_t Value>
+using minimal_uint_t = conditional_t<
+Value <= integral_max<uint8_t>(), uint8_t,
+conditional_t<
+Value <= integral_max<uint16_t>(), uint16_t,
+conditional_t<
+Value <= integral_max<uint32_t>(), uint32_t,
+uint64_t
+>
+>
+>;
 template <class UInt>
 constexpr unsigned power_of_two_exponent(UInt value) noexcept{
 static_assert(supported_uint<UInt>,
@@ -305,8 +328,7 @@ using weight_type = remove_cvref_t<decltype(invoke(
 declval<Projection&>(), declval<T&>()))>;
 static constexpr bool value =
 noexcept(invoke(declval<Projection&>(), declval<T&>())) &&
-supported_uint<weight_type> &&
-(sizeof(weight_type) <= sizeof(Result));
+supported_uint<weight_type>;
 };
 template <class C, class Result, class = void>
 struct valid_weight_collection{
@@ -318,8 +340,7 @@ decltype(*collection_data(declval<const C&>()))>>{
 using weight_type = remove_cvref_t<decltype(*collection_data(declval<const C&>()))>;
 static constexpr bool value =
 contiguous_collection<const C>::value &&
-supported_uint<weight_type> &&
-(sizeof(weight_type) <= sizeof(Result));
+supported_uint<weight_type>;
 };
 template <class C, class Projection, class Result, class = void>
 struct valid_projected_collection{
@@ -412,9 +433,16 @@ static_assert((E::min)() == engine_result_type{0},
 static_assert((E::max)() == static_cast<engine_result_type>(~engine_result_type{0}),
 "Random<E> requires an engine spanning its complete result_type");
 template <class T>
-static constexpr bool valid_weight_type =
-detail::supported_uint<T> &&
-(sizeof(detail::remove_cvref_t<T>) <= sizeof(engine_result_type));
+static constexpr bool valid_weight_type = detail::supported_uint<T>;
+template <auto Bound>
+static constexpr uint64_t bounded_result_max =
+Bound > 0 ? static_cast<uint64_t>(Bound - 1) : uint64_t{0};
+template <auto Bound>
+using default_bounded_result_type = detail::conditional_t<
+bounded_result_max<Bound> <= detail::integral_max<engine_result_type>(),
+engine_result_type,
+detail::minimal_uint_t<bounded_result_max<Bound>>
+>;
 public:
 using engine_type = E;
 using result_type = typename E::result_type;
@@ -501,36 +529,33 @@ return Random{bits_as<seed_type>()};
 }
 constexpr result_type next(result_type bound) noexcept{
 assert(bound > 0 && "Random::next(bound): bound must be positive.");
-result_type value = next();
-auto product = multiply_parts(value, bound);
-if(product.lo >= bound){
-return static_cast<result_type>(product.hi);
-}
-const result_type threshold = (result_type{0} - bound) % bound;
-while(product.lo < threshold){
-value = next();
-product = multiply_parts(value, bound);
-}
-return static_cast<result_type>(product.hi);
+return runtime_bounded_next(bound);
 }
 constexpr result_type operator()(result_type bound) noexcept{ return next(bound); }
-template <result_type Bound, class T = result_type>
+template <class U, detail::enable_if_t<detail::supported_uint<U>, int> = 0>
+constexpr U next(U bound) noexcept{
+assert(bound > 0 && "Random::next(bound): bound must be positive.");
+return runtime_bounded_next(bound);
+}
+template <class U, detail::enable_if_t<detail::supported_uint<U>, int> = 0>
+constexpr U operator()(U bound) noexcept{ return next(bound); }
+template <auto Bound, class T = default_bounded_result_type<Bound>>
 constexpr T next() noexcept{
 static_assert(Bound > 0, "Random::next<Bound>(): bound must be positive");
 static_assert(detail::supported_integer<T>, "Random::next<Bound, T>() requires a supported fixed-width integer type");
-static_assert(uint64_t{Bound - 1} <= detail::integral_max<T>(), "Bound is too large for return type T");
+static_assert(bounded_result_max<Bound> <= detail::integral_max<T>(), "Bound is too large for return type T");
+if constexpr(Bound > 0){
+using U = detail::unsigned_t<T>;
+constexpr uint64_t wide_bound = static_cast<uint64_t>(Bound);
 if constexpr(Bound == 1){
 return T{0};
-}else if constexpr((Bound & (Bound - 1)) == 0){
-using U = detail::unsigned_t<T>;
-return static_cast<T>(bits<detail::power_of_two_exponent(Bound), U>());
+}else if constexpr((wide_bound & (wide_bound - 1)) == 0){
+return static_cast<T>(bits<detail::power_of_two_exponent(wide_bound), U>());
 }else{
-constexpr result_type threshold = (result_type{0} - Bound) % Bound;
-auto product = multiply_parts(next(), Bound);
-while(product.lo < threshold){
-product = multiply_parts(next(), Bound);
+return static_cast<T>(bounded_next<U, static_cast<U>(Bound)>());
 }
-return static_cast<T>(product.hi);
+}else{
+return T{0};
 }
 }
 template <class I, detail::enable_if_t<detail::supported_integer<I>, int> = 0>
@@ -541,9 +566,8 @@ return lo;
 }
 using U = detail::unsigned_t<I>;
 const U bound = static_cast<U>(hi) - static_cast<U>(lo);
-assert(uint64_t{bound} <= uint64_t{(max)()} && "Random::between(lo, hi): range is too large for this engine.");
 return static_cast<I>(static_cast<U>(lo) +
-static_cast<U>(next(static_cast<result_type>(bound))));
+static_cast<U>(next(bound)));
 }
 template <class F = float>
 RND_DETAIL_FLOAT_CONSTEXPR F normalized() noexcept{
@@ -598,8 +622,8 @@ return mean + (normalized_sum - F{6}) * stddev;
 }
 [[nodiscard]] constexpr size_t index(size_t size) noexcept{
 assert(size != 0 && "Random::index(): empty collection.");
-assert(size <= static_cast<size_t>((max)()) && "Random::index(): collection is too large for this engine.");
-return static_cast<size_t>(next(static_cast<result_type>(size)));
+using U = detail::uint_of_size<sizeof(size_t)>::type;
+return static_cast<size_t>(next(static_cast<U>(size)));
 }
 template <class C,
 detail::enable_if_t<detail::contiguous_collection<const C>::value, int> = 0>
@@ -696,14 +720,14 @@ filled += take;
 return static_cast<T>(result & low_bits_mask<T>(n));
 }
 template <class WeightAt>
-constexpr result_type total_weight(size_t size, WeightAt& weight_at) noexcept{
+constexpr uint64_t total_weight(size_t size, WeightAt& weight_at) noexcept{
 using weight_type = detail::remove_cvref_t<decltype(weight_at(size_t{}))>;
-static_assert(valid_weight_type<weight_type>, "Weights must be non-boolean unsigned integers no wider than result_type");
-result_type total{};
+static_assert(valid_weight_type<weight_type>, "Weights must be non-boolean unsigned integers");
+uint64_t total{};
 for(size_t i = 0; i < size; ++i){
-const result_type weight = static_cast<result_type>(weight_at(i));
-if(weight > (max)() - total){
-assert(false && "Random::weighted_index(): total weight is too large for this engine.");
+const uint64_t weight = static_cast<uint64_t>(weight_at(i));
+if(weight > detail::integral_max<uint64_t>() - total){
+assert(false && "Random::weighted_index(): total weight exceeds uint64_t.");
 abort();
 }
 total += weight;
@@ -728,37 +752,109 @@ if(size == 0){
 assert(false && "Random::weighted_index(): empty weight collection.");
 abort();
 }
-result_type total = total_weight(size, weight_at);
+const uint64_t total = total_weight(size, weight_at);
 if(total == 0){
 assert(false && "Random::weighted_index(): at least one weight must be positive.");
 abort();
 }
-result_type target = next(total);
+return weighted_offset_with_target<uint64_t>(size, weight_at, total);
+}
+template <class U, class WeightAt>
+constexpr size_t weighted_offset_with_target(
+size_t size, WeightAt& weight_at, U total) noexcept{
+U target = next(total);
 for(size_t i = 0; i < size; ++i){
-const result_type weight = static_cast<result_type>(weight_at(i));
-if(target < weight){
+const uint64_t weight = static_cast<uint64_t>(weight_at(i));
+if(static_cast<uint64_t>(target) < weight){
 return i;
 }
-target -= weight;
+target = static_cast<U>(target - static_cast<U>(weight));
 }
 assert(false && "Random::weighted_index(): weights changed during selection.");
 abort();
 }
-static constexpr detail::u128_parts multiply_parts(result_type value, result_type bound) noexcept{
-if constexpr(sizeof(result_type) == 1){
+template <class U>
+static constexpr detail::u128_parts multiply_parts(U value, U bound) noexcept{
+if constexpr(sizeof(U) == 1){
 const uint16_t product = uint16_t{value} * uint16_t{bound};
-return {static_cast<uint64_t>(static_cast<result_type>(product)),
+return {static_cast<uint64_t>(static_cast<U>(product)),
 static_cast<uint64_t>(product >> 8)};
-}else if constexpr(sizeof(result_type) == 2){
+}else if constexpr(sizeof(U) == 2){
 const uint32_t product = uint32_t{value} * uint32_t{bound};
-return {static_cast<uint64_t>(static_cast<result_type>(product)),
+return {static_cast<uint64_t>(static_cast<U>(product)),
 static_cast<uint64_t>(product >> 16)};
-}else if constexpr(sizeof(result_type) == 4){
+}else if constexpr(sizeof(U) == 4){
 const uint64_t product = uint64_t{value} * uint64_t{bound};
 return {product & UINT32_MAX, product >> 32};
 }else{
 return detail::mul64_to_128_parts(value, bound);
 }
+}
+template <class U>
+static constexpr U rejection_threshold(U bound) noexcept{
+return static_cast<U>(U{0} - bound) % bound;
+}
+template <class U>
+constexpr U uniform_bits() noexcept{
+static_assert(detail::supported_uint<U>);
+constexpr unsigned target_bits = detail::bit_width<U>();
+if constexpr(target_bits == value_bits){
+return static_cast<U>(next());
+}else if constexpr(target_bits < value_bits){
+return take_high_bits<U>(next(), target_bits);
+}else{
+return gather_high_bits<U>(target_bits);
+}
+}
+template <class U>
+constexpr U runtime_bounded_next(U bound) noexcept{
+static_assert(detail::supported_uint<U>);
+if constexpr(sizeof(engine_result_type) >= sizeof(U)){
+return static_cast<U>(bounded_next<engine_result_type>(
+static_cast<engine_result_type>(bound)));
+}else{
+if(bound <= static_cast<U>(detail::integral_max<engine_result_type>())){
+return static_cast<U>(bounded_next<engine_result_type>(
+static_cast<engine_result_type>(bound)));
+}
+if constexpr(sizeof(engine_result_type) < sizeof(uint16_t) && sizeof(U) >= sizeof(uint16_t)){
+if(bound <= static_cast<U>(detail::integral_max<uint16_t>())){
+return static_cast<U>(bounded_next<uint16_t>(
+static_cast<uint16_t>(bound)));
+}
+}
+if constexpr(sizeof(engine_result_type) < sizeof(uint32_t) && sizeof(U) >= sizeof(uint32_t)){
+if(bound <= static_cast<U>(detail::integral_max<uint32_t>())){
+return static_cast<U>(bounded_next<uint32_t>(
+static_cast<uint32_t>(bound)));
+}
+}
+return bounded_next<U>(bound);
+}
+}
+template <class U>
+constexpr U bounded_next(U bound) noexcept{
+U value = uniform_bits<U>();
+auto product = multiply_parts(value, bound);
+if(static_cast<U>(product.lo) >= bound){
+return static_cast<U>(product.hi);
+}
+const U threshold = rejection_threshold(bound);
+while(static_cast<U>(product.lo) < threshold){
+value = uniform_bits<U>();
+product = multiply_parts(value, bound);
+}
+return static_cast<U>(product.hi);
+}
+template <class U, U Bound>
+constexpr U bounded_next() noexcept{
+static_assert(Bound > 0, "Random::bounded_next(): bound must be positive");
+constexpr U threshold = rejection_threshold(Bound);
+auto product = multiply_parts(uniform_bits<U>(), Bound);
+while(static_cast<U>(product.lo) < threshold){
+product = multiply_parts(uniform_bits<U>(), Bound);
+}
+return static_cast<U>(product.hi);
 }
 };
 }
