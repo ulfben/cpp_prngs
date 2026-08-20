@@ -506,7 +506,7 @@ auto product = multiply_parts(value, bound);
 if(product.lo >= bound){
 return static_cast<result_type>(product.hi);
 }
-const result_type threshold = static_cast<result_type>(-bound) % bound;
+const result_type threshold = (result_type{0} - bound) % bound;
 while(product.lo < threshold){
 value = next();
 product = multiply_parts(value, bound);
@@ -525,7 +525,7 @@ return T{0};
 using U = detail::unsigned_t<T>;
 return static_cast<T>(bits<detail::power_of_two_exponent(Bound), U>());
 }else{
-constexpr result_type threshold = static_cast<result_type>(-Bound) % Bound;
+constexpr result_type threshold = (result_type{0} - Bound) % Bound;
 auto product = multiply_parts(next(), Bound);
 while(product.lo < threshold){
 product = multiply_parts(next(), Bound);
